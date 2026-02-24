@@ -337,20 +337,20 @@ function HeroSection() {
               Cutting-Edge Web Development and Stunning UI/UX Design
             </p>
 
-            {/* Profile Picture - Positioned between columns on desktop */}
+            {/* Profile Picture - Positioned in top-right corner of hero */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={bounceIn}
-              className="absolute left-1/2 lg:-left-32 bottom-8 lg:bottom-auto lg:top-1/2 transform -translate-x-1/2 lg:translate-x-0 lg:-translate-y-1/2"
+              className="absolute right-4 lg:right-8 top-4 lg:top-8"
             >
               <div className="relative">
                 <div className="absolute inset-0 bg-[#FFB633] rounded-full blur-3xl opacity-20 animate-pulse" />
                 <img
                   src={PROFILE_PICTURE}
                   alt="Milan Drazic"
-                  className="w-48 h-48 lg:w-64 lg:h-64 rounded-full object-cover relative z-10 shadow-2xl"
-                  style={{ width: '16rem', height: '16rem' }}
+                  className="rounded-full object-cover relative z-10 shadow-2xl"
+                  style={{ width: '14rem', height: '16rem' }}
                 />
               </div>
             </motion.div>
