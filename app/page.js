@@ -296,8 +296,26 @@ function HeroSection() {
             initial="hidden"
             animate="visible"
             variants={fadeInLeft}
-            className="lg:col-span-3 glass rounded-l-2xl lg:rounded-r-none rounded-t-2xl lg:rounded-t-none lg:rounded-tl-2xl lg:rounded-bl-2xl flex flex-col justify-center p-8 lg:p-12"
+            className="lg:col-span-3 glass rounded-l-2xl lg:rounded-r-none rounded-t-2xl lg:rounded-t-none lg:rounded-tl-2xl lg:rounded-bl-2xl flex flex-col justify-center p-8 lg:p-12 relative"
           >
+            {/* Profile Picture - Top-right corner of left column */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={bounceIn}
+              className="absolute right-4 lg:right-6 top-4 lg:top-6 z-20"
+            >
+              <div className="relative">
+                <div className="absolute inset-0 bg-[#FFB633] rounded-full blur-3xl opacity-20 animate-pulse" />
+                <img
+                  src={PROFILE_PICTURE}
+                  alt="Milan Drazic"
+                  className="rounded-full object-cover relative z-10 shadow-2xl"
+                  style={{ width: '14rem', height: '16rem' }}
+                />
+              </div>
+            </motion.div>
+
             <motion.span
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -336,24 +354,6 @@ function HeroSection() {
             <p className="text-white text-xl lg:text-2xl font-light">
               Cutting-Edge Web Development and Stunning UI/UX Design
             </p>
-
-            {/* Profile Picture - Positioned in top-right corner of hero */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={bounceIn}
-              className="absolute right-4 lg:right-8 top-4 lg:top-8"
-            >
-              <div className="relative">
-                <div className="absolute inset-0 bg-[#FFB633] rounded-full blur-3xl opacity-20 animate-pulse" />
-                <img
-                  src={PROFILE_PICTURE}
-                  alt="Milan Drazic"
-                  className="rounded-full object-cover relative z-10 shadow-2xl"
-                  style={{ width: '14rem', height: '16rem' }}
-                />
-              </div>
-            </motion.div>
           </motion.div>
         </div>
       </div>
