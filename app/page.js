@@ -102,16 +102,15 @@ const scaleIn = {
 };
 
 const bounceIn = {
-  hidden: { opacity: 0, y: -150, x: 150, scale: 0.3 },
+  hidden: { opacity: 0, y: -300, scale: 0.3 },
   visible: {
     opacity: 1,
     y: 0,
-    x: 0,
     scale: 1,
     transition: {
       type: 'spring',
-      stiffness: 260,
-      damping: 20,
+      stiffness: 200,
+      damping: 15,
       delay: 0.8,
     },
   },
