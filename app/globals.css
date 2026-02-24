@@ -1,0 +1,225 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat+Subrayada:wght@400;700&family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #FFB633;
+  --color-dark: #0f0f10;
+  --color-dark-secondary: #2C2C2C;
+  --color-light: #ffffff;
+  --font-logo: 'Montserrat Subrayada', sans-serif;
+  --font-mono: 'Barlow Condensed', monospace;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-dark);
+  color: var(--color-light);
+}
+
+.font-logo {
+  font-family: var(--font-logo);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e5a32e;
+}
+
+/* CMS Content Styles for HTML */
+.cms-content section {
+  margin: 1.5rem 0;
+}
+
+.cms-content h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: white;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.cms-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.cms-content ul {
+  list-style-type: disc;
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+  color: #d1d5db;
+}
+
+.cms-content ul ul {
+  list-style-type: circle;
+  margin-top: 0.5rem;
+}
+
+.cms-content li {
+  margin-bottom: 0.5rem;
+  color: #d1d5db;
+}
+
+.cms-content strong {
+  font-weight: 700;
+  color: white;
+}
+
+.cms-content em {
+  font-style: italic;
+  color: #FFB633;
+}
+
+.cms-content p {
+  color: #d1d5db;
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+
+.cms-content blockquote {
+  border-left: 4px solid #FFB633;
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0;
+  background: rgba(255, 182, 51, 0.1);
+  border-radius: 0 8px 8px 0;
+}
+
+.cms-content blockquote p {
+  margin-bottom: 0;
+  color: #9ca3af;
+}
+
+.cms-content hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 2rem 0;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Service colors */
+.bg-service-blue { background-color: #3B82F6; }
+.bg-service-green { background-color: #10B981; }
+.bg-service-purple { background-color: #8B5CF6; }
+.bg-service-orange { background-color: #F97316; }
+.bg-service-pink { background-color: #EC4899; }
+.bg-service-cyan { background-color: #06B6D4; }
+.bg-service-yellow { background-color: #EAB308; }
+.bg-service-red { background-color: #EF4444; }
+
+/* Gradient overlays */
+.gradient-overlay {
+  background: linear-gradient(135deg, rgba(255, 182, 51, 0.1) 0%, rgba(15, 15, 16, 0.8) 100%);
+}
+
+/* Button styles */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-dark);
+  font-weight: 600;
+  padding: 12px 32px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(255, 182, 51, 0.3);
+}
+
+/* Section styles */
+.section-full {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 6%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 40 100% 60%;
+    --primary-foreground: 0 0% 6%;
+    --secondary: 0 0% 17%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 17%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 17%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 40 100% 60%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 40 100% 60%;
+    --sidebar-primary-foreground: 0 0% 6%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 40 100% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
