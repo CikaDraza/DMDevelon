@@ -1,24 +1,30 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import axios from 'axios';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Lightbulb, ArrowLeft, ExternalLink, Github } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import axios from "axios";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import {
+  Lightbulb,
+  ArrowLeft,
+  ExternalLink,
+  Github,
+  GitBranchIcon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const colorMap = {
-  blue: 'bg-blue-500',
-  green: 'bg-emerald-500',
-  purple: 'bg-purple-500',
-  orange: 'bg-orange-500',
-  pink: 'bg-pink-500',
-  cyan: 'bg-cyan-500',
-  yellow: 'bg-yellow-500',
-  red: 'bg-red-500',
-  indigo: 'bg-indigo-500',
-  teal: 'bg-teal-500',
+  blue: "bg-blue-500",
+  green: "bg-emerald-500",
+  purple: "bg-purple-500",
+  orange: "bg-orange-500",
+  pink: "bg-pink-500",
+  cyan: "bg-cyan-500",
+  yellow: "bg-yellow-500",
+  red: "bg-red-500",
+  indigo: "bg-indigo-500",
+  teal: "bg-teal-500",
 };
 
 export default function ProjectDetailPage() {
@@ -42,9 +48,9 @@ export default function ProjectDetailPage() {
       setProject(response.data);
     } catch (error) {
       if (error.response?.status === 404) {
-        setError('Project not found');
+        setError("Project not found");
       } else {
-        setError('Failed to load project');
+        setError("Failed to load project");
       }
     } finally {
       setLoading(false);
@@ -68,14 +74,18 @@ export default function ProjectDetailPage() {
               <Lightbulb className="w-8 h-8 text-[#FFB633]" />
               <div>
                 <h1 className="font-bold text-white">DMDevelon</h1>
-                <p className="text-xs text-gray-400">Transforming Ideas into Digital Success</p>
+                <p className="text-xs text-gray-400">
+                  Transforming Ideas into Digital Success
+                </p>
               </div>
             </a>
           </div>
         </header>
 
         <div className="container mx-auto px-4 py-20 text-center">
-          <h1 className="text-4xl font-bold text-white mb-4">Project Not Found</h1>
+          <h1 className="text-4xl font-bold text-white mb-4">
+            Project Not Found
+          </h1>
           <p className="text-gray-400 mb-8">
             The project you're looking for doesn't exist or has been removed.
           </p>
@@ -100,7 +110,9 @@ export default function ProjectDetailPage() {
             <Lightbulb className="w-8 h-8 text-[#FFB633]" />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
-              <p className="text-xs text-gray-400">Transforming Ideas into Digital Success</p>
+              <p className="text-xs text-gray-400">
+                Transforming Ideas into Digital Success
+              </p>
             </div>
           </a>
           <a
@@ -114,13 +126,15 @@ export default function ProjectDetailPage() {
       </header>
 
       {/* Hero Section */}
-      <div className={`${colorMap[project.color] || 'bg-blue-500'} py-20`}>
+      <div className={`${colorMap[project.color] || "bg-blue-500"} py-20`}>
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <span className="inline-block px-4 py-2 bg-white/20 rounded-full text-white text-sm font-medium mb-6">
               {project.category}
             </span>
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">{project.title}</h1>
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              {project.title}
+            </h1>
             <div className="flex flex-wrap justify-center gap-4">
               {project.live_preview_url && (
                 <a
@@ -134,14 +148,14 @@ export default function ProjectDetailPage() {
                   </Button>
                 </a>
               )}
-              {project.github_url && (
+              {!project.github_url && (
                 <a
                   href={project.github_url}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Button variant="outline" className="border-white text-white hover:bg-white/10">
-                    <Github className="w-4 h-4 mr-2" />
+                  <Button className="bg-black text-white hover:bg-white/10">
+                    <GitBranchIcon className="w-4 h-4 mr-2" />
                     View Source
                   </Button>
                 </a>
@@ -168,30 +182,46 @@ export default function ProjectDetailPage() {
       <main className="container mx-auto px-4 py-12">
         <article className="max-w-4xl mx-auto">
           <div className="bg-[#1a1a1b] rounded-xl p-8 border border-white/10">
-            <h2 className="text-2xl font-bold text-white mb-6">About This Project</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">
+              About This Project
+            </h2>
             <div className="prose prose-invert prose-lg max-w-none">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
                   h1: ({ children }) => (
-                    <h1 className="text-3xl font-bold text-white mt-8 mb-4">{children}</h1>
+                    <h1 className="text-3xl font-bold text-white mt-8 mb-4">
+                      {children}
+                    </h1>
                   ),
                   h2: ({ children }) => (
-                    <h2 className="text-2xl font-bold text-white mt-6 mb-3">{children}</h2>
+                    <h2 className="text-2xl font-bold text-white mt-6 mb-3">
+                      {children}
+                    </h2>
                   ),
                   h3: ({ children }) => (
-                    <h3 className="text-xl font-semibold text-white mt-4 mb-2">{children}</h3>
+                    <h3 className="text-xl font-semibold text-white mt-4 mb-2">
+                      {children}
+                    </h3>
                   ),
                   p: ({ children }) => (
-                    <p className="text-gray-300 mb-4 leading-relaxed">{children}</p>
+                    <p className="text-gray-300 mb-4 leading-relaxed">
+                      {children}
+                    </p>
                   ),
                   ul: ({ children }) => (
-                    <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">{children}</ul>
+                    <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
+                      {children}
+                    </ul>
                   ),
                   ol: ({ children }) => (
-                    <ol className="list-decimal list-inside text-gray-300 mb-4 space-y-2">{children}</ol>
+                    <ol className="list-decimal list-inside text-gray-300 mb-4 space-y-2">
+                      {children}
+                    </ol>
                   ),
-                  li: ({ children }) => <li className="text-gray-300">{children}</li>,
+                  li: ({ children }) => (
+                    <li className="text-gray-300">{children}</li>
+                  ),
                   a: ({ href, children }) => (
                     <a href={href} className="text-[#FFB633] hover:underline">
                       {children}
@@ -204,14 +234,18 @@ export default function ProjectDetailPage() {
                   ),
                   code: ({ inline, children }) =>
                     inline ? (
-                      <code className="bg-white/10 text-[#FFB633] px-1 rounded">{children}</code>
+                      <code className="bg-white/10 text-[#FFB633] px-1 rounded">
+                        {children}
+                      </code>
                     ) : (
                       <code className="block bg-[#0f0f10] p-4 rounded-lg overflow-x-auto text-gray-300">
                         {children}
                       </code>
                     ),
                   pre: ({ children }) => (
-                    <pre className="bg-[#0f0f10] p-4 rounded-lg overflow-x-auto my-4">{children}</pre>
+                    <pre className="bg-[#0f0f10] p-4 rounded-lg overflow-x-auto my-4">
+                      {children}
+                    </pre>
                   ),
                   hr: () => <hr className="border-white/10 my-8" />,
                 }}
@@ -224,7 +258,9 @@ export default function ProjectDetailPage() {
           {/* Project Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
             <div className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10">
-              <h3 className="text-lg font-semibold text-white mb-4">Project Details</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Project Details
+              </h3>
               <dl className="space-y-3">
                 <div>
                   <dt className="text-gray-500 text-sm">Category</dt>
@@ -232,7 +268,9 @@ export default function ProjectDetailPage() {
                 </div>
                 <div>
                   <dt className="text-gray-500 text-sm">Created</dt>
-                  <dd className="text-white">{new Date(project.createdAt).toLocaleDateString()}</dd>
+                  <dd className="text-white">
+                    {new Date(project.createdAt).toLocaleDateString()}
+                  </dd>
                 </div>
               </dl>
             </div>
@@ -251,14 +289,14 @@ export default function ProjectDetailPage() {
                       Live Preview
                     </a>
                   )}
-                  {project.github_url && (
+                  {!project.github_url && (
                     <a
                       href={project.github_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-[#FFB633] hover:underline"
+                      className="flex items-center gap-2 bg-black text-white hover:bg-slate-900"
                     >
-                      <Github className="w-4 h-4" />
+                      <GitBranchIcon className="w-4 h-4" />
                       GitHub Repository
                     </a>
                   )}
