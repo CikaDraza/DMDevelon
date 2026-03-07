@@ -4,7 +4,7 @@ import { getSeoMeta } from "@/lib/seo";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const URL = process.env.NEXT_PUBLIC_SITE_URL;
+const URL = process.env.SITE_URL;
 
 async function getServices() {
   const res = await fetch(`${URL}/api/services`, {
@@ -25,7 +25,7 @@ export async function generateMetadata() {
     openGraph: {
       title: seo.title,
       description: seo.description,
-      url: `${process.env.NEXT_PUBLIC_SITE_URL}/`,
+      url: `${process.env.SITE_URL}/`,
       type: "website",
       ogImage: seo.logo,
     },
