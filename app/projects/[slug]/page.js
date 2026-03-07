@@ -148,7 +148,7 @@ export default function ProjectDetailPage() {
                   </Button>
                 </a>
               )}
-              {!project.github_url && (
+              {project.github_url && (
                 <a
                   href={project.github_url}
                   target="_blank"
@@ -172,7 +172,7 @@ export default function ProjectDetailPage() {
             <img
               src={project.image_url}
               alt={project.title}
-              className="w-full rounded-xl shadow-2xl border border-white/10"
+              className="w-full rounded-xl shadow-2xl border border-white/50"
             />
           </div>
         </div>
@@ -182,18 +182,13 @@ export default function ProjectDetailPage() {
       <main className="container mx-auto px-4 py-12">
         <article className="max-w-4xl mx-auto">
           <div className="bg-[#1a1a1b] rounded-xl p-8 border border-white/10">
-            <h2 className="text-2xl font-bold text-white mb-6">
+            <h1 className="text-2xl font-bold text-white mb-6">
               About This Project
-            </h2>
+            </h1>
             <div className="prose prose-invert prose-lg max-w-none">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  h1: ({ children }) => (
-                    <h1 className="text-3xl font-bold text-white mt-8 mb-4">
-                      {children}
-                    </h1>
-                  ),
                   h2: ({ children }) => (
                     <h2 className="text-2xl font-bold text-white mt-6 mb-3">
                       {children}
@@ -246,6 +241,11 @@ export default function ProjectDetailPage() {
                     <pre className="bg-[#0f0f10] p-4 rounded-lg overflow-x-auto my-4">
                       {children}
                     </pre>
+                  ),
+                  table: ({ children }) => (
+                    <table className="bg-[#0f0f10] w-1/2 text-left rounded-lg overflow-x-auto my-4">
+                      {children}
+                    </table>
                   ),
                   hr: () => <hr className="border-white/10 my-8" />,
                 }}
@@ -306,7 +306,6 @@ export default function ProjectDetailPage() {
           </div>
         </article>
       </main>
-
       {/* Footer */}
       <footer className="bg-[#0f0f10] border-t border-white/10 py-8 mt-12">
         <div className="container mx-auto px-4 text-center">

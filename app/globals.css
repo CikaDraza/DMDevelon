@@ -216,10 +216,19 @@ body {
 }
 
 @layer base {
+  html,
+    body {
+      @apply overflow-x-hidden;
+    }
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  table th, table td {
+    padding: .5rem;
+    border: thin solid #e5a32e;
   }
 }

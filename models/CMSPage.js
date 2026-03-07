@@ -1,5 +1,5 @@
-import mongoose from 'mongoose';
-import { v4 as uuidv4 } from 'uuid';
+import mongoose from "mongoose";
+import { v4 as uuidv4 } from "uuid";
 
 const CMSPageSchema = new mongoose.Schema(
   {
@@ -10,8 +10,15 @@ const CMSPageSchema = new mongoose.Schema(
     title: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
     content: { type: String, required: true },
+    seo: {
+      title: { type: String, default: "" },
+      description: { type: String, default: "" },
+      keywords: { type: String, default: "" },
+      noIndex: { type: Boolean, default: false },
+    },
   },
-  { timestamps: true, _id: false }
+  { timestamps: true, _id: false },
 );
 
-export default mongoose.models.CMSPage || mongoose.model('CMSPage', CMSPageSchema);
+export default mongoose.models.CMSPage ||
+  mongoose.model("CMSPage", CMSPageSchema);
