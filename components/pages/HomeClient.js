@@ -1,7 +1,7 @@
 // components/pages/HomeClient.js
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useServices } from "@/hooks/useServices";
 import { useProjects } from "@/hooks/useProjects";
@@ -63,6 +63,7 @@ import Image from "next/image";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Slider from "react-slick";
 import LogoIcon from "../ui/logo-icon";
+import Link from "next/link";
 
 // Icon mapping
 const iconMap = {
@@ -530,6 +531,8 @@ function ProjectsSection({ projects }) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sliderRef, setSliderRef] = useState(null);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const scrollRef = useRef(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const categories = ["all", ...new Set(projects.map((p) => p.category))];
   const filteredProjects =
@@ -608,6 +611,26 @@ function ProjectsSection({ projects }) {
     ],
   };
 
+  const scrollToIndex = (index) => {
+    if (scrollRef.current) {
+      const cardWidth = scrollRef.current.children[0]?.clientWidth || 0;
+      scrollRef.current.scrollTo({
+        left: cardWidth * index,
+        behavior: "smooth",
+      });
+      setActiveIndex(index);
+    }
+  };
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const scrollLeft = scrollRef.current.scrollLeft;
+      const cardWidth = scrollRef.current.children[0]?.clientWidth || 1;
+      const newIndex = Math.round(scrollLeft / cardWidth);
+      setActiveIndex(newIndex);
+    }
+  };
+
   return (
     <section id="projects" className="section-full py-20 bg-[#0a0a0b]">
       <div className="container mx-auto px-4">
@@ -654,7 +677,7 @@ function ProjectsSection({ projects }) {
         </motion.div>
 
         {/* Projects Slider */}
-        <div className="relative px-4 md:px-12 lg:px-16">
+        <div className="hidden lg:block relative px-4 md:px-12 lg:px-16">
           <Slider ref={setSliderRef} {...settings} className="projects-slider">
             {displayProjects.map((project) => (
               <div key={project._id} className="px-2 md:px-3 p-4">
@@ -732,6 +755,112 @@ function ProjectsSection({ projects }) {
             ))}
           </Slider>
         </div>
+
+        {/* CSS Scroll Snap Slider */}
+        <div className="visible lg:hidden relative">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 px-4 pb-8"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {displayProjects.map((project, index) => (
+              <div key={project._id} className="px-2 md:px-3 p-4">
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  className={`${colorMap[project.color] || "bg-blue-600"} rounded-2xl overflow-hidden group h-full snap-center shrink-0 w-[85vw] md:w-[calc(50%-1rem)] lg:w-[calc(33.333%-1rem)] first:ml-auto last:mr-auto`}
+                >
+                  <div className="relative h-48 bg-black/20">
+                    {project.image_url ? (
+                      <Image
+                        width={300}
+                        height={200}
+                        src={project.image_url}
+                        alt={project.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Layers className="w-16 h-16 text-white/30" />
+                      </div>
+                    )}
+                    <span className="absolute top-4 right-4 px-3 py-1 bg-black/50 rounded-full text-white text-xs font-medium">
+                      {project.category}
+                    </span>
+                  </div>
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold text-white mb-2">
+                      {project.title}
+                    </h3>
+                    <p className="text-white/80 text-sm mb-4 line-clamp-2">
+                      {project.description}
+                    </p>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <Link
+                        href={
+                          project.live_preview_url ||
+                          `/projects/${project.slug || project._id}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-white font-medium hover:gap-3 transition-all"
+                      >
+                        Live Preview
+                        <ExternalLink className="w-4 h-4" />
+                      </Link>
+                      {project.github_url ? (
+                        <Link
+                          href={
+                            project.github_url ||
+                            `/projects/${project.slug || project._id}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-white font-medium hover:gap-3 transition-all"
+                        >
+                          GitHub
+                          <GitBranch className="w-4 h-4" />
+                        </Link>
+                      ) : (
+                        <Link
+                          href={
+                            project.github_url ||
+                            `/projects/${project.slug || project._id}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-white font-medium hover:gap-3 transition-all"
+                        >
+                          Details
+                          <NotebookTabs className="w-4 h-4" />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            ))}
+          </div>
+
+          {/* Dots */}
+          <div className="flex justify-center gap-2 mt-4">
+            {displayProjects.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => scrollToIndex(index)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  activeIndex === index ? "bg-[#FFB633] w-6" : "bg-gray-500 w-2"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <style jsx>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
       </div>
 
       {/* Custom styles for react-slick */}
@@ -777,6 +906,8 @@ function ProjectsSection({ projects }) {
 function TestimonialsSection({ testimonials }) {
   const [sliderRef, setSliderRef] = useState(null);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const scrollRef = useRef(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   // Default testimonials if none in database
   const defaultTestimonials = [
@@ -865,6 +996,26 @@ function TestimonialsSection({ testimonials }) {
     ],
   };
 
+  const scrollToIndex = (index) => {
+    if (scrollRef.current) {
+      const cardWidth = scrollRef.current.children[0]?.clientWidth || 0;
+      scrollRef.current.scrollTo({
+        left: cardWidth * index,
+        behavior: "smooth",
+      });
+      setActiveIndex(index);
+    }
+  };
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const scrollLeft = scrollRef.current.scrollLeft;
+      const cardWidth = scrollRef.current.children[0]?.clientWidth || 1;
+      const newIndex = Math.round(scrollLeft / cardWidth);
+      setActiveIndex(newIndex);
+    }
+  };
+
   return (
     <section id="testimonials" className="section-full py-20 bg-[#0a0a0b]">
       <div className="container mx-auto px-4">
@@ -884,7 +1035,7 @@ function TestimonialsSection({ testimonials }) {
         </motion.div>
 
         {/* Testimonials Slider */}
-        <div className="relative px-4 md:px-12 lg:px-16">
+        <div className="hidden lg:block relative px-4 md:px-12 lg:px-16">
           <Slider
             ref={setSliderRef}
             {...settings}
@@ -948,6 +1099,92 @@ function TestimonialsSection({ testimonials }) {
             ))}
           </Slider>
         </div>
+
+        {/* CSS Scroll Snap Slider */}
+        <div className="visible lg:hidden relative">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 px-4 pb-8"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {displayTestimonials.map((testimonial) => (
+              <div key={testimonial._id} className="px-2 md:px-3 pt-4">
+                <motion.div
+                  whileHover={{ y: -5 }}
+                  className="glass rounded-2xl p-6 h-full border border-white/10 bg-white/5 backdrop-blur-sm flex flex-col overflow-hidden group snap-center shrink-0 w-[85vw] md:w-[calc(50%-1rem)] lg:w-[calc(33.333%-1rem)] first:ml-auto last:mr-auto"
+                >
+                  {/* Stars - fixed at top */}
+                  <div className="flex gap-1 mb-4 flex-shrink-0">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`w-5 h-5 ${
+                          i < testimonial.rating
+                            ? "text-[#FFB633] fill-[#FFB633]"
+                            : "text-gray-600"
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Comment - grows to fill space */}
+                  <div className="flex-grow mb-4">
+                    <p className="text-gray-300 italic leading-relaxed">
+                      "{testimonial.comment}"
+                    </p>
+                  </div>
+
+                  {/* Admin Reply - if exists, fixed height */}
+                  {testimonial.adminReply && (
+                    <div className="bg-[#FFB633]/10 rounded-lg p-3 mb-4 border-l-2 border-[#FFB633] flex-shrink-0">
+                      <p className="text-sm text-gray-400">
+                        <span className="text-[#FFB633] font-medium">
+                          Reply:
+                        </span>{" "}
+                        {testimonial.adminReply}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Client Info - always at bottom */}
+                  <div className="flex items-center gap-3 pt-4 border-t border-white/10 flex-shrink-0 mt-auto">
+                    <div className="w-12 h-12 rounded-full bg-[#FFB633]/20 flex items-center justify-center flex-shrink-0">
+                      <User className="w-6 h-6 text-[#FFB633]" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-white font-semibold truncate">
+                        {testimonial.clientName}
+                      </h4>
+                      <p className="text-gray-400 text-sm truncate">
+                        {testimonial.clientTitle}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            ))}
+          </div>
+
+          {/* Dots */}
+          <div className="flex justify-center gap-2 mt-4">
+            {displayTestimonials.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => scrollToIndex(index)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  activeIndex === index ? "bg-[#FFB633] w-6" : "bg-gray-500 w-2"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <style jsx>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
       </div>
 
       {/* Custom styles for react-slick */}
