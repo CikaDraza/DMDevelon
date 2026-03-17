@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
 
 export function useAuth() {
   const [user, setUser] = useState(null);
@@ -9,8 +9,8 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const storedToken = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("user");
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
@@ -19,35 +19,41 @@ export function useAuth() {
   }, []);
 
   const login = useCallback(async (email, password) => {
-    const response = await axios.post('/api/auth/login', { email, password });
+    const response = await axios.post("/api/auth/login", { email, password });
     const { token: newToken, user: userData } = response.data;
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("user", JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
     return userData;
   }, []);
 
   const register = useCallback(async (name, email, password) => {
-    const response = await axios.post('/api/auth/register', { name, email, password });
+    const response = await axios.post("/api/auth/register", {
+      name,
+      email,
+      password,
+    });
     const { token: newToken, user: userData } = response.data;
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("user", JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
     return userData;
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setToken(null);
     setUser(null);
   }, []);
 
   const getAuthHeaders = useCallback(() => {
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, [token]);
+    // Uvek čitaj iz localStorage za sigurnost
+    const currentToken = localStorage.getItem("token");
+    return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
+  }, []);
 
   return {
     user,

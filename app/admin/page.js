@@ -45,6 +45,7 @@ import {
   Lightbulb,
   Monitor,
   ShoppingCart,
+  Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,8 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import Loader from "@/components/loaders/Loader";
+import Link from "next/link";
 
 // Icon mapping
 const iconMap = {
@@ -1478,7 +1481,7 @@ function CompanyProfileManagement() {
   };
 
   if (isLoading) {
-    return <div className="text-gray-400">Loading profile...</div>;
+    return <Loader />;
   }
 
   return (
@@ -2026,6 +2029,13 @@ export default function AdminPage() {
               <Menu className="w-6 h-6" />
             </button>
             <div className="flex items-center gap-4 ml-auto">
+              <Link
+                href="/"
+                className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+              >
+                <Home className="w-4 h-4" />
+                <span className="hidden sm:inline">Home</span>
+              </Link>
               <span className="text-gray-400 text-sm">
                 Welcome, {user?.name}
               </span>

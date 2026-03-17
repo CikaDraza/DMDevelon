@@ -136,7 +136,7 @@ export async function GET(request, context) {
 
     // Contact Messages (admin only)
     if (pathStr === "contact-messages") {
-      const user = getUserFromRequest(request);
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -167,8 +167,10 @@ export async function GET(request, context) {
 
     // Users (admin only)
     if (pathStr === "users") {
-      const user = getUserFromRequest(request);
-      if (!user || !user.isAdmin) {
+      const decoded = await getUserFromRequest(request);
+      console.log({ user: decoded, path: pathStr });
+
+      if (!decoded || !decoded.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
           { status: 401, headers: getCorsHeaders() },
@@ -182,7 +184,7 @@ export async function GET(request, context) {
 
     // User profile
     if (pathStr === "auth/me") {
-      const user = getUserFromRequest(request);
+      const user = await getUserFromRequest(request);
       if (!user) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -203,7 +205,8 @@ export async function GET(request, context) {
 
     // Statistics (admin only)
     if (pathStr === "statistics") {
-      const user = getUserFromRequest(request);
+      const user = await getUserFromRequest(request);
+
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -354,6 +357,7 @@ export async function POST(request, context) {
     // Services (admin only)
     if (pathStr === "services") {
       const user = getUserFromRequest(request);
+
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },

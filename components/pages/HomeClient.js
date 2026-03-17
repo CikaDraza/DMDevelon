@@ -64,6 +64,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import Slider from "react-slick";
 import LogoIcon from "../ui/logo-icon";
 import Link from "next/link";
+import Loader from "../loaders/Loader";
 
 // Icon mapping
 const iconMap = {
@@ -1606,6 +1607,15 @@ export default function HomeClient({ initialServices }) {
   const { projects, isLoading: projectsLoading } = useProjects();
   const { testimonials, isLoading: testimonialsLoading } = useTestimonials();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+
+  if (
+    authLoading ||
+    servicesLoading ||
+    projectsLoading ||
+    testimonialsLoading
+  ) {
+    return <Loader />;
+  }
 
   return (
     <div className="min-h-screen bg-[#0f0f10]">
