@@ -604,7 +604,7 @@ export async function PUT(request, context) {
           { status: 404, headers: getCorsHeaders() },
         );
       }
-      if (replyMessage) {
+      if (message?.replyMessage) {
         try {
           const template = emailTemplates.contactReply({
             name: message.name,
