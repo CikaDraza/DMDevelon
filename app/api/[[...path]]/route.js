@@ -168,7 +168,6 @@ export async function GET(request, context) {
     // Users (admin only)
     if (pathStr === "users") {
       const decoded = await getUserFromRequest(request);
-      console.log({ user: decoded, path: pathStr });
 
       if (!decoded || !decoded.isAdmin) {
         return NextResponse.json(
