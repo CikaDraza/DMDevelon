@@ -609,7 +609,7 @@ export async function PUT(request, context) {
           const template = emailTemplates.contactReply({
             name: message.name,
             originalMessage: message.message,
-            replyMessage,
+            replyMessage: message?.replyMessage,
           });
           await sendEmail({
             to: message.email,
