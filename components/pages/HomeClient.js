@@ -710,7 +710,7 @@ function ProjectsSection({ projects }) {
                       {project.description}
                     </p>
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                      <a
+                      <Link
                         href={
                           project.live_preview_url ||
                           `/projects/${project.slug || project._id}`
@@ -721,34 +721,28 @@ function ProjectsSection({ projects }) {
                       >
                         Live Preview
                         <ExternalLink className="w-4 h-4" />
-                      </a>
-                      {project.github_url ? (
-                        <a
-                          href={
-                            project.github_url ||
-                            `/projects/${project.slug || project._id}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-white font-medium hover:gap-3 transition-all"
-                        >
-                          GitHub
-                          <GitBranch className="w-4 h-4" />
-                        </a>
-                      ) : (
-                        <a
-                          href={
-                            project.github_url ||
-                            `/projects/${project.slug || project._id}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-white font-medium hover:gap-3 transition-all"
-                        >
-                          Details
-                          <NotebookTabs className="w-4 h-4" />
-                        </a>
-                      )}
+                      </Link>
+                      <Link
+                        href={
+                          project.github_url ||
+                          `/projects/${project.slug || project._id}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-white font-medium hover:gap-3 transition-all"
+                      >
+                        GitHub
+                        <GitBranch className="w-4 h-4" />
+                      </Link>
+                      <Link
+                        href={`/projects/${project.slug || project._id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-white font-medium hover:gap-3 transition-all"
+                      >
+                        Details
+                        <NotebookTabs className="w-4 h-4" />
+                      </Link>
                     </div>
                   </div>
                 </motion.div>

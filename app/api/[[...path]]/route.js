@@ -14,6 +14,8 @@ import {
   getUserFromRequest,
 } from "@/lib/auth";
 import { v4 as uuidv4 } from "uuid";
+import { emailTemplates } from "@/lib/email-templates";
+import { sendEmail } from "@/lib/email";
 
 function getCorsHeaders() {
   return {
@@ -291,6 +293,22 @@ export async function POST(request, context) {
         password: hashedPassword,
         isAdmin: false,
       });
+
+      try {
+        const verificationUrl = `https://dmdevelon.website/verify-email?token=${verificationToken}`;
+        const template = emailTemplates.emailVerification({
+          name,
+          verificationUrl,
+        });
+        await sendEmail({
+          to: email,
+          ...template,
+          type: "verification",
+        });
+      } catch (error) {
+        console.error("Failed to send verification email:", error);
+      }
+
       const token = generateToken({
         userId: user._id,
         email: user.email,
@@ -419,6 +437,22 @@ export async function POST(request, context) {
         email,
         message,
       });
+
+      try {
+        const template = emailTemplates.contactNotification({
+          name,
+          email,
+          message,
+        });
+        await sendEmail({
+          to: "milan.drazic@dmdevelon.website",
+          ...template,
+          type: "contact",
+        });
+      } catch (error) {
+        console.error("Failed to send contact notification:", error);
+      }
+
       return NextResponse.json(contactMessage, {
         status: 201,
         headers: getCorsHeaders(),
@@ -485,6 +519,7 @@ export async function PUT(request, context) {
 
     // Projects
     if (pathStr.startsWith("projects/")) {
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -551,7 +586,8 @@ export async function PUT(request, context) {
     }
 
     // Contact Message Reply
-    if (pathStr.startsWith("contact-messages/")) {
+    if (pathStr.startsWith("contact-messages") && request.method === "PATCH") {
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -567,6 +603,22 @@ export async function PUT(request, context) {
           { error: "Message not found" },
           { status: 404, headers: getCorsHeaders() },
         );
+      }
+      if (replyMessage) {
+        try {
+          const template = emailTemplates.contactReply({
+            name: message.name,
+            originalMessage: message.message,
+            replyMessage,
+          });
+          await sendEmail({
+            to: message.email,
+            ...template,
+            type: "contact",
+          });
+        } catch (error) {
+          console.error("Failed to send reply email:", error);
+        }
       }
       return NextResponse.json(message, { headers: getCorsHeaders() });
     }
@@ -712,6 +764,7 @@ export async function DELETE(request, context) {
 
     // Contact Messages
     if (pathStr.startsWith("contact-messages/")) {
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
