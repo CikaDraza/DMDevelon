@@ -586,7 +586,7 @@ export async function PUT(request, context) {
     }
 
     // Contact Message Reply
-    if (pathStr.startsWith("contact-messages") && request.method === "PATCH") {
+    if (pathStr.startsWith("contact-messages")) {
       const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(

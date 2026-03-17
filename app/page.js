@@ -25,7 +25,7 @@ export async function generateMetadata() {
     openGraph: {
       title: seo.title,
       description: seo.description,
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/`,
+      url: `${URL}/`,
       type: "website",
       ogImage: seo.logo,
     },
