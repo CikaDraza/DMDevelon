@@ -219,7 +219,7 @@ function Header({ user, onLoginClick, onLogout }) {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between w-full">
           {/* Logo */}
-          <a href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="relative">
               <Lightbulb className="w-7 h-7 lg:w-10 lg:h-10 text-[#FFB633]" />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFB633] rounded-full animate-pulse" />
@@ -232,35 +232,35 @@ function Header({ user, onLoginClick, onLogout }) {
                 Transforming Ideas into Digital Success
               </span>
             </div>
-          </a>
+          </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
                 className="text-gray-300 hover:text-[#FFB633] transition-colors text-sm font-medium"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
             {user ? (
               <div className="flex items-center gap-4">
                 {user.isAdmin && (
-                  <a
+                  <Link
                     href="/admin"
                     className="text-[#FFB633] hover:text-[#e5a32e] transition-colors text-sm font-medium"
                   >
                     Admin
-                  </a>
+                  </Link>
                 )}
-                <a
+                <Link
                   href="/dashboard"
                   className="text-gray-300 hover:text-[#FFB633] transition-colors text-sm font-medium"
                 >
                   Dashboard
-                </a>
+                </Link>
                 <Button
                   onClick={onLogout}
                   variant="outline"
@@ -306,31 +306,31 @@ function Header({ user, onLoginClick, onLogout }) {
             >
               <div className="flex flex-col gap-4 pt-4">
                 {navLinks.map((link) => (
-                  <a
+                  <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className="text-gray-300 hover:text-[#FFB633] transition-colors text-sm font-medium"
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 ))}
                 {user ? (
                   <>
                     {user.isAdmin && (
-                      <a
+                      <Link
                         href="/admin"
                         className="text-[#FFB633] text-sm font-medium"
                       >
                         Admin
-                      </a>
+                      </Link>
                     )}
-                    <a
+                    <Link
                       href="/dashboard"
                       className="text-gray-300 text-sm font-medium"
                     >
                       Dashboard
-                    </a>
+                    </Link>
                     <Button
                       onClick={onLogout}
                       variant="outline"
@@ -392,10 +392,10 @@ function HeroSection() {
               whileTap={{ scale: 0.95 }}
               className="btn-primary w-fit flex items-center gap-2 relative z-50"
             >
-              <a href="#projects" className="flex items-center gap-2">
+              <Link href="#projects" className="flex items-center gap-2">
                 See my projects
                 <ArrowRight className="w-5 h-5" />
-              </a>
+              </Link>
             </motion.div>
             <div className="absolute inset-0 w-1/2 blur h-full rounded-l-2xl border border-gray-700 border-r-transparent -z-10" />
           </motion.div>
@@ -1307,13 +1307,13 @@ function ContactSection() {
             <div className="flex gap-4 mt-8">
               {[Facebook, Twitter, Linkedin, Instagram, Github].map(
                 (Icon, i) => (
-                  <a
+                  <Link
                     key={i}
                     href="#"
                     className="p-3 bg-white/5 rounded-xl hover:bg-[#FFB633]/20 transition-colors"
                   >
                     <Icon className="w-5 h-5 text-gray-400 hover:text-[#FFB633]" />
-                  </a>
+                  </Link>
                 ),
               )}
             </div>
@@ -1411,34 +1411,34 @@ function Footer() {
             <span>Copyright © 2026. DMDevelon. All rights reserved.</span>
           </p>
           <div className="flex items-center gap-6">
-            <a
+            <Link
               href="/privacy"
               className="text-gray-400 hover:text-[#FFB633] text-sm transition-colors"
             >
               Privacy Policy
-            </a>
-            <a
+            </Link>
+            <Link
               href="/terms"
               className="text-gray-400 hover:text-[#FFB633] text-sm transition-colors"
             >
               Terms of Service
-            </a>
-            <a
+            </Link>
+            <Link
               href="/cookies"
               className="text-gray-400 hover:text-[#FFB633] text-sm transition-colors"
             >
               Cookies
-            </a>
+            </Link>
           </div>
           <div className="flex gap-4">
             {[Facebook, Twitter, Linkedin, Instagram, Github].map((Icon, i) => (
-              <a
+              <Link
                 key={i}
                 href="#"
                 className="text-gray-400 hover:text-[#FFB633] transition-colors"
               >
                 <Icon className="w-5 h-5" />
-              </a>
+              </Link>
             ))}
           </div>
         </div>
