@@ -37,6 +37,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
+        <meta
+          httpEquiv="Content-Security-Policy"
+          content="default-src 'self'; font-src 'self' https://fonts.gstatic.com;"
+        />
         <GeoStructuredData />
       </head>
       <body>
