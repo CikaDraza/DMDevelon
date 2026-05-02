@@ -121,6 +121,7 @@ export async function GET(request, context) {
           _id: uuidv4(),
           name: "DMDevelon",
           description: "Transforming Ideas into Digital Success",
+          subheadline: "",
           logo: "",
           heroImage: "",
           phone: "",
@@ -130,6 +131,15 @@ export async function GET(request, context) {
             title: "DMDevelon Portfolio",
             description: "Professional web development services",
             keywords: "web development, portfolio",
+            OgImage: "",
+          },
+          geo: {
+            address: "",
+            city: "",
+            country: "",
+            postalCode: "",
+            lat: "",
+            lng: "",
           },
         });
       }
@@ -373,7 +383,7 @@ export async function POST(request, context) {
 
     // Services (admin only)
     if (pathStr === "services") {
-      const user = getUserFromRequest(request);
+      const user = await getUserFromRequest(request);
 
       if (!user || !user.isAdmin) {
         return NextResponse.json(
@@ -390,7 +400,7 @@ export async function POST(request, context) {
 
     // Projects (admin only)
     if (pathStr === "projects") {
-      const user = getUserFromRequest(request);
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -410,7 +420,7 @@ export async function POST(request, context) {
 
     // Testimonials
     if (pathStr === "testimonials") {
-      const user = getUserFromRequest(request);
+      const user = await getUserFromRequest(request);
       const testimonial = await Testimonial.create({
         _id: uuidv4(),
         ...body,
@@ -461,7 +471,7 @@ export async function POST(request, context) {
 
     // CMS Pages (admin only)
     if (pathStr === "cms-pages") {
-      const user = getUserFromRequest(request);
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -496,10 +506,10 @@ export async function PUT(request, context) {
 
   try {
     const body = await request.json();
-    const user = getUserFromRequest(request);
 
     // Services
     if (pathStr.startsWith("services/")) {
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -545,6 +555,7 @@ export async function PUT(request, context) {
 
     // Testimonials (admin reply)
     if (pathStr.startsWith("testimonials/")) {
+      const user = await getUserFromRequest(request);
       const id = path[1];
       if (body.adminReply !== undefined) {
         if (!user || !user.isAdmin) {
@@ -568,6 +579,7 @@ export async function PUT(request, context) {
 
     // Company Profile
     if (pathStr === "company-profile") {
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -625,6 +637,7 @@ export async function PUT(request, context) {
 
     // CMS Pages
     if (pathStr.startsWith("cms-pages/")) {
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -644,6 +657,7 @@ export async function PUT(request, context) {
 
     // Users
     if (pathStr.startsWith("users/")) {
+      const user = await getUserFromRequest(request);
       const id = path[1];
       // User can update their own profile, admin can update anyone
       if (!user || (user.userId !== id && !user.isAdmin)) {
@@ -692,7 +706,7 @@ export async function DELETE(request, context) {
   const pathStr = path.join("/");
 
   try {
-    const user = getUserFromRequest(request);
+    const user = await getUserFromRequest(request);
 
     // Services
     if (pathStr.startsWith("services/")) {
@@ -718,6 +732,7 @@ export async function DELETE(request, context) {
 
     // Projects
     if (pathStr.startsWith("projects/")) {
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -740,6 +755,7 @@ export async function DELETE(request, context) {
 
     // Testimonials
     if (pathStr.startsWith("testimonials/")) {
+      const user = await getUserFromRequest(request);
       const id = path[1];
       const testimonial = await Testimonial.findById(id);
       if (!testimonial) {
@@ -787,6 +803,7 @@ export async function DELETE(request, context) {
 
     // CMS Pages
     if (pathStr.startsWith("cms-pages/")) {
+      const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -809,6 +826,7 @@ export async function DELETE(request, context) {
 
     // Users
     if (pathStr.startsWith("users/")) {
+      const user = await getUserFromRequest(request);
       const id = path[1];
       // User can delete their own account, admin can delete anyone
       if (!user || (user.userId !== id && !user.isAdmin)) {

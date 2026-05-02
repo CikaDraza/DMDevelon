@@ -46,6 +46,10 @@ import {
   Monitor,
   ShoppingCart,
   Home,
+  NotebookPen,
+  Store,
+  MapPinHouse,
+  Handshake,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +82,7 @@ import {
 } from "recharts";
 import Loader from "@/components/loaders/Loader";
 import Link from "next/link";
+import { useCompanyProfile } from "@/hooks/useCompanyProfile";
 
 // Icon mapping
 const iconMap = {
@@ -98,6 +103,10 @@ const iconMap = {
   Settings,
   Mail,
   ShoppingCart,
+  NotebookPen,
+  Store,
+  MapPinHouse,
+  Handshake,
 };
 
 const iconOptions = [
@@ -118,6 +127,10 @@ const iconOptions = [
   "Settings",
   "Mail",
   "ShoppingCart",
+  "NotebookPen",
+  "Store",
+  "MapPinHouse",
+  "HandshakeIcon",
 ];
 const colorOptions = [
   "blue",
@@ -1419,12 +1432,11 @@ function MessagesManagement() {
 
 // Company Profile Management Component
 function CompanyProfileManagement() {
-  const { getAuthHeaders } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { profile, isLoading, updateProfile, isUpdating } = useCompanyProfile();
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    subheadline: "",
     logo: "",
     heroImage: "",
     phone: "",
@@ -1435,52 +1447,76 @@ function CompanyProfileManagement() {
       linkedin: "",
       instagram: "",
       github: "",
+      tiktok: "",
     },
     seo: {
       title: "",
       description: "",
       keywords: "",
+      ogImage: "",
+    },
+    geo: {
+      address: "",
+      city: "",
+      country: "",
+      postalCode: "",
+      lat: "",
+      lng: "",
     },
   });
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    handleProfile();
+  }, [profile]);
 
-  const fetchProfile = async () => {
-    try {
-      const response = await axios.get("/api/company-profile");
-      setProfile(response.data);
+  const handleProfile = async () => {
+    if (profile) {
       setFormData({
-        name: response.data.name || "",
-        description: response.data.description || "",
-        logo: response.data.logo || "",
-        heroImage: response.data.heroImage || "",
-        phone: response.data.phone || "",
-        email: response.data.email || "",
-        socialLinks: response.data.socialLinks || {},
-        seo: response.data.seo || {},
+        name: profile.name || "",
+        description: profile.description || "",
+        subheadline: profile.subheadline || "",
+        logo: profile.logo || "",
+        heroImage: profile.heroImage || "",
+        phone: profile.phone || "",
+        email: profile.email || "",
+        socialLinks: {
+          facebook: profile.socialLinks?.facebook || "",
+          twitter: profile.socialLinks?.twitter || "",
+          linkedin: profile.socialLinks?.linkedin || "",
+          instagram: profile.socialLinks?.instagram || "",
+          github: profile.socialLinks?.github || "",
+          tiktok: profile.socialLinks?.tiktok || "",
+        },
+        geo: {
+          address: profile.geo?.address || "",
+          city: profile.geo?.city || "",
+          country: profile.geo?.country || "",
+          postalCode: profile.geo?.postalCode || "",
+          lat: profile.geo?.lat || "",
+          lng: profile.geo?.lng || "",
+        },
+        seo: {
+          title: profile.seo?.title || "",
+          description: profile.seo?.description || "",
+          keywords: profile.seo?.keywords || "",
+          ogImage: profile.seo?.ogImage || "",
+        },
       });
-    } catch (error) {
-      console.error("Failed to fetch profile:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData) return;
     try {
-      await axios.put("/api/company-profile", formData, {
-        headers: getAuthHeaders(),
-      });
+      await updateProfile.mutateAsync(formData);
       toast.success("Company profile updated successfully!");
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to update profile");
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !formData) {
     return <Loader />;
   }
 
@@ -1492,6 +1528,7 @@ function CompanyProfileManagement() {
         onSubmit={handleSubmit}
         className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10 space-y-6"
       >
+        {/* Basic info grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <Label className="text-white">Company Name</Label>
@@ -1516,6 +1553,7 @@ function CompanyProfileManagement() {
           </div>
         </div>
 
+        {/* Description */}
         <div>
           <Label className="text-white">Description</Label>
           <textarea
@@ -1528,6 +1566,20 @@ function CompanyProfileManagement() {
           />
         </div>
 
+        {/* Subheadline (novo) */}
+        <div>
+          <Label className="text-white">Subheadline (short tagline)</Label>
+          <Input
+            value={formData.subheadline}
+            onChange={(e) =>
+              setFormData({ ...formData, subheadline: e.target.value })
+            }
+            placeholder="e.g., Transforming ideas into digital success"
+            className="bg-white/5 border-white/10 text-white mt-1"
+          />
+        </div>
+
+        {/* Logo & Hero Image */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <Label className="text-white">Logo URL</Label>
@@ -1540,46 +1592,162 @@ function CompanyProfileManagement() {
             />
           </div>
           <div>
-            <Label className="text-white">Phone</Label>
+            <Label className="text-white">Hero Image URL</Label>
             <Input
-              value={formData.phone}
+              value={formData.heroImage}
               onChange={(e) =>
-                setFormData({ ...formData, phone: e.target.value })
+                setFormData({ ...formData, heroImage: e.target.value })
               }
               className="bg-white/5 border-white/10 text-white mt-1"
             />
           </div>
         </div>
 
+        {/* Phone */}
+        <div>
+          <Label className="text-white">Phone</Label>
+          <Input
+            value={formData.phone}
+            onChange={(e) =>
+              setFormData({ ...formData, phone: e.target.value })
+            }
+            className="bg-white/5 border-white/10 text-white mt-1"
+          />
+        </div>
+
+        {/* Social Links */}
         <div>
           <h3 className="text-lg font-semibold text-white mb-4">
             Social Links
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {["facebook", "twitter", "linkedin", "instagram", "github"].map(
-              (social) => (
-                <div key={social}>
-                  <Label className="text-white capitalize">{social}</Label>
-                  <Input
-                    value={formData.socialLinks[social] || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        socialLinks: {
-                          ...formData.socialLinks,
-                          [social]: e.target.value,
-                        },
-                      })
-                    }
-                    placeholder={`https://${social}.com/...`}
-                    className="bg-white/5 border-white/10 text-white mt-1"
-                  />
-                </div>
-              ),
-            )}
+            {[
+              "facebook",
+              "twitter",
+              "linkedin",
+              "instagram",
+              "github",
+              "tiktok",
+            ].map((social) => (
+              <div key={social}>
+                <Label className="text-white capitalize">{social}</Label>
+                <Input
+                  value={formData.socialLinks[social] || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      socialLinks: {
+                        ...formData.socialLinks,
+                        [social]: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder={`https://${social}.com/...`}
+                  className="bg-white/5 border-white/10 text-white mt-1"
+                />
+              </div>
+            ))}
           </div>
         </div>
 
+        {/* GEO sekcija */}
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-4">
+            Location (GEO)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-white">Address / Street</Label>
+              <Input
+                value={formData?.geo.address ?? ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    geo: { ...formData.geo, address: e.target.value },
+                  })
+                }
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-white">City</Label>
+              <Input
+                value={formData.geo.city}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    geo: { ...formData.geo, city: e.target.value },
+                  })
+                }
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-white">Country</Label>
+              <Input
+                value={formData.geo.country}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    geo: { ...formData.geo, country: e.target.value },
+                  })
+                }
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-white">Postal Code</Label>
+              <Input
+                value={formData.geo.postalCode}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    geo: { ...formData.geo, postalCode: e.target.value },
+                  })
+                }
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-white">Latitude</Label>
+              <Input
+                type="number"
+                step="any"
+                value={formData.geo.lat || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    geo: {
+                      ...formData.geo,
+                      lat: parseFloat(e.target.value) || null,
+                    },
+                  })
+                }
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-white">Longitude</Label>
+              <Input
+                type="number"
+                step="any"
+                value={formData.geo.lng || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    geo: {
+                      ...formData.geo,
+                      lng: parseFloat(e.target.value) || null,
+                    },
+                  })
+                }
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* SEO Settings (dodat ogImage) */}
         <div>
           <h3 className="text-lg font-semibold text-white mb-4">
             SEO Settings
@@ -1626,6 +1794,22 @@ function CompanyProfileManagement() {
                 className="bg-white/5 border-white/10 text-white mt-1"
               />
             </div>
+            <div>
+              <Label className="text-white">
+                Open Graph Image URL (og:image)
+              </Label>
+              <Input
+                value={formData.seo.ogImage || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    seo: { ...formData.seo, ogImage: e.target.value },
+                  })
+                }
+                placeholder="https://example.com/og-image.jpg"
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
           </div>
         </div>
 
@@ -1633,7 +1817,7 @@ function CompanyProfileManagement() {
           type="submit"
           className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
         >
-          Save Changes
+          {isUpdating ? "Saving..." : "Save Changes"}
         </Button>
       </form>
     </div>

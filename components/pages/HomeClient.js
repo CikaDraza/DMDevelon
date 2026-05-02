@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   Lightbulb,
   CodeXml,
+  LockIcon,
   Menu,
   X,
   ChevronLeft,
@@ -48,7 +49,12 @@ import {
   Settings,
   GitBranch,
   NotebookTabs,
+  NotebookPen,
+  Store,
+  MapPinHouse,
+  Handshake,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +71,13 @@ import Slider from "react-slick";
 import LogoIcon from "../ui/logo-icon";
 import Link from "next/link";
 import Loader from "../loaders/Loader";
+import FacebookIcon from "../ui/assets/FacebookIcon";
+import TikTokIcon from "../ui/assets/TikTokIcon";
+import GitHubicon from "../ui/assets/GitHubIcon";
+import InstagramIcon from "../ui/assets/InstagramIcon";
+import LinkedInIcon from "../ui/assets/LinkedInIcon";
+import TwitterIcon from "../ui/assets/TwitterIcon";
+import { useCompanyProfile } from "@/hooks/useCompanyProfile";
 
 // Icon mapping
 const iconMap = {
@@ -85,7 +98,29 @@ const iconMap = {
   Settings,
   Mail,
   ShoppingCart,
+  NotebookPen,
+  Store,
+  MapPinHouse,
+  Handshake,
 };
+
+const socialIconMap = {
+  facebook: FacebookIcon,
+  tiktok: TikTokIcon,
+  github: GitHubicon,
+  instagram: InstagramIcon,
+  linkedin: LinkedInIcon,
+  twitter: TwitterIcon,
+};
+
+const socialOrder = [
+  "tiktok",
+  "facebook",
+  "twitter",
+  "linkedin",
+  "instagram",
+  "github",
+];
 
 // Color mapping
 const colorMap = {
@@ -360,7 +395,7 @@ function Header({ user, onLoginClick, onLogout }) {
 }
 
 // Hero Section Component
-function HeroSection() {
+function HeroSection({ profile }) {
   const isMobile = useIsMobile();
   return (
     <section id="hero" className="w-full relative overflow-hidden pt-20">
@@ -381,11 +416,11 @@ function HeroSection() {
             >
               WELCOME
             </motion.span>
-            <h1 className="text-4xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+            <h2 className="text-4xl lg:text-6xl font-bold text-white mb-6 leading-tight">
               I'm Milan Drazic
-            </h1>
+            </h2>
             <p className="text-gray-400 text-sm mb-8">
-              PR DMDevelon Computer programming
+              PR DMDevelon Marketplace Systems Architect
             </p>
             <motion.div
               whileHover={{ scale: 1.05 }}
@@ -433,14 +468,15 @@ function HeroSection() {
             variants={fadeInRight}
             className="lg:col-span-5 lg:border border-transparent border-l-zinc-800 bg-zinc-950 rounded-r-2xl rounded-tl-2xl lg:rounded-l-none rounded-b-2xl lg:rounded-b-none lg:rounded-tr-2xl lg:rounded-br-2xl flex flex-col justify-center p-8 lg:p-12 relative -z-10"
           >
-            <h2 className="text-3xl lg:text-6xl font-bold text-[#FFB633] mb-6 leading-tight">
-              I help small businesses increase sales through fast and modern
-              websites.
+            <h1 className="text-4xl lg:text-6xl font-bold text-[#FFB633] mb-6 leading-tight">
+              I design and engineer booking, search and growth systems for
+              modern service businesses.
               {/* Transforming Ideas into Digital Success */}
-            </h2>
+            </h1>
             <p className="text-gray-400 text-lg font-light">
-              Cutting-Edge Web Development and Stunning UI/UX Design. AI-powered
-              web & automation developer
+              From marketplace search engines and appointment systems to AI
+              assistants and marketing automation. I build digital
+              infrastructure that helps local businesses grow.
             </p>
           </motion.div>
         </div>
@@ -1239,7 +1275,8 @@ function TestimonialsSection({ testimonials }) {
 }
 
 // Contact Section Component
-function ContactSection() {
+function ContactSection({ profile }) {
+  const socialLinks = profile?.socialLinks || {};
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -1289,7 +1326,7 @@ function ContactSection() {
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Email</p>
-                  <p className="text-white">drazic.milan@gmail.com</p>
+                  <p className="text-white">milan.drazic@dmdevelon.website</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -1305,17 +1342,23 @@ function ContactSection() {
 
             {/* Social Links */}
             <div className="flex gap-4 mt-8">
-              {[Facebook, Twitter, Linkedin, Instagram, Github].map(
-                (Icon, i) => (
+              {socialOrder.map((social, i) => {
+                const url = socialLinks[social];
+                if (!url) return null;
+
+                const Icon = socialIconMap[social];
+                if (!Icon) return null;
+
+                return (
                   <Link
-                    key={i}
-                    href="#"
-                    className="p-3 bg-white/5 rounded-xl hover:bg-[#FFB633]/20 transition-colors"
+                    key={social}
+                    href={url}
+                    className="group p-3 bg-white/5 rounded-xl hover:bg-[#FFB633]/20 transition-colors"
                   >
-                    <Icon className="w-5 h-5 text-gray-400 hover:text-[#FFB633]" />
+                    <Icon className="w-6 h-6 text-gray-400 group-hover:text-[#FFB633] transition-colors" />
                   </Link>
-                ),
-              )}
+                );
+              })}
             </div>
           </motion.div>
 
@@ -1399,7 +1442,8 @@ function ContactSection() {
 }
 
 // Footer Component
-function Footer() {
+function Footer({ profile }) {
+  const socialLinks = profile?.socialLinks || {};
   return (
     <footer className="bg-[#0f0f10] border-t border-white/10 py-8">
       <div className="container mx-auto px-4">
@@ -1431,15 +1475,23 @@ function Footer() {
             </Link>
           </div>
           <div className="flex gap-4">
-            {[Facebook, Twitter, Linkedin, Instagram, Github].map((Icon, i) => (
-              <Link
-                key={i}
-                href="#"
-                className="text-gray-400 hover:text-[#FFB633] transition-colors"
-              >
-                <Icon className="w-5 h-5" />
-              </Link>
-            ))}
+            {socialOrder.map((social, i) => {
+              const url = socialLinks[social];
+              if (!url) return null;
+
+              const Icon = socialIconMap[social];
+              if (!Icon) return null;
+
+              return (
+                <Link
+                  key={social}
+                  href={url}
+                  className="text-gray-400 group hover:text-[#FFB633] transition-colors"
+                >
+                  <Icon className="w-5 h-5" />
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1600,10 +1652,12 @@ export default function HomeClient({ initialServices }) {
   const { isLoading: servicesLoading } = useServices();
   const { projects, isLoading: projectsLoading } = useProjects();
   const { testimonials, isLoading: testimonialsLoading } = useTestimonials();
+  const { profile, isLoading: profileLoading } = useCompanyProfile();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   if (
     authLoading ||
+    profileLoading ||
     servicesLoading ||
     projectsLoading ||
     testimonialsLoading
@@ -1618,12 +1672,12 @@ export default function HomeClient({ initialServices }) {
         onLoginClick={() => setLoginModalOpen(true)}
         onLogout={logout}
       />
-      <HeroSection />
+      <HeroSection profile={profile} />
       <ServicesSection services={initialServices} />
       <ProjectsSection projects={projects} />
       <TestimonialsSection testimonials={testimonials} />
-      <ContactSection />
-      <Footer />
+      <ContactSection profile={profile} />
+      <Footer profile={profile} />
       <LoginModal
         isOpen={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}

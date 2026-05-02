@@ -27,7 +27,7 @@ export async function generateMetadata() {
       description: seo.description,
       url: `${URL}/`,
       type: "website",
-      ogImage: seo.logo,
+      ogImage: seo?.ogImage,
     },
   };
 }

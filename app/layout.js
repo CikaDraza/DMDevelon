@@ -3,21 +3,32 @@ import { getSeoMeta } from "@/lib/seo";
 import "./globals.css";
 import QueryProvider from "@/providers/QueryProvider";
 import { Toaster } from "react-hot-toast";
+import GeoStructuredData from "@/components/geo/GeoStructuredData";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const seo = await getSeoMeta(slug);
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   return {
     title: seo.title,
     description: seo.description,
     robots: seo.noIndex ? "noindex, nofollow" : "index, follow",
+    canonical: `${baseUrl}/${slug === "/" ? "" : slug}`,
     openGraph: {
       title: seo.title,
       description: seo.description,
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/`,
+      url: `${baseUrl}/${slug === "/" ? "" : slug}`,
       type: "website",
-      ogImage: seo.logo,
+      images: seo.ogImage
+        ? [
+            {
+              url: seo.ogImage.startsWith("http")
+                ? seo.ogImage
+                : `${baseUrl}/images/ogimage.png`,
+            },
+          ]
+        : [],
     },
   };
 }
@@ -25,6 +36,9 @@ export async function generateMetadata({ params }) {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <GeoStructuredData />
+      </head>
       <body>
         <QueryProvider>
           {children}
