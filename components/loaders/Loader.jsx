@@ -19,9 +19,9 @@ export default function Loader() {
         </div>
         <div className="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
           <div className="text-center">
-            <div className="flex justify-center w-full rounded-md px-3.5 py-2.5 text-center text-sm font-semibold text-black">
+            <div className="flex justify-center w-full rounded-md px-3.5 py-2.5 text-center text-sm font-semibold text-white">
               {" "}
-              <ArrowPathIcon className="mr-3 size-5 text-(--secondary-color) animate-spin ..." />
+              <ArrowPathIcon className="mr-3 size-5 text-white animate-spin ..." />
               Processing…
             </div>
           </div>
