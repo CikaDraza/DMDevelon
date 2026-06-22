@@ -9,6 +9,7 @@ import ContactMessage from "@/models/ContactMessage";
 import CMSPage from "@/models/CMSPage";
 import ClientProject from "@/models/ClientProject";
 import ProjectMessage from "@/models/ProjectMessage";
+import ProjectRequest from "@/models/ProjectRequest";
 import {
   hashPassword,
   comparePassword,
@@ -42,6 +43,16 @@ function canAccessClientProject(user, project) {
   return (
     (project.clientUserId && project.clientUserId === user.userId) ||
     (project.clientEmail && project.clientEmail === user.email)
+  );
+}
+
+// Same ownership rule for project requests.
+function canAccessRequest(user, req) {
+  if (!user || !req) return false;
+  if (user.isAdmin) return true;
+  return (
+    (req.clientUserId && req.clientUserId === user.userId) ||
+    (req.clientEmail && req.clientEmail === user.email)
   );
 }
 
@@ -162,6 +173,49 @@ export async function GET(request, context) {
         return NextResponse.json(messages, { headers: getCorsHeaders() });
       }
       return NextResponse.json(project, { headers: getCorsHeaders() });
+    }
+
+    // Project Requests (auth required)
+    if (pathStr === "project-requests") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const query = user.isAdmin
+        ? {}
+        : { $or: [{ clientUserId: user.userId }, { clientEmail: user.email }] };
+      const requests = await ProjectRequest.find(query).sort({
+        lastActivityAt: -1,
+      });
+      return NextResponse.json(requests, { headers: getCorsHeaders() });
+    }
+
+    if (pathStr.startsWith("project-requests/")) {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const id = path[1];
+      const req = await ProjectRequest.findById(id);
+      if (!req) {
+        return NextResponse.json(
+          { error: "Request not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      if (!canAccessRequest(user, req)) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      return NextResponse.json(req, { headers: getCorsHeaders() });
     }
 
     // Testimonials
@@ -556,6 +610,253 @@ export async function POST(request, context) {
       });
     }
 
+    // Project Requests
+    if (pathStr === "project-requests") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+
+      // Admin: convert an existing ContactMessage into a ProjectRequest
+      if (body.fromMessageId) {
+        if (!user.isAdmin) {
+          return NextResponse.json(
+            { error: "Unauthorized" },
+            { status: 401, headers: getCorsHeaders() },
+          );
+        }
+        const msg = await ContactMessage.findById(body.fromMessageId);
+        if (!msg) {
+          return NextResponse.json(
+            { error: "Message not found" },
+            { status: 404, headers: getCorsHeaders() },
+          );
+        }
+        if (msg.convertedToRequestId) {
+          return NextResponse.json(
+            { error: "Message already converted" },
+            { status: 400, headers: getCorsHeaders() },
+          );
+        }
+        const owner = await User.findOne({ email: msg.email });
+        const clientName = owner?.name || msg.name;
+        const clientSlug = slugify(clientName);
+        const now = new Date();
+        const messages = [
+          {
+            _id: uuidv4(),
+            authorUserId: owner?._id || null,
+            authorName: clientName,
+            authorRole: "client",
+            type: "message",
+            body: msg.message,
+            createdAt: msg.createdAt || now,
+          },
+        ];
+        let status = "new";
+        if (msg.replyMessage) {
+          messages.push({
+            _id: uuidv4(),
+            authorName: "DMDevelon",
+            authorRole: "admin",
+            type: "message",
+            body: msg.replyMessage,
+            createdAt: now,
+          });
+          status = "discussion";
+        }
+        const title =
+          (msg.message || "")
+            .replace(/^\[Project request\]\s*/i, "")
+            .split(/[.\n]/)[0]
+            .slice(0, 80)
+            .trim() || "Project request";
+        const reqDoc = await ProjectRequest.create({
+          _id: uuidv4(),
+          clientUserId: owner?._id || null,
+          clientName,
+          clientEmail: msg.email,
+          clientSlug,
+          title,
+          description: msg.message,
+          status,
+          messages,
+          lastActivityAt: now,
+        });
+        msg.convertedToRequestId = reqDoc._id;
+        await msg.save();
+        ensureClientFolders(clientSlug).catch(() => {});
+        return NextResponse.json(reqDoc, {
+          status: 201,
+          headers: getCorsHeaders(),
+        });
+      }
+
+      // Client (or admin) creates a request
+      if (!body.title) {
+        return NextResponse.json(
+          { error: "Title is required" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      const owner = await User.findById(user.userId);
+      const clientName = owner?.name || body.clientName || user.email;
+      const clientEmail = owner?.email || user.email;
+      const clientSlug = slugify(clientName);
+      const now = new Date();
+      const messages = body.description
+        ? [
+            {
+              _id: uuidv4(),
+              authorUserId: user.userId,
+              authorName: clientName,
+              authorRole: "client",
+              type: "message",
+              body: body.description,
+              createdAt: now,
+            },
+          ]
+        : [];
+      const reqDoc = await ProjectRequest.create({
+        _id: uuidv4(),
+        clientUserId: user.userId,
+        clientName,
+        clientEmail,
+        clientSlug,
+        title: body.title,
+        description: body.description || "",
+        status: "new",
+        messages,
+        lastActivityAt: now,
+      });
+      ensureClientFolders(clientSlug).catch(() => {});
+      return NextResponse.json(reqDoc, {
+        status: 201,
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // Project Request sub-actions (messages / accept / request-changes)
+    if (pathStr.startsWith("project-requests/") && path[1]) {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const reqDoc = await ProjectRequest.findById(path[1]);
+      if (!reqDoc) {
+        return NextResponse.json(
+          { error: "Request not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      if (!canAccessRequest(user, reqDoc)) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const now = new Date();
+      const role = user.isAdmin ? "admin" : "client";
+
+      if (path[2] === "messages") {
+        reqDoc.messages.push({
+          _id: uuidv4(),
+          authorUserId: user.userId,
+          authorName:
+            body.authorName ||
+            (user.isAdmin ? "DMDevelon" : reqDoc.clientName || user.email),
+          authorRole: role,
+          type: "message",
+          body: body.body || "",
+          attachments: Array.isArray(body.attachments) ? body.attachments : [],
+          createdAt: now,
+        });
+        if (user.isAdmin && reqDoc.status === "new") reqDoc.status = "discussion";
+        reqDoc.lastActivityAt = now;
+        await reqDoc.save();
+        return NextResponse.json(reqDoc, {
+          status: 201,
+          headers: getCorsHeaders(),
+        });
+      }
+
+      if (path[2] === "accept") {
+        if (reqDoc.linkedClientProjectId) {
+          return NextResponse.json(
+            { projectId: reqDoc.linkedClientProjectId, request: reqDoc },
+            { headers: getCorsHeaders() },
+          );
+        }
+        const clientSlug = reqDoc.clientSlug || slugify(reqDoc.clientName);
+        const project = await ClientProject.create({
+          _id: uuidv4(),
+          clientUserId: reqDoc.clientUserId,
+          clientName: reqDoc.clientName,
+          clientEmail: reqDoc.clientEmail,
+          clientSlug,
+          requestId: reqDoc._id,
+          title: reqDoc.proposal?.title || reqDoc.title,
+          description: reqDoc.proposal?.scope || reqDoc.description,
+          requirements: reqDoc.description,
+          status: "in_progress",
+          milestones: [],
+        });
+        ensureClientFolders(clientSlug).catch(() => {});
+        reqDoc.status = "approved";
+        if (reqDoc.proposal) reqDoc.proposal.acceptedAt = now;
+        reqDoc.linkedClientProjectId = project._id;
+        reqDoc.messages.push({
+          _id: uuidv4(),
+          authorName: "System",
+          authorRole: role,
+          type: "system",
+          body: "Request approved — project created.",
+          createdAt: now,
+        });
+        reqDoc.lastActivityAt = now;
+        await reqDoc.save();
+        return NextResponse.json(
+          { projectId: project._id, request: reqDoc },
+          { status: 201, headers: getCorsHeaders() },
+        );
+      }
+
+      if (path[2] === "request-changes") {
+        if (body.body) {
+          reqDoc.messages.push({
+            _id: uuidv4(),
+            authorUserId: user.userId,
+            authorName: body.authorName || reqDoc.clientName || user.email,
+            authorRole: role,
+            type: "message",
+            body: body.body,
+            attachments: Array.isArray(body.attachments)
+              ? body.attachments
+              : [],
+            createdAt: now,
+          });
+        }
+        reqDoc.messages.push({
+          _id: uuidv4(),
+          authorName: "System",
+          authorRole: role,
+          type: "system",
+          body: "Changes requested on the proposal.",
+          createdAt: now,
+        });
+        reqDoc.status = "discussion";
+        reqDoc.lastActivityAt = now;
+        await reqDoc.save();
+        return NextResponse.json(reqDoc, { headers: getCorsHeaders() });
+      }
+    }
+
     // File upload (images + PDF) to Cloudinary (auth required)
     if (pathStr === "upload") {
       const user = await getUserFromRequest(request);
@@ -565,7 +866,7 @@ export async function POST(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
-      const { file, name, projectId, kind } = body;
+      const { file, name, projectId, requestId, kind } = body;
       if (!file) {
         return NextResponse.json(
           { error: "No file provided" },
@@ -582,7 +883,8 @@ export async function POST(request, context) {
         );
       }
       // Resolve destination folder: admin -> portfolio/admin/<kind>,
-      // client -> portfolio/clients/<slug>/<kind>. Requires project access.
+      // client -> portfolio/clients/<slug>/<kind>. Requires owner access to
+      // the referenced project or request.
       let folder;
       if (projectId) {
         const project = await ClientProject.findById(projectId);
@@ -592,12 +894,20 @@ export async function POST(request, context) {
             { status: 401, headers: getCorsHeaders() },
           );
         }
-        if (user.isAdmin) {
-          folder = adminFolder(kind);
-        } else {
-          const slug = project.clientSlug || slugify(project.clientName);
-          folder = clientFolder(slug, kind);
+        folder = user.isAdmin
+          ? adminFolder(kind)
+          : clientFolder(project.clientSlug || slugify(project.clientName), kind);
+      } else if (requestId) {
+        const reqDoc = await ProjectRequest.findById(requestId);
+        if (!reqDoc || !canAccessRequest(user, reqDoc)) {
+          return NextResponse.json(
+            { error: "Unauthorized" },
+            { status: 401, headers: getCorsHeaders() },
+          );
         }
+        folder = user.isAdmin
+          ? adminFolder(kind)
+          : clientFolder(reqDoc.clientSlug || slugify(reqDoc.clientName), kind);
       } else {
         folder = adminFolder(kind);
       }
@@ -793,6 +1103,46 @@ export async function PUT(request, context) {
         new: true,
       });
       return NextResponse.json(project, { headers: getCorsHeaders() });
+    }
+
+    // Project Request proposal (admin only)
+    if (pathStr.startsWith("project-requests/") && path[2] === "proposal") {
+      const user = await getUserFromRequest(request);
+      if (!user || !user.isAdmin) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const reqDoc = await ProjectRequest.findById(path[1]);
+      if (!reqDoc) {
+        return NextResponse.json(
+          { error: "Request not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      const now = new Date();
+      reqDoc.proposal = {
+        title: body.title || reqDoc.title,
+        scope: body.scope || "",
+        timeline: body.timeline || "",
+        budget: body.budget || "",
+        version: (reqDoc.proposal?.version || 0) + 1,
+        sentAt: now,
+        acceptedAt: reqDoc.proposal?.acceptedAt || null,
+      };
+      reqDoc.status = "proposal_sent";
+      reqDoc.messages.push({
+        _id: uuidv4(),
+        authorName: "DMDevelon",
+        authorRole: "admin",
+        type: "system",
+        body: `Proposal sent · v${reqDoc.proposal.version}`,
+        createdAt: now,
+      });
+      reqDoc.lastActivityAt = now;
+      await reqDoc.save();
+      return NextResponse.json(reqDoc, { headers: getCorsHeaders() });
     }
 
     // Testimonials (admin reply)
@@ -1032,6 +1382,27 @@ export async function DELETE(request, context) {
       );
     }
 
+    // Project Requests (admin only)
+    if (pathStr.startsWith("project-requests/")) {
+      if (!user || !user.isAdmin) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const reqDoc = await ProjectRequest.findByIdAndDelete(path[1]);
+      if (!reqDoc) {
+        return NextResponse.json(
+          { error: "Request not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      return NextResponse.json(
+        { message: "Request deleted" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
     // Testimonials
     if (pathStr.startsWith("testimonials/")) {
       const user = await getUserFromRequest(request);
@@ -1248,6 +1619,37 @@ export async function PATCH(request, context) {
         }
         return NextResponse.json(project, { headers: getCorsHeaders() });
       }
+    }
+
+    // PATCH /project-requests/:id/status (admin)
+    if (path[0] === "project-requests" && path[1] && path[2] === "status") {
+      const user = await getUserFromRequest(request);
+      if (!user || !user.isAdmin) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const reqDoc = await ProjectRequest.findById(path[1]);
+      if (!reqDoc) {
+        return NextResponse.json(
+          { error: "Request not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      const now = new Date();
+      reqDoc.status = body.status;
+      reqDoc.messages.push({
+        _id: uuidv4(),
+        authorName: "DMDevelon",
+        authorRole: "admin",
+        type: "system",
+        body: `Status changed to ${body.status}`,
+        createdAt: now,
+      });
+      reqDoc.lastActivityAt = now;
+      await reqDoc.save();
+      return NextResponse.json(reqDoc, { headers: getCorsHeaders() });
     }
 
     return NextResponse.json(

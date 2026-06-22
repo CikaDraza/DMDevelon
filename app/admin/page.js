@@ -52,6 +52,8 @@ import {
   Handshake,
   AlertTriangle,
   RefreshCw,
+  Inbox,
+  FilePlus2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +88,7 @@ import Loader from "@/components/loaders/Loader";
 import Link from "next/link";
 import { useCompanyProfile } from "@/hooks/useCompanyProfile";
 import ClientProjectsManager from "@/components/admin/ClientProjectsManager";
+import ProjectRequestsManager from "@/components/admin/ProjectRequestsManager";
 
 // Icon mapping
 const iconMap = {
@@ -182,6 +185,7 @@ function AdminSidebar({
     { id: "services", label: "Services", icon: Briefcase },
     { id: "projects", label: "Projects", icon: FolderKanban },
     { id: "client-projects", label: "Client Projects", icon: Handshake },
+    { id: "project-requests", label: "Project Requests", icon: Inbox },
     { id: "testimonials", label: "Testimonials", icon: MessageSquare },
     { id: "users", label: "Users", icon: Users },
     { id: "messages", label: "Messages", icon: Mail },
@@ -1360,6 +1364,20 @@ function MessagesManagement() {
     }
   };
 
+  const handleConvert = async (message) => {
+    try {
+      await axios.post(
+        "/api/project-requests",
+        { fromMessageId: message._id },
+        { headers: getAuthHeaders() },
+      );
+      toast.success("Converted to a Project Request");
+      fetchMessages();
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to convert");
+    }
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-white mb-6">Contact Messages</h2>
@@ -1394,6 +1412,19 @@ function MessagesManagement() {
                     <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
                       Replied
                     </span>
+                  )}
+                  {message.convertedToRequestId ? (
+                    <span className="px-2 py-1 bg-[#FFB633]/20 text-[#FFB633] text-xs rounded">
+                      Converted
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleConvert(message)}
+                      title="Convert to Project Request"
+                      className="p-2 text-gray-400 hover:text-[#FFB633] hover:bg-[#FFB633]/10 rounded-lg transition-colors"
+                    >
+                      <FilePlus2 className="w-4 h-4" />
+                    </button>
                   )}
                   <button
                     onClick={() => {
@@ -2235,6 +2266,8 @@ export default function AdminPage() {
         return <ProjectsManagement />;
       case "client-projects":
         return <ClientProjectsManager />;
+      case "project-requests":
+        return <ProjectRequestsManager />;
       case "testimonials":
         return <TestimonialsManagement />;
       case "users":

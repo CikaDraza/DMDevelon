@@ -12,6 +12,7 @@ const ContactMessageSchema = new mongoose.Schema(
     message: { type: String, required: true },
     replied: { type: Boolean, default: false },
     replyMessage: { type: String, default: '' },
+    convertedToRequestId: { type: String, default: null },
   },
   { timestamps: true, _id: false }
 );

@@ -57,6 +57,7 @@ const ClientProjectSchema = new mongoose.Schema(
     color: { type: String, default: 'blue' },
     publishToHomepage: { type: Boolean, default: false },
     linkedProjectId: { type: String, default: null },
+    requestId: { type: String, default: null }, // back-link to originating ProjectRequest
     milestones: { type: [MilestoneSchema], default: [] },
   },
   { timestamps: true, _id: false }

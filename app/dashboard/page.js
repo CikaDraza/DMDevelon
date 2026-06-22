@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useTestimonials } from "@/hooks/useTestimonials";
 import { useClientProjects } from "@/hooks/useClientProjects";
+import { useProjectRequests } from "@/hooks/useProjectRequests";
 import toast from "react-hot-toast";
 import axios from "axios";
 import {
@@ -22,7 +23,7 @@ import {
   Home,
   AlertTriangle,
   ArrowRight,
-  Mail,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,12 +49,15 @@ export default function DashboardPage() {
   } = useTestimonials();
   const { projects: clientProjects, isLoading: projectsLoading } =
     useClientProjects();
+  const { requests: projectRequests, isLoading: requestsLoading, createRequest } =
+    useProjectRequests();
   const [activeTab, setActiveTab] = useState("services");
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isTestimonialModalOpen, setIsTestimonialModalOpen] = useState(false);
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] =
     useState(false);
   const [isStartProjectModalOpen, setIsStartProjectModalOpen] = useState(false);
+  const [requestTitle, setRequestTitle] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [editingTestimonial, setEditingTestimonial] = useState(null);
@@ -136,32 +140,27 @@ export default function DashboardPage() {
 
   const handleSubmitProjectRequest = async (e) => {
     e.preventDefault();
-    if (!requestMessage.trim()) {
-      toast.error("Please describe what you'd like to build");
+    if (!requestTitle.trim()) {
+      toast.error("Please give your project a name");
       return;
     }
     setRequestSubmitting(true);
     try {
-      await axios.post("/api/contact-messages", {
-        name: user?.name || "Client",
-        email: user?.email,
-        message: `[Project request] ${requestMessage.trim()}`,
+      const created = await createRequest.mutateAsync({
+        title: requestTitle.trim(),
+        description: requestMessage.trim(),
       });
-      toast.success("Request sent! We'll get back to you shortly.");
+      toast.success("Request created! We'll get back to you shortly.");
+      setRequestTitle("");
       setRequestMessage("");
       setIsStartProjectModalOpen(false);
+      if (created?._id) router.push(`/dashboard/requests/${created._id}`);
     } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to send request");
+      toast.error(error.response?.data?.error || "Failed to create request");
     } finally {
       setRequestSubmitting(false);
     }
   };
-
-  const mailtoHref = `mailto:contact@dmdevelon.website?subject=${encodeURIComponent(
-    "Project request from " + (user?.name || ""),
-  )}&body=${encodeURIComponent(
-    "Hi DMDevelon team,\n\nI'd like to start a project. Here's what I have in mind:\n\n",
-  )}`;
 
   const handleSubmitTestimonial = async (e) => {
     e.preventDefault();
@@ -251,6 +250,22 @@ export default function DashboardPage() {
     (p) => p.status !== "completed",
   );
 
+  const REQUEST_STATUS = {
+    new: { label: "Submitted — awaiting review", cls: "bg-purple-500/20 text-purple-300" },
+    discussion: { label: "Discussion", cls: "bg-blue-500/20 text-blue-400" },
+    proposal_sent: { label: "Proposal Ready", cls: "bg-[#FFB633]/20 text-[#FFB633]" },
+    approved: { label: "Approved", cls: "bg-green-500/20 text-green-400" },
+    closed: { label: "Closed", cls: "bg-gray-500/20 text-gray-400" },
+  };
+  const lastMsgPreview = (req) => {
+    const msgs = (req.messages || []).filter((m) => m.type !== "system");
+    return msgs[msgs.length - 1]?.body?.slice(0, 90) || "—";
+  };
+  // Approved requests are represented by their ClientProject below
+  const pendingRequests = projectRequests.filter(
+    (r) => r.status !== "approved",
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center">
@@ -331,7 +346,7 @@ export default function DashboardPage() {
                 }`}
               >
                 <Briefcase className="w-5 h-5" />
-                <span>My Services</span>
+                <span>My Projects</span>
               </button>
               <button
                 onClick={() => setActiveTab("testimonials")}
@@ -353,12 +368,9 @@ export default function DashboardPage() {
               <div>
                 <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
                   <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      My Services
-                    </h2>
+                    <h2 className="text-2xl font-bold text-white">My Projects</h2>
                     <p className="text-gray-400 mt-1">
-                      View the services you have requested or are currently
-                      using.
+                      Your project requests and active projects.
                     </p>
                   </div>
                   <Button
@@ -370,9 +382,10 @@ export default function DashboardPage() {
                   </Button>
                 </div>
 
-                {projectsLoading ? (
-                  <div className="text-gray-400">Loading your projects…</div>
-                ) : clientProjects.length === 0 ? (
+                {projectsLoading || requestsLoading ? (
+                  <div className="text-gray-400">Loading…</div>
+                ) : pendingRequests.length === 0 &&
+                  clientProjects.length === 0 ? (
                   <div className="text-center py-12 bg-[#1a1a1b] rounded-xl border border-white/10">
                     <Briefcase className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                     <p className="text-gray-400">
@@ -386,56 +399,121 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {clientProjects.map((project) => {
-                      const progress = computeProgress(project);
-                      return (
-                        <motion.div
-                          key={project._id}
-                          whileHover={{ scale: 1.01 }}
-                          onClick={() =>
-                            router.push(`/dashboard/projects/${project._id}`)
-                          }
-                          className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10 cursor-pointer hover:border-[#FFB633]/40 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0">
-                              <h3 className="text-lg font-semibold text-white">
-                                {project.title}
-                              </h3>
-                              {project.description && (
-                                <p className="text-gray-400 text-sm mt-1 line-clamp-2">
-                                  {project.description}
-                                </p>
-                              )}
-                            </div>
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${statusBadgeClass(
-                                project.status,
-                              )}`}
-                            >
-                              {project.status.replace("_", " ")}
-                            </span>
-                          </div>
-                          <div className="mt-4 pt-4 border-t border-white/10">
-                            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-                              <span>Progress</span>
-                              <span>{progress}%</span>
-                            </div>
-                            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-[#FFB633] rounded-full transition-all"
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                            <div className="flex items-center gap-1 mt-3 text-sm text-[#FFB633]">
-                              View progress
-                              <ArrowRight className="w-4 h-4" />
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
+                  <div className="space-y-8">
+                    {/* Project Requests */}
+                    {pendingRequests.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-white mb-3">
+                          Project Requests
+                        </h3>
+                        <div className="space-y-4">
+                          {pendingRequests.map((req) => {
+                            const s =
+                              REQUEST_STATUS[req.status] || REQUEST_STATUS.new;
+                            return (
+                              <motion.div
+                                key={req._id}
+                                whileHover={{ scale: 1.01 }}
+                                onClick={() =>
+                                  router.push(`/dashboard/requests/${req._id}`)
+                                }
+                                className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10 cursor-pointer hover:border-[#FFB633]/40 transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="min-w-0">
+                                    <h4 className="text-lg font-semibold text-white">
+                                      {req.title}
+                                    </h4>
+                                    <p className="text-gray-500 text-sm mt-1 line-clamp-1">
+                                      {lastMsgPreview(req)}
+                                    </p>
+                                  </div>
+                                  <span
+                                    className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${s.cls}`}
+                                  >
+                                    {s.label}
+                                  </span>
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+                                  <span className="text-gray-500 text-xs">
+                                    Updated{" "}
+                                    {new Date(
+                                      req.lastActivityAt || req.createdAt,
+                                    ).toLocaleDateString()}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-sm text-[#FFB633]">
+                                    <MessageCircle className="w-4 h-4" />
+                                    Open Conversation
+                                  </span>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Active / completed projects */}
+                    {clientProjects.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-white mb-3">
+                          Projects
+                        </h3>
+                        <div className="space-y-4">
+                          {clientProjects.map((project) => {
+                            const progress = computeProgress(project);
+                            return (
+                              <motion.div
+                                key={project._id}
+                                whileHover={{ scale: 1.01 }}
+                                onClick={() =>
+                                  router.push(
+                                    `/dashboard/projects/${project._id}`,
+                                  )
+                                }
+                                className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10 cursor-pointer hover:border-[#FFB633]/40 transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="min-w-0">
+                                    <h4 className="text-lg font-semibold text-white">
+                                      {project.title}
+                                    </h4>
+                                    {project.description && (
+                                      <p className="text-gray-400 text-sm mt-1 line-clamp-2">
+                                        {project.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${statusBadgeClass(
+                                      project.status,
+                                    )}`}
+                                  >
+                                    {project.status.replace("_", " ")}
+                                  </span>
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-white/10">
+                                  <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                                    <span>Progress</span>
+                                    <span>{progress}%</span>
+                                  </div>
+                                  <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-[#FFB633] rounded-full transition-all"
+                                      style={{ width: `${progress}%` }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1 mt-3 text-sm text-[#FFB633]">
+                                    View progress
+                                    <ArrowRight className="w-4 h-4" />
+                                  </div>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -767,11 +845,21 @@ export default function DashboardPage() {
           </DialogHeader>
           <form onSubmit={handleSubmitProjectRequest} className="space-y-4 mt-2">
             <div>
+              <Label className="text-white">Project name</Label>
+              <Input
+                value={requestTitle}
+                onChange={(e) => setRequestTitle(e.target.value)}
+                placeholder="e.g. Spiritualized Language Tutor"
+                required
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
+            <div>
               <Label className="text-white">What do you want to build?</Label>
               <textarea
                 value={requestMessage}
                 onChange={(e) => setRequestMessage(e.target.value)}
-                placeholder="e.g. An e-commerce store for my brand, with admin dashboard…"
+                placeholder="Describe the idea, features, goals…"
                 rows={4}
                 className="w-full bg-white/5 border border-white/10 text-white rounded-md px-3 py-2 mt-1"
               />
@@ -781,25 +869,9 @@ export default function DashboardPage() {
               disabled={requestSubmitting}
               className="w-full bg-[#FFB633] text-black hover:bg-[#e5a32e] disabled:opacity-60"
             >
-              {requestSubmitting ? "Sending…" : "Send request"}
+              {requestSubmitting ? "Creating…" : "Create request"}
             </Button>
           </form>
-
-          <div className="flex items-center gap-3 my-1">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-xs text-gray-500">or</span>
-            <div className="flex-1 h-px bg-white/10" />
-          </div>
-
-          <a href={mailtoHref}>
-            <Button
-              variant="outline"
-              className="w-full border-white/20 text-gray-300 hover:text-white"
-            >
-              <Mail className="w-4 h-4 mr-2" />
-              Email us directly
-            </Button>
-          </a>
         </DialogContent>
       </Dialog>
     </div>
