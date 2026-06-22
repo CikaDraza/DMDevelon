@@ -50,6 +50,8 @@ import {
   Store,
   MapPinHouse,
   Handshake,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +85,7 @@ import {
 import Loader from "@/components/loaders/Loader";
 import Link from "next/link";
 import { useCompanyProfile } from "@/hooks/useCompanyProfile";
+import ClientProjectsManager from "@/components/admin/ClientProjectsManager";
 
 // Icon mapping
 const iconMap = {
@@ -178,6 +181,7 @@ function AdminSidebar({
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "services", label: "Services", icon: Briefcase },
     { id: "projects", label: "Projects", icon: FolderKanban },
+    { id: "client-projects", label: "Client Projects", icon: Handshake },
     { id: "testimonials", label: "Testimonials", icon: MessageSquare },
     { id: "users", label: "Users", icon: Users },
     { id: "messages", label: "Messages", icon: Mail },
@@ -244,9 +248,42 @@ function AdminSidebar({
 }
 
 // Dashboard Stats Component
-function DashboardStats({ stats, isLoading }) {
+function DashboardStats({ stats, isLoading, error, onRetry, onRelogin }) {
   if (isLoading) {
     return <div className="text-gray-400">Loading statistics...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-white">Dashboard Overview</h2>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+          <div className="flex items-center gap-3 text-red-400">
+            <AlertTriangle className="w-6 h-6" />
+            <p className="font-semibold">Error: something went wrong</p>
+          </div>
+          <p className="text-gray-400 text-sm mt-2">{error.message}</p>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <Button
+              onClick={onRetry}
+              className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+            {error.status === 401 && onRelogin && (
+              <Button
+                onClick={onRelogin}
+                variant="outline"
+                className="border-white/20 text-gray-300 hover:text-white"
+              >
+                Log in again
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const chartData = [
@@ -2125,6 +2162,7 @@ export default function AdminPage() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [stats, setStats] = useState({});
   const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState(null);
 
   useEffect(() => {
     if (!loading && (!user || !user.isAdmin)) {
@@ -2139,6 +2177,8 @@ export default function AdminPage() {
   }, [user]);
 
   const fetchStats = async () => {
+    setStatsLoading(true);
+    setStatsError(null);
     try {
       const response = await axios.get("/api/statistics", {
         headers: getAuthHeaders(),
@@ -2146,6 +2186,15 @@ export default function AdminPage() {
       setStats(response.data);
     } catch (error) {
       console.error("Failed to fetch stats:", error);
+      const status = error.response?.status;
+      setStatsError({
+        status,
+        message:
+          status === 401
+            ? "Your session has expired. Please log in again."
+            : error.response?.data?.error ||
+              "Something went wrong while loading statistics.",
+      });
     } finally {
       setStatsLoading(false);
     }
@@ -2171,11 +2220,21 @@ export default function AdminPage() {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <DashboardStats stats={stats} isLoading={statsLoading} />;
+        return (
+          <DashboardStats
+            stats={stats}
+            isLoading={statsLoading}
+            error={statsError}
+            onRetry={fetchStats}
+            onRelogin={handleLogout}
+          />
+        );
       case "services":
         return <ServicesManagement />;
       case "projects":
         return <ProjectsManagement />;
+      case "client-projects":
+        return <ClientProjectsManager />;
       case "testimonials":
         return <TestimonialsManagement />;
       case "users":
@@ -2187,7 +2246,15 @@ export default function AdminPage() {
       case "cms":
         return <CMSPagesManagement />;
       default:
-        return <DashboardStats stats={stats} isLoading={statsLoading} />;
+        return (
+          <DashboardStats
+            stats={stats}
+            isLoading={statsLoading}
+            error={statsError}
+            onRetry={fetchStats}
+            onRelogin={handleLogout}
+          />
+        );
     }
   };
 

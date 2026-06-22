@@ -7,6 +7,8 @@ import Testimonial from "@/models/Testimonial";
 import CompanyProfile from "@/models/CompanyProfile";
 import ContactMessage from "@/models/ContactMessage";
 import CMSPage from "@/models/CMSPage";
+import ClientProject from "@/models/ClientProject";
+import ProjectMessage from "@/models/ProjectMessage";
 import {
   hashPassword,
   comparePassword,
@@ -16,13 +18,31 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { emailTemplates } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
+import {
+  uploadToCloudinary,
+  ensureClientFolders,
+  ensureAdminFolders,
+  clientFolder,
+  adminFolder,
+} from "@/lib/cloudinary";
+import { slugify } from "@/lib/slugify";
 
 function getCorsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
+}
+
+// Admin gets full access; client only to their own projects (by id or email).
+function canAccessClientProject(user, project) {
+  if (!user || !project) return false;
+  if (user.isAdmin) return true;
+  return (
+    (project.clientUserId && project.clientUserId === user.userId) ||
+    (project.clientEmail && project.clientEmail === user.email)
+  );
 }
 
 export async function OPTIONS() {
@@ -91,6 +111,55 @@ export async function GET(request, context) {
           { error: "Project not found" },
           { status: 404, headers: getCorsHeaders() },
         );
+      }
+      return NextResponse.json(project, { headers: getCorsHeaders() });
+    }
+
+    // Client Projects (auth required)
+    if (pathStr === "client-projects") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const query = user.isAdmin
+        ? {}
+        : { $or: [{ clientUserId: user.userId }, { clientEmail: user.email }] };
+      const projects = await ClientProject.find(query).sort({ createdAt: -1 });
+      return NextResponse.json(projects, { headers: getCorsHeaders() });
+    }
+
+    if (pathStr.startsWith("client-projects/")) {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const id = path[1];
+      const project = await ClientProject.findById(id);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      if (!canAccessClientProject(user, project)) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      // Per-milestone chat thread: client-projects/:id/messages?milestoneId=...
+      if (path[2] === "messages") {
+        const milestoneId = searchParams.get("milestoneId");
+        const mq = { projectId: id };
+        if (milestoneId) mq.milestoneId = milestoneId;
+        const messages = await ProjectMessage.find(mq).sort({ createdAt: 1 });
+        return NextResponse.json(messages, { headers: getCorsHeaders() });
       }
       return NextResponse.json(project, { headers: getCorsHeaders() });
     }
@@ -418,6 +487,127 @@ export async function POST(request, context) {
       });
     }
 
+    // Client Projects (admin only)
+    if (pathStr === "client-projects") {
+      const user = await getUserFromRequest(request);
+      if (!user || !user.isAdmin) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const clientSlug = slugify(body.clientName || body.title);
+      const project = await ClientProject.create({
+        _id: uuidv4(),
+        ...body,
+        clientSlug,
+      });
+      // Create the Cloudinary folder tree for this client (+ admin folder).
+      ensureClientFolders(clientSlug).catch(() => {});
+      ensureAdminFolders().catch(() => {});
+      return NextResponse.json(project, {
+        status: 201,
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // Post a chat message to a milestone (admin or owner client)
+    if (pathStr.startsWith("client-projects/") && path[2] === "messages") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const id = path[1];
+      const project = await ClientProject.findById(id);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      if (!canAccessClientProject(user, project)) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      if (!body.milestoneId) {
+        return NextResponse.json(
+          { error: "milestoneId is required" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      const message = await ProjectMessage.create({
+        _id: uuidv4(),
+        projectId: id,
+        milestoneId: body.milestoneId,
+        authorUserId: user.userId,
+        authorName: body.authorName || user.email,
+        authorRole: user.isAdmin ? "admin" : "client",
+        body: body.body || "",
+        attachments: Array.isArray(body.attachments) ? body.attachments : [],
+      });
+      return NextResponse.json(message, {
+        status: 201,
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // File upload (images + PDF) to Cloudinary (auth required)
+    if (pathStr === "upload") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const { file, name, projectId, kind } = body;
+      if (!file) {
+        return NextResponse.json(
+          { error: "No file provided" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      const isPdf =
+        file.startsWith("data:application/pdf") ||
+        (name && name.toLowerCase().endsWith(".pdf"));
+      if (!file.startsWith("data:image/") && !isPdf) {
+        return NextResponse.json(
+          { error: "Only images and PDF files are allowed" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      // Resolve destination folder: admin -> portfolio/admin/<kind>,
+      // client -> portfolio/clients/<slug>/<kind>. Requires project access.
+      let folder;
+      if (projectId) {
+        const project = await ClientProject.findById(projectId);
+        if (!project || !canAccessClientProject(user, project)) {
+          return NextResponse.json(
+            { error: "Unauthorized" },
+            { status: 401, headers: getCorsHeaders() },
+          );
+        }
+        if (user.isAdmin) {
+          folder = adminFolder(kind);
+        } else {
+          const slug = project.clientSlug || slugify(project.clientName);
+          folder = clientFolder(slug, kind);
+        }
+      } else {
+        folder = adminFolder(kind);
+      }
+      const url = await uploadToCloudinary(file, { folder });
+      return NextResponse.json(
+        { url, type: isPdf ? "pdf" : "image", name: name || "" },
+        { status: 201, headers: getCorsHeaders() },
+      );
+    }
+
     // Testimonials
     if (pathStr === "testimonials") {
       const user = await getUserFromRequest(request);
@@ -553,6 +743,58 @@ export async function PUT(request, context) {
       return NextResponse.json(project, { headers: getCorsHeaders() });
     }
 
+    // Client Projects (admin only) - full update / reassign / publish
+    if (pathStr.startsWith("client-projects/")) {
+      const user = await getUserFromRequest(request);
+      if (!user || !user.isAdmin) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const id = path[1];
+      const existing = await ClientProject.findById(id);
+      if (!existing) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      // Publish to public portfolio: create a linked Project once.
+      if (
+        body.publishToHomepage &&
+        !existing.linkedProjectId &&
+        !body.linkedProjectId
+      ) {
+        const title = body.title || existing.title;
+        const slug = title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "");
+        const portfolio = await Project.create({
+          _id: uuidv4(),
+          title,
+          description: body.description || existing.description || title,
+          image_url: body.coverImageUrl || existing.coverImageUrl || "",
+          live_preview_url: body.livePreviewUrl || existing.livePreviewUrl || "",
+          github_url: body.githubRepoUrl || existing.githubRepoUrl || "",
+          color: body.color || existing.color || "blue",
+          category: body.category || existing.category || "Web App",
+          slug,
+        });
+        body.linkedProjectId = portfolio._id;
+      }
+      // Reassign / renamed client -> recompute slug and ensure its folders.
+      if (body.clientName && slugify(body.clientName) !== existing.clientSlug) {
+        body.clientSlug = slugify(body.clientName);
+        ensureClientFolders(body.clientSlug).catch(() => {});
+      }
+      const project = await ClientProject.findByIdAndUpdate(id, body, {
+        new: true,
+      });
+      return NextResponse.json(project, { headers: getCorsHeaders() });
+    }
+
     // Testimonials (admin reply)
     if (pathStr.startsWith("testimonials/")) {
       const user = await getUserFromRequest(request);
@@ -670,6 +912,20 @@ export async function PUT(request, context) {
       if (body.isAdmin !== undefined && !user.isAdmin) {
         delete body.isAdmin;
       }
+      // Don't allow changing email while an active project relies on it for
+      // ownership matching (keeps client projects from being orphaned).
+      if (body.email !== undefined) {
+        const target = await User.findById(id);
+        if (target && body.email !== target.email) {
+          const activeProjects = await ClientProject.countDocuments({
+            status: { $ne: "completed" },
+            $or: [{ clientUserId: id }, { clientEmail: target.email }],
+          });
+          if (activeProjects > 0) {
+            delete body.email;
+          }
+        }
+      }
       // Hash password if being updated
       if (body.password) {
         body.password = hashPassword(body.password);
@@ -747,6 +1003,29 @@ export async function DELETE(request, context) {
           { status: 404, headers: getCorsHeaders() },
         );
       }
+      return NextResponse.json(
+        { message: "Project deleted" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // Client Projects (admin only)
+    if (pathStr.startsWith("client-projects/")) {
+      if (!user || !user.isAdmin) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const id = path[1];
+      const project = await ClientProject.findByIdAndDelete(id);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      await ProjectMessage.deleteMany({ projectId: id });
       return NextResponse.json(
         { message: "Project deleted" },
         { headers: getCorsHeaders() },
@@ -835,6 +1114,25 @@ export async function DELETE(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
+      // Block deletion while the user still owns an active project, so it
+      // doesn't become orphaned. Admin must reassign it first.
+      const target = await User.findById(id);
+      const activeProjects = await ClientProject.countDocuments({
+        status: { $ne: "completed" },
+        $or: [
+          { clientUserId: id },
+          ...(target?.email ? [{ clientEmail: target.email }] : []),
+        ],
+      });
+      if (activeProjects > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Account has a project in progress. Please contact admin to reassign it before deleting.",
+          },
+          { status: 409, headers: getCorsHeaders() },
+        );
+      }
       const deletedUser = await User.findByIdAndDelete(id);
       if (!deletedUser) {
         return NextResponse.json(
@@ -854,6 +1152,110 @@ export async function DELETE(request, context) {
     );
   } catch (error) {
     console.error("DELETE Error:", error);
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500, headers: getCorsHeaders() },
+    );
+  }
+}
+
+// Granular, patch-based progress updates (admin only). Targets a single
+// project status, a milestone, or a task — no need to resend the whole project.
+export async function PATCH(request, context) {
+  await connectDB();
+  const params = await context.params;
+  const path = params?.path || [];
+
+  try {
+    const body = await request.json();
+
+    if (path[0] === "client-projects" && path[1]) {
+      const user = await getUserFromRequest(request);
+      if (!user || !user.isAdmin) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const id = path[1];
+
+      // PATCH /client-projects/:id/status
+      if (path[2] === "status") {
+        const update = {};
+        if (body.status !== undefined) update.status = body.status;
+        if (body.publishToHomepage !== undefined)
+          update.publishToHomepage = body.publishToHomepage;
+        const project = await ClientProject.findByIdAndUpdate(
+          id,
+          { $set: update },
+          { new: true },
+        );
+        if (!project) {
+          return NextResponse.json(
+            { error: "Project not found" },
+            { status: 404, headers: getCorsHeaders() },
+          );
+        }
+        return NextResponse.json(project, { headers: getCorsHeaders() });
+      }
+
+      // PATCH /client-projects/:id/milestone/:mid[/task/:tid]
+      if (path[2] === "milestone" && path[3]) {
+        const mid = path[3];
+
+        // Task-level update
+        if (path[4] === "task" && path[5]) {
+          const tid = path[5];
+          const set = {};
+          ["status", "title", "description", "order"].forEach((k) => {
+            if (body[k] !== undefined)
+              set[`milestones.$[m].tasks.$[t].${k}`] = body[k];
+          });
+          const project = await ClientProject.findByIdAndUpdate(
+            id,
+            { $set: set },
+            {
+              new: true,
+              arrayFilters: [{ "m._id": mid }, { "t._id": tid }],
+            },
+          );
+          if (!project) {
+            return NextResponse.json(
+              { error: "Project not found" },
+              { status: 404, headers: getCorsHeaders() },
+            );
+          }
+          return NextResponse.json(project, { headers: getCorsHeaders() });
+        }
+
+        // Milestone-level update
+        const set = {};
+        ["status", "title", "description", "icon", "order", "githubBranch"].forEach(
+          (k) => {
+            if (body[k] !== undefined) set[`milestones.$[m].${k}`] = body[k];
+          },
+        );
+        const project = await ClientProject.findByIdAndUpdate(
+          id,
+          { $set: set },
+          { new: true, arrayFilters: [{ "m._id": mid }] },
+        );
+        if (!project) {
+          return NextResponse.json(
+            { error: "Project not found" },
+            { status: 404, headers: getCorsHeaders() },
+          );
+        }
+        return NextResponse.json(project, { headers: getCorsHeaders() });
+      }
+    }
+
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: getCorsHeaders() },
+    );
+  } catch (error) {
+    console.error("PATCH Error:", error);
     return NextResponse.json(
       { error: error.message },
       { status: 500, headers: getCorsHeaders() },
