@@ -47,6 +47,9 @@ function RequestDetail({ id, onBack }) {
     budget: "",
   });
 
+  // Seed the form once when this request first loads (keyed by id), NOT on
+  // every poll/refetch — otherwise an admin's in-progress proposal draft would
+  // be overwritten whenever the request changes (new chat message, status, …).
   useEffect(() => {
     if (request) {
       setProposal({
@@ -56,7 +59,8 @@ function RequestDetail({ id, onBack }) {
         budget: request.proposal?.budget || "",
       });
     }
-  }, [request]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request?._id]);
 
   if (!request) {
     return <div className="text-gray-400">Loading…</div>;

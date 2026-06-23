@@ -230,7 +230,7 @@ export function RequestConversation({
           onChange={(e) => setText(e.target.value)}
           placeholder="Write a reply…"
           rows={2}
-          className="flex-1 bg-transparent text-white text-sm px-2 py-1 focus:outline-none resize-none"
+          className="flex-1 bg-transparent text-white text-sm px-2 py-1 focus:outline-none resize-y min-h-[40px] max-h-72 overflow-y-auto"
         />
         <button
           type="submit"
