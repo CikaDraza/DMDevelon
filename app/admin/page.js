@@ -90,6 +90,7 @@ import Link from "next/link";
 import { useCompanyProfile } from "@/hooks/useCompanyProfile";
 import ClientProjectsManager from "@/components/admin/ClientProjectsManager";
 import ProjectRequestsManager from "@/components/admin/ProjectRequestsManager";
+import NotificationBell from "@/components/NotificationBell";
 
 // Icon mapping
 const iconMap = {
@@ -2385,7 +2386,7 @@ export default function AdminPage() {
       {/* Main Content */}
       <div className="lg:ml-64">
         {/* Top Bar */}
-        <header className="bg-[#1a1a1b] border-b border-white/10 px-6 py-4">
+        <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setIsMobileOpen(true)}
@@ -2401,6 +2402,7 @@ export default function AdminPage() {
                 <Home className="w-4 h-4" />
                 <span className="hidden sm:inline">Home</span>
               </Link>
+              <NotificationBell />
               <span className="text-gray-400 text-sm">
                 Welcome, {user?.name}
               </span>

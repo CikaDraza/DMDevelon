@@ -6,20 +6,21 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjectRequest } from "@/hooks/useProjectRequests";
+import { useNotifications } from "@/hooks/useNotifications";
 import { RequestConversation } from "@/components/dashboard/RequestConversation";
 import { Button } from "@/components/ui/button";
-import {
-  ArrowLeft,
-  Lightbulb,
-  Check,
-  Edit3,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowLeft, Lightbulb, Check, Edit3, ArrowRight } from "lucide-react";
 
 const STATUS = {
-  new: { label: "Submitted — awaiting review", cls: "bg-purple-500/20 text-purple-300" },
+  new: {
+    label: "Submitted — awaiting review",
+    cls: "bg-purple-500/20 text-purple-300",
+  },
   discussion: { label: "Discussion", cls: "bg-blue-500/20 text-blue-400" },
-  proposal_sent: { label: "Proposal Ready", cls: "bg-[#FFB633]/20 text-[#FFB633]" },
+  proposal_sent: {
+    label: "Proposal Ready",
+    cls: "bg-[#FFB633]/20 text-[#FFB633]",
+  },
   approved: { label: "Approved", cls: "bg-green-500/20 text-green-400" },
   closed: { label: "Closed", cls: "bg-gray-500/20 text-gray-400" },
 };
@@ -38,9 +39,17 @@ export default function ClientRequestDetailPage() {
     requestChanges,
   } = useProjectRequest(id);
 
+  const { markRead } = useNotifications();
+
   useEffect(() => {
     if (!authLoading && !user) router.push("/");
   }, [authLoading, user, router]);
+
+  // Clear unread notifications for this request on open
+  useEffect(() => {
+    if (id) markRead.mutate({ entityId: id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const handleAccept = async () => {
     try {
@@ -86,7 +95,7 @@ export default function ClientRequestDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#0f0f10]">
-      <header className="bg-[#1a1a1b] border-b border-white/10 px-6 py-4">
+      <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
         <div className="container mx-auto flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
             <Lightbulb className="w-8 h-8 text-[#FFB633]" />
@@ -129,7 +138,9 @@ export default function ClientRequestDetailPage() {
             </p>
             <Button
               onClick={() =>
-                router.push(`/dashboard/projects/${request.linkedClientProjectId}`)
+                router.push(
+                  `/dashboard/projects/${request.linkedClientProjectId}`,
+                )
               }
               className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
             >

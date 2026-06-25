@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTestimonials } from "@/hooks/useTestimonials";
 import { useClientProjects } from "@/hooks/useClientProjects";
 import { useProjectRequests } from "@/hooks/useProjectRequests";
+import { useNotifications } from "@/hooks/useNotifications";
+import NotificationBell from "@/components/NotificationBell";
 import toast from "react-hot-toast";
 import axios from "axios";
 import {
@@ -50,8 +52,12 @@ export default function DashboardPage() {
   } = useTestimonials();
   const { projects: clientProjects, isLoading: projectsLoading } =
     useClientProjects();
-  const { requests: projectRequests, isLoading: requestsLoading, createRequest } =
-    useProjectRequests();
+  const {
+    requests: projectRequests,
+    isLoading: requestsLoading,
+    createRequest,
+  } = useProjectRequests();
+  const { unreadEntityIds } = useNotifications();
   const [activeTab, setActiveTab] = useState("services");
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isTestimonialModalOpen, setIsTestimonialModalOpen] = useState(false);
@@ -261,20 +267,29 @@ export default function DashboardPage() {
           : "bg-purple-500/20 text-purple-300";
 
   // Client can't delete account while a project is still active (avoids orphans)
-  const hasActiveProject = clientProjects.some(
-    (p) => p.status !== "completed",
-  );
+  const hasActiveProject = clientProjects.some((p) => p.status !== "completed");
 
   const REQUEST_STATUS = {
-    new: { label: "Submitted — awaiting review", cls: "bg-purple-500/20 text-purple-300" },
+    new: {
+      label: "Submitted — awaiting review",
+      cls: "bg-purple-500/20 text-purple-300",
+    },
     discussion: { label: "Discussion", cls: "bg-blue-500/20 text-blue-400" },
-    proposal_sent: { label: "Proposal Ready", cls: "bg-[#FFB633]/20 text-[#FFB633]" },
+    proposal_sent: {
+      label: "Proposal Ready",
+      cls: "bg-[#FFB633]/20 text-[#FFB633]",
+    },
     approved: { label: "Approved", cls: "bg-green-500/20 text-green-400" },
     closed: { label: "Closed", cls: "bg-gray-500/20 text-gray-400" },
   };
   const lastMsgPreview = (req) => {
     const msgs = (req.messages || []).filter((m) => m.type !== "system");
     return msgs[msgs.length - 1]?.body?.slice(0, 90) || "—";
+  };
+  // Last non-system author role → who needs to act next
+  const lastAuthorRole = (req) => {
+    const msgs = (req.messages || []).filter((m) => m.type !== "system");
+    return msgs[msgs.length - 1]?.authorRole || null;
   };
   // Approved requests are represented by their ClientProject below
   const pendingRequests = projectRequests.filter(
@@ -296,9 +311,9 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#0f0f10]">
       {/* Header */}
-      <header className="bg-[#1a1a1b] border-b border-white/10 px-6 py-4">
-        <div className="container mx-auto flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3">
+      <header className="bg-[#1a1a1b] border-b border-white/10 px-3 lg:px-6 py-4">
+        <div className="container mx-auto flex items-center justify-between px-1 lg:px-3">
+          <a href="/" className="flex items-center lg:gap-3">
             <Lightbulb className="w-8 h-8 text-[#FFB633]" />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
@@ -306,6 +321,7 @@ export default function DashboardPage() {
             </div>
           </a>
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <Link
               href="/"
               className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"
@@ -406,7 +422,9 @@ export default function DashboardPage() {
               <div>
                 <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
                   <div>
-                    <h2 className="text-2xl font-bold text-white">My Projects</h2>
+                    <h2 className="text-2xl font-bold text-white">
+                      My Projects
+                    </h2>
                     <p className="text-gray-400 mt-1">
                       Your project requests and active projects.
                     </p>
@@ -459,18 +477,30 @@ export default function DashboardPage() {
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
-                                    <h4 className="text-lg font-semibold text-white">
-                                      {req.title}
-                                    </h4>
+                                    <div className="flex items-center gap-2">
+                                      {unreadEntityIds.has(req._id) && (
+                                        <span className="w-2 h-2 rounded-full bg-[#FFB633] shrink-0" />
+                                      )}
+                                      <h4 className="text-lg font-semibold text-white truncate">
+                                        {req.title}
+                                      </h4>
+                                    </div>
                                     <p className="text-gray-500 text-sm mt-1 line-clamp-1">
                                       {lastMsgPreview(req)}
                                     </p>
                                   </div>
-                                  <span
-                                    className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${s.cls}`}
-                                  >
-                                    {s.label}
-                                  </span>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {lastAuthorRole(req) === "admin" && (
+                                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-[#FFB633]/20 text-[#FFB633]">
+                                        Action needed
+                                      </span>
+                                    )}
+                                    <span
+                                      className={`px-3 py-1 rounded-full text-xs font-medium ${s.cls}`}
+                                    >
+                                      {s.label}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
                                   <span className="text-gray-500 text-xs">
@@ -513,9 +543,14 @@ export default function DashboardPage() {
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
-                                    <h4 className="text-lg font-semibold text-white">
-                                      {project.title}
-                                    </h4>
+                                    <div className="flex items-center gap-2">
+                                      {unreadEntityIds.has(project._id) && (
+                                        <span className="w-2 h-2 rounded-full bg-[#FFB633] shrink-0" />
+                                      )}
+                                      <h4 className="text-lg font-semibold text-white truncate">
+                                        {project.title}
+                                      </h4>
+                                    </div>
                                     {project.description && (
                                       <p className="text-gray-400 text-sm mt-1 line-clamp-2">
                                         {project.description}
@@ -881,7 +916,10 @@ export default function DashboardPage() {
               Tell us what you'd like to build and we'll set it up for you.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmitProjectRequest} className="space-y-4 mt-2">
+          <form
+            onSubmit={handleSubmitProjectRequest}
+            className="space-y-4 mt-2"
+          >
             <div>
               <Label className="text-white">Project name</Label>
               <Input

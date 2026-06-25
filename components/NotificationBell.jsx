@@ -1,0 +1,108 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Bell, CheckCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useNotifications } from "@/hooks/useNotifications";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+
+function timeAgo(d) {
+  const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  return `${days}d ago`;
+}
+
+export default function NotificationBell() {
+  const router = useRouter();
+  const { items, unreadCount, markRead } = useNotifications();
+  const [open, setOpen] = useState(false);
+
+  const handleClick = (n) => {
+    if (!n.read) markRead.mutate({ id: n._id });
+    setOpen(false);
+    if (n.link) router.push(n.link);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="relative p-2 text-gray-400 hover:text-white transition-colors"
+          aria-label="Notifications"
+        >
+          <Bell className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-80 p-0 bg-[#1a1a1b] border-white/10 text-white"
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <span className="font-semibold">Notifications</span>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => markRead.mutate({})}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#FFB633]"
+            >
+              <CheckCheck className="w-4 h-4" />
+              Mark all read
+            </button>
+          )}
+        </div>
+        <div className="max-h-96 overflow-y-auto">
+          {items.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-8">
+              No notifications yet.
+            </p>
+          ) : (
+            items.map((n) => (
+              <button
+                key={n._id}
+                onClick={() => handleClick(n)}
+                className={cn(
+                  "w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors flex gap-2",
+                  !n.read && "bg-[#FFB633]/5",
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-1.5 w-2 h-2 rounded-full shrink-0",
+                    n.read ? "bg-transparent" : "bg-[#FFB633]",
+                  )}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm text-white truncate">
+                    {n.title}
+                  </span>
+                  {n.body && (
+                    <span className="block text-xs text-gray-400 truncate">
+                      {n.body}
+                    </span>
+                  )}
+                  <span className="block text-[10px] text-gray-500 mt-0.5">
+                    {timeAgo(n.createdAt)}
+                  </span>
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}

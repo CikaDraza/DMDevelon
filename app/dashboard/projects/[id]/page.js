@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "@/hooks/useAuth";
 import { useClientProject } from "@/hooks/useClientProjects";
+import { useNotifications } from "@/hooks/useNotifications";
 import { ProjectTimeline } from "@/components/ui/project-timeline";
 import { MilestoneChat } from "@/components/dashboard/MilestoneChat";
 import {
@@ -24,7 +25,18 @@ import {
   Circle,
   ExternalLink,
   Github,
+  Activity,
 } from "lucide-react";
+
+function eventTimeAgo(d) {
+  const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 const STATUS_BADGE = {
   planning: "bg-purple-500/20 text-purple-300",
@@ -66,7 +78,9 @@ const markdownComponents = {
   ),
   code: ({ inline, children }) =>
     inline ? (
-      <code className="bg-white/10 text-[#FFB633] px-1 rounded">{children}</code>
+      <code className="bg-white/10 text-[#FFB633] px-1 rounded">
+        {children}
+      </code>
     ) : (
       <code className="block bg-[#0f0f10] p-3 rounded-lg overflow-x-auto text-gray-300">
         {children}
@@ -82,10 +96,17 @@ export default function ClientProjectDetailPage() {
 
   const [selectedMilestoneId, setSelectedMilestoneId] = useState(null);
   const [chatMilestone, setChatMilestone] = useState(null);
+  const { markRead } = useNotifications();
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/");
   }, [authLoading, user, router]);
+
+  // Clear unread notifications for this project on open
+  useEffect(() => {
+    if (id) markRead.mutate({ entityId: id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const handleSelect = (milestoneId) => {
     setSelectedMilestoneId(milestoneId);
@@ -119,7 +140,7 @@ export default function ClientProjectDetailPage() {
   return (
     <div className="min-h-screen bg-[#0f0f10]">
       {/* Header */}
-      <header className="bg-[#1a1a1b] border-b border-white/10 px-6 py-4">
+      <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
         <div className="container mx-auto flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
             <Lightbulb className="w-8 h-8 text-[#FFB633]" />
@@ -251,6 +272,31 @@ export default function ClientProjectDetailPage() {
             ))
           )}
         </div>
+
+        {/* Activity feed */}
+        {(project.events || []).length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-[#FFB633]" /> Activity
+            </h3>
+            <div className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10 space-y-3">
+              {[...project.events]
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .map((ev) => (
+                  <div key={ev._id} className="flex items-start gap-3">
+                    <span className="mt-1.5 w-2 h-2 rounded-full bg-[#FFB633]/60 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-200">{ev.body}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {ev.actorName ? `${ev.actorName} · ` : ""}
+                        {eventTimeAgo(ev.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* Showcase links when completed */}
         {project.status === "completed" &&

@@ -7,6 +7,7 @@ import {
   useProjectRequests,
   useProjectRequest,
 } from "@/hooks/useProjectRequests";
+import { useNotifications } from "@/hooks/useNotifications";
 import { RequestConversation } from "@/components/dashboard/RequestConversation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,10 +37,22 @@ function lastMessagePreview(req) {
   return last?.body?.slice(0, 80) || "—";
 }
 
+// Last non-system author === "client" means the client spoke last → needs reply
+function needsReply(req) {
+  const msgs = (req.messages || []).filter((m) => m.type !== "system");
+  return msgs[msgs.length - 1]?.authorRole === "client";
+}
+
 function RequestDetail({ id, onBack }) {
   const { user } = useAuth();
   const { request, postMessage, uploadAttachment } = useProjectRequest(id);
   const { saveProposal, updateStatus, deleteRequest } = useProjectRequests();
+  const { markRead } = useNotifications();
+
+  useEffect(() => {
+    if (id) markRead.mutate({ entityId: id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
   const [proposal, setProposal] = useState({
     title: "",
     scope: "",
@@ -242,6 +255,7 @@ function RequestDetail({ id, onBack }) {
 
 export default function ProjectRequestsManager() {
   const { requests, isLoading } = useProjectRequests();
+  const { unreadEntityIds } = useNotifications();
   const [selectedId, setSelectedId] = useState(null);
 
   if (selectedId) {
@@ -276,6 +290,9 @@ export default function ProjectRequestsManager() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
+                      {unreadEntityIds.has(req._id) && (
+                        <span className="w-2 h-2 rounded-full bg-[#FFB633] shrink-0" />
+                      )}
                       <h3 className="text-lg font-semibold text-white">
                         {req.title}
                       </h3>
@@ -284,6 +301,11 @@ export default function ProjectRequestsManager() {
                       >
                         {status.label}
                       </span>
+                      {needsReply(req) && (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+                          Needs reply
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-400 text-sm mt-1">
                       {req.clientName || req.clientEmail}

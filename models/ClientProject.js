@@ -59,6 +59,21 @@ const ClientProjectSchema = new mongoose.Schema(
     linkedProjectId: { type: String, default: null },
     requestId: { type: String, default: null }, // back-link to originating ProjectRequest
     milestones: { type: [MilestoneSchema], default: [] },
+    events: {
+      type: [
+        new mongoose.Schema(
+          {
+            _id: { type: String, default: () => uuidv4() },
+            type: { type: String, default: 'event' },
+            body: { type: String, default: '' },
+            actorName: { type: String, default: '' },
+            createdAt: { type: Date, default: Date.now },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true, _id: false }
 );

@@ -10,6 +10,12 @@ import CMSPage from "@/models/CMSPage";
 import ClientProject from "@/models/ClientProject";
 import ProjectMessage from "@/models/ProjectMessage";
 import ProjectRequest from "@/models/ProjectRequest";
+import Notification from "@/models/Notification";
+import {
+  notifyUser,
+  notifyAdmins,
+  resolveClientUserId,
+} from "@/lib/notify";
 import {
   hashPassword,
   comparePassword,
@@ -342,6 +348,27 @@ export async function GET(request, context) {
         );
       }
       return NextResponse.json(userData, { headers: getCorsHeaders() });
+    }
+
+    // Notifications (current user)
+    if (pathStr === "notifications") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const [items, unreadCount] = await Promise.all([
+        Notification.find({ userId: user._id })
+          .sort({ createdAt: -1 })
+          .limit(50),
+        Notification.countDocuments({ userId: user._id, read: false }),
+      ]);
+      return NextResponse.json(
+        { items, unreadCount },
+        { headers: getCorsHeaders() },
+      );
     }
 
     // Statistics (admin only)
@@ -691,10 +718,31 @@ export async function POST(request, context) {
         _id: uuidv4(),
         ...body,
         clientSlug,
+        events: [
+          {
+            _id: uuidv4(),
+            type: "created",
+            body: "Project created",
+            actorName: user.name || "Admin",
+            createdAt: new Date(),
+          },
+        ],
       });
       // Create the Cloudinary folder tree for this client (+ admin folder).
       ensureClientFolders(clientSlug).catch(() => {});
       ensureAdminFolders().catch(() => {});
+      const clientId = await resolveClientUserId(project);
+      await notifyUser({
+        userId: clientId,
+        actorId: user._id,
+        type: "project_created",
+        title: `Your project is live: ${project.title}`,
+        body: "You can now follow its progress in your dashboard.",
+        link: `/dashboard/projects/${project._id}`,
+        entityType: "project",
+        entityId: project._id,
+        email: true,
+      });
       return NextResponse.json(project, {
         status: 201,
         headers: getCorsHeaders(),
@@ -734,12 +782,38 @@ export async function POST(request, context) {
         _id: uuidv4(),
         projectId: id,
         milestoneId: body.milestoneId,
-        authorUserId: user.userId,
+        authorUserId: user._id,
         authorName: body.authorName || user.email,
         authorRole: user.isAdmin ? "admin" : "client",
         body: body.body || "",
         attachments: Array.isArray(body.attachments) ? body.attachments : [],
       });
+      const msgPreview = (body.body || "").slice(0, 140);
+      if (user.isAdmin) {
+        const clientId = await resolveClientUserId(project);
+        await notifyUser({
+          userId: clientId,
+          actorId: user._id,
+          type: "project_message",
+          title: `New message on ${project.title}`,
+          body: msgPreview,
+          link: `/dashboard/projects/${project._id}`,
+          entityType: "project",
+          entityId: project._id,
+          email: true,
+        });
+      } else {
+        await notifyAdmins({
+          actorId: user._id,
+          type: "project_message",
+          title: `Client message on ${project.title}`,
+          body: `${project.clientName}: ${msgPreview}`,
+          link: "/admin",
+          entityType: "project",
+          entityId: project._id,
+          email: false,
+        });
+      }
       return NextResponse.json(message, {
         status: 201,
         headers: getCorsHeaders(),
@@ -858,7 +932,7 @@ export async function POST(request, context) {
         : [];
       const reqDoc = await ProjectRequest.create({
         _id: uuidv4(),
-        clientUserId: user.userId,
+        clientUserId: user._id,
         clientName,
         clientEmail,
         clientSlug,
@@ -869,6 +943,16 @@ export async function POST(request, context) {
         lastActivityAt: now,
       });
       ensureClientFolders(clientSlug).catch(() => {});
+      await notifyAdmins({
+        actorId: user._id,
+        type: "request_created",
+        title: `New project request: ${reqDoc.title}`,
+        body: `${clientName} submitted a new request.`,
+        link: "/admin",
+        entityType: "request",
+        entityId: reqDoc._id,
+        email: true,
+      });
       return NextResponse.json(reqDoc, {
         status: 201,
         headers: getCorsHeaders(),
@@ -916,6 +1000,32 @@ export async function POST(request, context) {
         if (user.isAdmin && reqDoc.status === "new") reqDoc.status = "discussion";
         reqDoc.lastActivityAt = now;
         await reqDoc.save();
+        const preview = (body.body || "").slice(0, 140);
+        if (user.isAdmin) {
+          const clientId = await resolveClientUserId(reqDoc);
+          await notifyUser({
+            userId: clientId,
+            actorId: user._id,
+            type: "request_message",
+            title: `DMDevelon replied: ${reqDoc.title}`,
+            body: preview,
+            link: `/dashboard/requests/${reqDoc._id}`,
+            entityType: "request",
+            entityId: reqDoc._id,
+            email: true,
+          });
+        } else {
+          await notifyAdmins({
+            actorId: user._id,
+            type: "request_message",
+            title: `New message: ${reqDoc.title}`,
+            body: `${reqDoc.clientName}: ${preview}`,
+            link: "/admin",
+            entityType: "request",
+            entityId: reqDoc._id,
+            email: true,
+          });
+        }
         return NextResponse.json(reqDoc, {
           status: 201,
           headers: getCorsHeaders(),
@@ -942,6 +1052,15 @@ export async function POST(request, context) {
           requirements: reqDoc.description,
           status: "in_progress",
           milestones: [],
+          events: [
+            {
+              _id: uuidv4(),
+              type: "created",
+              body: "Project created from accepted proposal",
+              actorName: reqDoc.clientName || "Client",
+              createdAt: now,
+            },
+          ],
         });
         ensureClientFolders(clientSlug).catch(() => {});
         reqDoc.status = "approved";
@@ -957,6 +1076,16 @@ export async function POST(request, context) {
         });
         reqDoc.lastActivityAt = now;
         await reqDoc.save();
+        await notifyAdmins({
+          actorId: user._id,
+          type: "request_approved",
+          title: `Proposal accepted: ${reqDoc.title}`,
+          body: `${reqDoc.clientName} accepted the proposal — project created.`,
+          link: "/admin",
+          entityType: "request",
+          entityId: reqDoc._id,
+          email: true,
+        });
         return NextResponse.json(
           { projectId: project._id, request: reqDoc },
           { status: 201, headers: getCorsHeaders() },
@@ -989,8 +1118,35 @@ export async function POST(request, context) {
         reqDoc.status = "discussion";
         reqDoc.lastActivityAt = now;
         await reqDoc.save();
+        await notifyAdmins({
+          actorId: user._id,
+          type: "request_changes",
+          title: `Changes requested: ${reqDoc.title}`,
+          body: `${reqDoc.clientName} requested changes on the proposal.`,
+          link: "/admin",
+          entityType: "request",
+          entityId: reqDoc._id,
+          email: true,
+        });
         return NextResponse.json(reqDoc, { headers: getCorsHeaders() });
       }
+    }
+
+    // Mark notifications read (current user)
+    if (pathStr === "notifications/read") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const filter = { userId: user._id, read: false };
+      if (body.id) filter._id = body.id;
+      else if (body.entityId) filter.entityId = body.entityId;
+      // else: all unread for this user
+      await Notification.updateMany(filter, { $set: { read: true } });
+      return NextResponse.json({ success: true }, { headers: getCorsHeaders() });
     }
 
     // File upload (images + PDF) to Cloudinary (auth required)
@@ -1278,6 +1434,20 @@ export async function PUT(request, context) {
       });
       reqDoc.lastActivityAt = now;
       await reqDoc.save();
+      {
+        const clientId = await resolveClientUserId(reqDoc);
+        await notifyUser({
+          userId: clientId,
+          actorId: user._id,
+          type: "proposal_sent",
+          title: `Proposal ready: ${reqDoc.title}`,
+          body: "A proposal is ready for your review.",
+          link: `/dashboard/requests/${reqDoc._id}`,
+          entityType: "request",
+          entityId: reqDoc._id,
+          email: true,
+        });
+      }
       return NextResponse.json(reqDoc, { headers: getCorsHeaders() });
     }
 
@@ -1686,72 +1856,133 @@ export async function PATCH(request, context) {
       }
       const id = path[1];
 
+      const project = await ClientProject.findById(id);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      const actorName = user.name || "Admin";
+      const projLink = `/dashboard/projects/${project._id}`;
+
       // PATCH /client-projects/:id/status
       if (path[2] === "status") {
-        const update = {};
-        if (body.status !== undefined) update.status = body.status;
-        if (body.publishToHomepage !== undefined)
-          update.publishToHomepage = body.publishToHomepage;
-        const project = await ClientProject.findByIdAndUpdate(
-          id,
-          { $set: update },
-          { new: true },
-        );
-        if (!project) {
-          return NextResponse.json(
-            { error: "Project not found" },
-            { status: 404, headers: getCorsHeaders() },
-          );
+        if (body.status !== undefined) {
+          project.status = body.status;
+          project.events.push({
+            _id: uuidv4(),
+            type: "status",
+            body: `Project status → ${String(body.status).replace("_", " ")}`,
+            actorName,
+            createdAt: new Date(),
+          });
         }
+        if (body.publishToHomepage !== undefined)
+          project.publishToHomepage = body.publishToHomepage;
+        await project.save();
+        const clientId = await resolveClientUserId(project);
+        await notifyUser({
+          userId: clientId,
+          actorId: user._id,
+          type: "status_change",
+          title: `${project.title}: ${String(body.status || "").replace("_", " ")}`,
+          body: "Project status updated.",
+          link: projLink,
+          entityType: "project",
+          entityId: project._id,
+          email: false,
+        });
         return NextResponse.json(project, { headers: getCorsHeaders() });
       }
 
       // PATCH /client-projects/:id/milestone/:mid[/task/:tid]
       if (path[2] === "milestone" && path[3]) {
         const mid = path[3];
+        const m = (project.milestones || []).find((x) => x._id === mid);
+        if (!m) {
+          return NextResponse.json(
+            { error: "Milestone not found" },
+            { status: 404, headers: getCorsHeaders() },
+          );
+        }
 
         // Task-level update
         if (path[4] === "task" && path[5]) {
-          const tid = path[5];
-          const set = {};
-          ["status", "title", "description", "order"].forEach((k) => {
-            if (body[k] !== undefined)
-              set[`milestones.$[m].tasks.$[t].${k}`] = body[k];
-          });
-          const project = await ClientProject.findByIdAndUpdate(
-            id,
-            { $set: set },
-            {
-              new: true,
-              arrayFilters: [{ "m._id": mid }, { "t._id": tid }],
-            },
-          );
-          if (!project) {
+          const t = (m.tasks || []).find((x) => x._id === path[5]);
+          if (!t) {
             return NextResponse.json(
-              { error: "Project not found" },
+              { error: "Task not found" },
               { status: 404, headers: getCorsHeaders() },
             );
+          }
+          const prev = t.status;
+          ["status", "title", "description", "order"].forEach((k) => {
+            if (body[k] !== undefined) t[k] = body[k];
+          });
+          const justCompleted =
+            body.status === "completed" && prev !== "completed";
+          if (body.status !== undefined && body.status !== prev) {
+            project.events.push({
+              _id: uuidv4(),
+              type: "task",
+              body: `Task '${t.title}' → ${String(body.status).replace("_", " ")}`,
+              actorName,
+              createdAt: new Date(),
+            });
+          }
+          project.markModified("milestones");
+          await project.save();
+          if (justCompleted) {
+            const clientId = await resolveClientUserId(project);
+            await notifyUser({
+              userId: clientId,
+              actorId: user._id,
+              type: "task_done",
+              title: `${project.title}: task completed`,
+              body: `Task '${t.title}' was completed.`,
+              link: projLink,
+              entityType: "project",
+              entityId: project._id,
+              email: false,
+            });
           }
           return NextResponse.json(project, { headers: getCorsHeaders() });
         }
 
         // Milestone-level update
-        const set = {};
+        const prev = m.status;
         ["status", "title", "description", "icon", "order", "githubBranch"].forEach(
           (k) => {
-            if (body[k] !== undefined) set[`milestones.$[m].${k}`] = body[k];
+            if (body[k] !== undefined) m[k] = body[k];
           },
         );
-        const project = await ClientProject.findByIdAndUpdate(
-          id,
-          { $set: set },
-          { new: true, arrayFilters: [{ "m._id": mid }] },
-        );
-        if (!project) {
-          return NextResponse.json(
-            { error: "Project not found" },
-            { status: 404, headers: getCorsHeaders() },
-          );
+        const justCompleted =
+          body.status === "completed" && prev !== "completed";
+        if (body.status !== undefined && body.status !== prev) {
+          project.events.push({
+            _id: uuidv4(),
+            type: "milestone",
+            body: `Milestone '${m.title}' → ${String(body.status).replace("_", " ")}`,
+            actorName,
+            createdAt: new Date(),
+          });
+        }
+        project.markModified("milestones");
+        await project.save();
+        if (justCompleted) {
+          const clientId = await resolveClientUserId(project);
+          await notifyUser({
+            userId: clientId,
+            actorId: user._id,
+            type: "milestone_done",
+            title: `${project.title}: milestone completed`,
+            body: `Milestone '${m.title}' was completed.`,
+            link: projLink,
+            entityType: "project",
+            entityId: project._id,
+            email: true,
+          });
         }
         return NextResponse.json(project, { headers: getCorsHeaders() });
       }
@@ -1785,6 +2016,20 @@ export async function PATCH(request, context) {
       });
       reqDoc.lastActivityAt = now;
       await reqDoc.save();
+      {
+        const clientId = await resolveClientUserId(reqDoc);
+        await notifyUser({
+          userId: clientId,
+          actorId: user._id,
+          type: "status_change",
+          title: `Request status: ${reqDoc.title}`,
+          body: `Status changed to ${body.status}.`,
+          link: `/dashboard/requests/${reqDoc._id}`,
+          entityType: "request",
+          entityId: reqDoc._id,
+          email: false,
+        });
+      }
       return NextResponse.json(reqDoc, { headers: getCorsHeaders() });
     }
 

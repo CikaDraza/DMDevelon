@@ -68,7 +68,7 @@ export default function ProjectDetailPage() {
   if (error || !project) {
     return (
       <div className="min-h-screen bg-[#0f0f10]">
-        <header className="bg-[#1a1a1b] border-b border-white/10 px-6 py-4">
+        <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
           <div className="container mx-auto flex items-center justify-between">
             <a href="/" className="flex items-center gap-3">
               <Lightbulb className="w-8 h-8 text-[#FFB633]" />
@@ -104,7 +104,7 @@ export default function ProjectDetailPage() {
   return (
     <div className="min-h-screen bg-[#0f0f10]">
       {/* Header */}
-      <header className="bg-[#1a1a1b] border-b border-white/10 px-6 py-4">
+      <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
         <div className="container mx-auto flex items-center justify-between">
           <a href="/" className="flex items-center gap-3">
             <Lightbulb className="w-8 h-8 text-[#FFB633]" />

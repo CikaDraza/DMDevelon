@@ -122,8 +122,9 @@ export function ProjectTimeline({ milestones = [], selectedId, onSelect }) {
             </div>
             <div className="mt-3 sm:pe-8">
               <h3
+                title={m.title}
                 className={cn(
-                  "text-sm font-semibold my-1 cursor-pointer",
+                  "text-sm font-semibold my-1 cursor-pointer truncate min-w-[125px] max-w-[200px]",
                   isSelected ? "text-[#FFB633]" : "text-white",
                 )}
                 onClick={() => onSelect?.(m._id)}
@@ -132,16 +133,24 @@ export function ProjectTimeline({ milestones = [], selectedId, onSelect }) {
               </h3>
               {tasks.length > 0 && (
                 <div className="flex items-center gap-1.5 mt-1.5">
-                  {tasks.map((t) => (
+                  {tasks.slice(0, 10).map((t) => (
                     <span
                       key={t._id}
                       title={`${t.title} — ${t.status.replace("_", " ")}`}
                       className={cn(
-                        "w-2 h-2 rounded-full",
+                        "w-2 h-2 rounded-full shrink-0",
                         TASK_DOT[t.status] || TASK_DOT.pending,
                       )}
                     />
                   ))}
+                  {tasks.length > 10 && (
+                    <span
+                      title={`${tasks.length - 10} more task(s)`}
+                      className="text-[10px] leading-none text-gray-500 ml-0.5 shrink-0"
+                    >
+                      +{tasks.length - 10}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
