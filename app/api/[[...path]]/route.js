@@ -17,8 +17,15 @@ import {
   getUserFromRequest,
 } from "@/lib/auth";
 import { v4 as uuidv4 } from "uuid";
+import { randomBytes } from "crypto";
 import { emailTemplates } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
+
+// Base URL for links in emails (prod domain, falls back to localhost in dev)
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  "http://localhost:3003";
 import {
   uploadToCloudinary,
   ensureClientFolders,
@@ -311,7 +318,7 @@ export async function GET(request, context) {
         );
       }
       const users = await User.find().select(
-        "-password -resetToken -resetTokenExpiry",
+        "-password -verifyToken -resetToken -resetTokenExpiry",
       );
       return NextResponse.json(users, { headers: getCorsHeaders() });
     }
@@ -326,7 +333,7 @@ export async function GET(request, context) {
         );
       }
       const userData = await User.findById(user.userId).select(
-        "-password -resetToken -resetTokenExpiry",
+        "-password -verifyToken -resetToken -resetTokenExpiry",
       );
       if (!userData) {
         return NextResponse.json(
@@ -419,16 +426,19 @@ export async function POST(request, context) {
         );
       }
       const hashedPassword = hashPassword(password);
+      const verifyToken = randomBytes(32).toString("hex");
       const user = await User.create({
         _id: uuidv4(),
         name,
         email,
         password: hashedPassword,
         isAdmin: false,
+        emailVerified: false,
+        verifyToken,
       });
 
       try {
-        const verificationUrl = `https://dmdevelon.website/verify-email?token=${verificationToken}`;
+        const verificationUrl = `${APP_URL}/verify-email?token=${verifyToken}`;
         const template = emailTemplates.emailVerification({
           name,
           verificationUrl,
@@ -455,6 +465,7 @@ export async function POST(request, context) {
             name: user.name,
             email: user.email,
             isAdmin: user.isAdmin,
+            emailVerified: user.emailVerified,
           },
         },
         { headers: getCorsHeaders() },
@@ -498,8 +509,133 @@ export async function POST(request, context) {
             email: user.email,
             isAdmin: user.isAdmin,
             image: user.image,
+            emailVerified: user.emailVerified,
           },
         },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // Auth - Forgot password (always returns 200, no user enumeration)
+    if (pathStr === "auth/forgot-password") {
+      const { email } = body;
+      if (email) {
+        const user = await User.findOne({ email });
+        if (user) {
+          user.resetToken = randomBytes(32).toString("hex");
+          user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1h
+          await user.save();
+          try {
+            const resetUrl = `${APP_URL}/reset-password?token=${user.resetToken}`;
+            const template = emailTemplates.passwordReset({
+              name: user.name,
+              resetUrl,
+            });
+            await sendEmail({ to: email, ...template, type: "system" });
+          } catch (error) {
+            console.error("Failed to send reset email:", error);
+          }
+        }
+      }
+      return NextResponse.json(
+        {
+          message:
+            "If an account exists with that email, a reset link has been sent.",
+        },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // Auth - Reset password
+    if (pathStr === "auth/reset-password") {
+      const { token, password } = body;
+      if (!token || !password) {
+        return NextResponse.json(
+          { error: "Missing token or password" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      const user = await User.findOne({
+        resetToken: token,
+        resetTokenExpiry: { $gt: new Date() },
+      });
+      if (!user) {
+        return NextResponse.json(
+          { error: "Invalid or expired token" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      user.password = hashPassword(password);
+      user.resetToken = null;
+      user.resetTokenExpiry = null;
+      await user.save();
+      return NextResponse.json(
+        { message: "Password updated. You can now sign in." },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // Auth - Verify email
+    if (pathStr === "auth/verify-email") {
+      const { token } = body;
+      if (!token) {
+        return NextResponse.json(
+          { error: "Missing token" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      const user = await User.findOne({ verifyToken: token });
+      if (!user) {
+        return NextResponse.json(
+          { error: "Invalid or expired verification link" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      user.emailVerified = true;
+      user.verifyToken = null;
+      await user.save();
+      return NextResponse.json(
+        { success: true, email: user.email },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // Auth - Resend verification (authenticated)
+    if (pathStr === "auth/resend-verification") {
+      const decoded = await getUserFromRequest(request);
+      if (!decoded) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const user = await User.findById(decoded._id || decoded.userId);
+      if (!user) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      if (user.emailVerified) {
+        return NextResponse.json(
+          { message: "Email already verified" },
+          { headers: getCorsHeaders() },
+        );
+      }
+      user.verifyToken = randomBytes(32).toString("hex");
+      await user.save();
+      try {
+        const verificationUrl = `${APP_URL}/verify-email?token=${user.verifyToken}`;
+        const template = emailTemplates.emailVerification({
+          name: user.name,
+          verificationUrl,
+        });
+        await sendEmail({ to: user.email, ...template, type: "verification" });
+      } catch (error) {
+        console.error("Failed to resend verification email:", error);
+      }
+      return NextResponse.json(
+        { message: "Verification email sent" },
         { headers: getCorsHeaders() },
       );
     }

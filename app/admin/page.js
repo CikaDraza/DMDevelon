@@ -54,6 +54,7 @@ import {
   RefreshCw,
   Inbox,
   FilePlus2,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1173,6 +1174,9 @@ function UsersManagement() {
   const { getAuthHeaders } = useAuth();
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
     fetchUsers();
@@ -1216,6 +1220,33 @@ function UsersManagement() {
       } catch (error) {
         toast.error(error.response?.data?.error || "Failed to delete user");
       }
+    }
+  };
+
+  const openPasswordModal = (user) => {
+    setSelectedUser(user);
+    setNewPassword("");
+    setPasswordModalOpen(true);
+  };
+
+  const handleSetPassword = async (e) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    try {
+      await axios.put(
+        `/api/users/${selectedUser._id}`,
+        { password: newPassword },
+        { headers: getAuthHeaders() },
+      );
+      toast.success(`Password updated for ${selectedUser.name}`);
+      setPasswordModalOpen(false);
+      setSelectedUser(null);
+      setNewPassword("");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to set password");
     }
   };
 
@@ -1267,15 +1298,26 @@ function UsersManagement() {
                   </td>
                   <td className="px-6 py-4 text-gray-400">{user.email}</td>
                   <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        user.isAdmin
-                          ? "bg-[#FFB633]/20 text-[#FFB633]"
-                          : "bg-white/10 text-gray-400"
-                      }`}
-                    >
-                      {user.isAdmin ? "Admin" : "User"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          user.isAdmin
+                            ? "bg-[#FFB633]/20 text-[#FFB633]"
+                            : "bg-white/10 text-gray-400"
+                        }`}
+                      >
+                        {user.isAdmin ? "Admin" : "User"}
+                      </span>
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          user.emailVerified
+                            ? "bg-green-500/20 text-green-400"
+                            : "bg-yellow-500/20 text-yellow-400"
+                        }`}
+                      >
+                        {user.emailVerified ? "Verified" : "Unverified"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-gray-400">
                     {new Date(user.createdAt).toLocaleDateString()}
@@ -1287,6 +1329,13 @@ function UsersManagement() {
                         className="px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
                       >
                         {user.isAdmin ? "Demote" : "Make Admin"}
+                      </button>
+                      <button
+                        onClick={() => openPasswordModal(user)}
+                        title="Set password"
+                        className="p-1.5 text-gray-400 hover:text-[#FFB633] hover:bg-[#FFB633]/10 rounded transition-colors"
+                      >
+                        <KeyRound className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(user._id)}
@@ -1302,6 +1351,38 @@ function UsersManagement() {
           </table>
         </div>
       )}
+
+      {/* Set Password Modal */}
+      <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
+        <DialogContent className="bg-[#1a1a1b] border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set password</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Set a new password for {selectedUser?.name} ({selectedUser?.email}
+              ).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSetPassword} className="space-y-4 mt-2">
+            <div>
+              <Label className="text-white">New password</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                required
+                className="bg-white/5 border-white/10 text-white mt-1"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-[#FFB633] text-black hover:bg-[#e5a32e]"
+            >
+              Update password
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

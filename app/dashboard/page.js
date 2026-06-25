@@ -40,7 +40,8 @@ import Link from "next/link";
 // Client Dashboard Page
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, logout, loading, getAuthHeaders } = useAuth();
+  const { user, logout, loading, getAuthHeaders, resendVerification } =
+    useAuth();
   const {
     testimonials,
     createTestimonial,
@@ -91,9 +92,23 @@ export default function DashboardPage() {
     }
   }, [user]);
 
+  const [resending, setResending] = useState(false);
+
   const handleLogout = () => {
     logout();
     router.push("/");
+  };
+
+  const handleResendVerification = async () => {
+    setResending(true);
+    try {
+      await resendVerification();
+      toast.success("Verification email sent — check your inbox.");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to send email");
+    } finally {
+      setResending(false);
+    }
   };
 
   const handleUpdateProfile = async (e) => {
@@ -310,6 +325,29 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {!user.emailVerified && (
+        <div className="bg-[#FFB633]/10 border-b border-[#FFB633]/30">
+          <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-[#FFB633] shrink-0" />
+              <p className="text-sm text-gray-200">
+                Please verify your email address — check your inbox for the
+                confirmation link.
+              </p>
+            </div>
+            <Button
+              onClick={handleResendVerification}
+              disabled={resending}
+              size="sm"
+              variant="outline"
+              className="border-[#FFB633]/50 text-[#FFB633] hover:bg-[#FFB633]/10"
+            >
+              {resending ? "Sending…" : "Resend email"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

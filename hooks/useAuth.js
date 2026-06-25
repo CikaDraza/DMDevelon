@@ -55,6 +55,41 @@ export function useAuth() {
     return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
   }, []);
 
+  const forgotPassword = useCallback(async (email) => {
+    const res = await axios.post("/api/auth/forgot-password", { email });
+    return res.data;
+  }, []);
+
+  const resetPassword = useCallback(async (token, password) => {
+    const res = await axios.post("/api/auth/reset-password", {
+      token,
+      password,
+    });
+    return res.data;
+  }, []);
+
+  const verifyEmail = useCallback(async (token) => {
+    const res = await axios.post("/api/auth/verify-email", { token });
+    // Keep the cached user in sync so the "verify your email" banner clears
+    const stored = localStorage.getItem("user");
+    if (stored) {
+      const u = { ...JSON.parse(stored), emailVerified: true };
+      localStorage.setItem("user", JSON.stringify(u));
+      setUser(u);
+    }
+    return res.data;
+  }, []);
+
+  const resendVerification = useCallback(async () => {
+    const currentToken = localStorage.getItem("token");
+    const res = await axios.post(
+      "/api/auth/resend-verification",
+      {},
+      { headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {} },
+    );
+    return res.data;
+  }, []);
+
   return {
     user,
     token,
@@ -65,5 +100,9 @@ export function useAuth() {
     register,
     logout,
     getAuthHeaders,
+    forgotPassword,
+    resetPassword,
+    verifyEmail,
+    resendVerification,
   };
 }

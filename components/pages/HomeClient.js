@@ -1500,8 +1500,9 @@ function Footer({ profile }) {
 }
 
 // Login Modal Component
-function LoginModal({ isOpen, onClose, onLogin, onRegister }) {
+function LoginModal({ isOpen, onClose, onLogin, onRegister, onForgotPassword }) {
   const [isLoginMode, setIsLoginMode] = useState(true);
+  const [forgotMode, setForgotMode] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -1509,6 +1510,22 @@ function LoginModal({ isOpen, onClose, onLogin, onRegister }) {
     confirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
+
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onForgotPassword(formData.email);
+      toast.success(
+        "If an account exists with that email, a reset link has been sent.",
+      );
+      setForgotMode(false);
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1541,14 +1558,59 @@ function LoginModal({ isOpen, onClose, onLogin, onRegister }) {
       <DialogContent className="bg-[#1a1a1b] border-white/10 text-white max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-center">
-            {isLoginMode ? "Welcome Back" : "Create Account"}
+            {forgotMode
+              ? "Reset password"
+              : isLoginMode
+                ? "Welcome Back"
+                : "Create Account"}
           </DialogTitle>
           <DialogDescription className="text-gray-400 text-center">
-            {isLoginMode
-              ? "Sign in to access your dashboard"
-              : "Register to get started"}
+            {forgotMode
+              ? "Enter your email and we'll send you a reset link"
+              : isLoginMode
+                ? "Sign in to access your dashboard"
+                : "Register to get started"}
           </DialogDescription>
         </DialogHeader>
+
+        {forgotMode ? (
+          <>
+            <form onSubmit={handleForgot} className="space-y-4 mt-4">
+              <div>
+                <Label htmlFor="forgotEmail" className="text-white">
+                  Email
+                </Label>
+                <Input
+                  id="forgotEmail"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  placeholder="your@email.com"
+                  required
+                  className="bg-white/5 border-white/10 text-white mt-1"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#FFB633] text-black hover:bg-[#e5a32e] mt-2"
+              >
+                {loading ? "Please wait..." : "Send reset link"}
+              </Button>
+            </form>
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={() => setForgotMode(false)}
+                className="text-[#FFB633] hover:underline text-sm"
+              >
+                Back to sign in
+              </button>
+            </div>
+          </>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           {!isLoginMode && (
             <div>
@@ -1629,18 +1691,32 @@ function LoginModal({ isOpen, onClose, onLogin, onRegister }) {
                 ? "Sign In"
                 : "Create Account"}
           </Button>
+          {isLoginMode && (
+            <div className="text-right -mt-2">
+              <button
+                type="button"
+                onClick={() => setForgotMode(true)}
+                className="text-gray-400 hover:text-[#FFB633] text-xs"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
         </form>
-        <div className="text-center mt-4">
-          <button
-            type="button"
-            onClick={() => setIsLoginMode(!isLoginMode)}
-            className="text-[#FFB633] hover:underline text-sm"
-          >
-            {isLoginMode
-              ? "Don't have an account? Register"
-              : "Already have an account? Sign In"}
-          </button>
-        </div>
+        )}
+        {!forgotMode && (
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => setIsLoginMode(!isLoginMode)}
+              className="text-[#FFB633] hover:underline text-sm"
+            >
+              {isLoginMode
+                ? "Don't have an account? Register"
+                : "Already have an account? Sign In"}
+            </button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -1648,7 +1724,14 @@ function LoginModal({ isOpen, onClose, onLogin, onRegister }) {
 
 // Main Page Component
 export default function HomeClient({ initialServices }) {
-  const { user, login, register, logout, loading: authLoading } = useAuth();
+  const {
+    user,
+    login,
+    register,
+    logout,
+    forgotPassword,
+    loading: authLoading,
+  } = useAuth();
   const { isLoading: servicesLoading } = useServices();
   const { projects, isLoading: projectsLoading } = useProjects();
   const { testimonials, isLoading: testimonialsLoading } = useTestimonials();
@@ -1683,6 +1766,7 @@ export default function HomeClient({ initialServices }) {
         onClose={() => setLoginModalOpen(false)}
         onLogin={login}
         onRegister={register}
+        onForgotPassword={forgotPassword}
       />
     </div>
   );
