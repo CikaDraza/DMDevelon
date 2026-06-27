@@ -128,6 +128,10 @@ export function useProjectMessages(projectId, milestoneId) {
     queryKey: ['project-messages', projectId, milestoneId],
     enabled: !!projectId && !!milestoneId,
     refetchInterval: 15000,
+    // Chat must be live: always pull the latest when the drawer (re)opens
+    // instead of serving the 60s-stale global cache.
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const res = await axios.get(
         `/api/client-projects/${projectId}/messages?milestoneId=${encodeURIComponent(

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from './useAuth';
@@ -32,6 +33,13 @@ export function useNotifications() {
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
+
+  // Each time the notifications poll lands, refresh any open milestone chat so
+  // the new message appears together with its notification (not a poll later).
+  useEffect(() => {
+    if (!query.dataUpdatedAt) return;
+    queryClient.invalidateQueries({ queryKey: ['project-messages'] });
+  }, [query.dataUpdatedAt, queryClient]);
 
   const items = query.data?.items || [];
   // Entities (request/project ids) that have at least one unread notification
