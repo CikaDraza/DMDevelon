@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -88,25 +88,46 @@ const markdownComponents = {
     ),
 };
 
-export default function ClientProjectDetailPage() {
+function ClientProjectDetailInner() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { data: project, isLoading, error } = useClientProject(id);
 
   const [selectedMilestoneId, setSelectedMilestoneId] = useState(null);
   const [chatMilestone, setChatMilestone] = useState(null);
-  const { markRead } = useNotifications();
+  const { markRead, unreadMilestoneIds } = useNotifications();
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/");
   }, [authLoading, user, router]);
 
-  // Clear unread notifications for this project on open
+  // Clear non-message notifications (status/task/milestone) for this project on
+  // open. Per-milestone chat messages stay unread until their chat is opened.
   useEffect(() => {
-    if (id) markRead.mutate({ entityId: id });
+    if (id) markRead.mutate({ entityId: id, excludeMilestones: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Deep-link from a project_message notification: ?m=<milestoneId> opens that
+  // milestone's chat directly and marks its unread message read.
+  useEffect(() => {
+    const mId = searchParams.get("m");
+    if (!mId || !project?.milestones) return;
+    const m = project.milestones.find((x) => x._id === mId);
+    if (m) {
+      setChatMilestone(m);
+      markRead.mutate({ entityId: id, milestoneId: mId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?._id, searchParams]);
+
+  const openChat = (m) => {
+    setChatMilestone(m);
+    if (unreadMilestoneIds.has(m._id))
+      markRead.mutate({ entityId: id, milestoneId: m._id });
+  };
 
   const handleSelect = (milestoneId) => {
     setSelectedMilestoneId(milestoneId);
@@ -229,8 +250,12 @@ export default function ClientProjectDetailPage() {
                     </h4>
                   </div>
                   <button
-                    onClick={() => setChatMilestone(m)}
-                    className="flex items-center gap-1 text-sm text-gray-400 hover:text-[#FFB633] shrink-0"
+                    onClick={() => openChat(m)}
+                    className={`flex items-center gap-1 text-sm shrink-0 ${
+                      unreadMilestoneIds.has(m._id)
+                        ? "text-[#FFB633] animate-pulse"
+                        : "text-gray-400 hover:text-[#FFB633]"
+                    }`}
                   >
                     <MessageSquare className="w-4 h-4" />
                     <span className="hidden sm:inline">Ask a question</span>
@@ -349,5 +374,19 @@ export default function ClientProjectDetailPage() {
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+export default function ClientProjectDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center">
+          <div className="text-white">Loading…</div>
+        </div>
+      }
+    >
+      <ClientProjectDetailInner />
+    </Suspense>
   );
 }

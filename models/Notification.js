@@ -9,8 +9,9 @@ const NotificationSchema = new mongoose.Schema(
     title: { type: String, required: true },
     body: { type: String, default: '' },
     link: { type: String, default: '' },
-    entityType: { type: String, default: '' }, // 'request' | 'project'
+    entityType: { type: String, default: '' }, // 'request' | 'project' | 'contact' | 'testimonial'
     entityId: { type: String, default: '' },
+    milestoneId: { type: String, default: '' }, // set for per-milestone chat messages
     read: { type: Boolean, default: false },
   },
   { timestamps: true, _id: false }

@@ -253,10 +253,17 @@ function RequestDetail({ id, onBack }) {
   );
 }
 
-export default function ProjectRequestsManager() {
+export default function ProjectRequestsManager({ highlightId }) {
   const { requests, isLoading } = useProjectRequests();
   const { unreadEntityIds } = useNotifications();
   const [selectedId, setSelectedId] = useState(null);
+
+  // Deep-link from a notification: open the referenced request once it loads.
+  useEffect(() => {
+    if (highlightId && requests.some((r) => r._id === highlightId)) {
+      setSelectedId(highlightId);
+    }
+  }, [highlightId, requests]);
 
   if (selectedId) {
     return <RequestDetail id={selectedId} onBack={() => setSelectedId(null)} />;

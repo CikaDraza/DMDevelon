@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useTestimonials } from "@/hooks/useTestimonials";
 import { useClientProjects } from "@/hooks/useClientProjects";
 import { useProjectRequests } from "@/hooks/useProjectRequests";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useCardHighlight } from "@/hooks/useCardHighlight";
 import NotificationBell from "@/components/NotificationBell";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -40,8 +41,9 @@ import {
 import Link from "next/link";
 
 // Client Dashboard Page
-export default function DashboardPage() {
+function DashboardInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, logout, loading, getAuthHeaders, resendVerification } =
     useAuth();
   const {
@@ -86,6 +88,12 @@ export default function DashboardPage() {
       router.push("/");
     }
   }, [user, loading, router]);
+
+  // Deep-link from a notification: ?tab=services|testimonials switches view.
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "services" || tab === "testimonials") setActiveTab(tab);
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) {
@@ -240,6 +248,15 @@ export default function DashboardPage() {
   // Filter user's testimonials
   const userTestimonials = testimonials.filter(
     (t) => t.clientEmail === user?.email || t.userId === user?.id,
+  );
+
+  // Deep-link card highlight: scroll to ?id once the active tab is rendered and
+  // its list has loaded. The token re-runs the effect on tab switch / data load.
+  const flashId = useCardHighlight(
+    searchParams.get("id"),
+    projectsLoading || requestsLoading
+      ? ""
+      : `${activeTab}:${clientProjects.length}:${projectRequests.length}:${userTestimonials.length}`,
   );
 
   // Progress = completed tasks / total tasks (fallback to milestones)
@@ -469,11 +486,16 @@ export default function DashboardPage() {
                             return (
                               <motion.div
                                 key={req._id}
+                                id={`card-${req._id}`}
                                 whileHover={{ scale: 1.01 }}
                                 onClick={() =>
                                   router.push(`/dashboard/requests/${req._id}`)
                                 }
-                                className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10 cursor-pointer hover:border-[#FFB633]/40 transition-colors"
+                                className={`bg-[#1a1a1b] rounded-xl p-6 border cursor-pointer transition-colors ${
+                                  flashId === req._id
+                                    ? "border-[#FFB633] ring-2 ring-[#FFB633]"
+                                    : "border-white/10 hover:border-[#FFB633]/40"
+                                }`}
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
@@ -533,13 +555,18 @@ export default function DashboardPage() {
                             return (
                               <motion.div
                                 key={project._id}
+                                id={`card-${project._id}`}
                                 whileHover={{ scale: 1.01 }}
                                 onClick={() =>
                                   router.push(
                                     `/dashboard/projects/${project._id}`,
                                   )
                                 }
-                                className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10 cursor-pointer hover:border-[#FFB633]/40 transition-colors"
+                                className={`bg-[#1a1a1b] rounded-xl p-6 border cursor-pointer transition-colors ${
+                                  flashId === project._id
+                                    ? "border-[#FFB633] ring-2 ring-[#FFB633]"
+                                    : "border-white/10 hover:border-[#FFB633]/40"
+                                }`}
                               >
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
@@ -637,8 +664,13 @@ export default function DashboardPage() {
                     {userTestimonials.map((testimonial) => (
                       <motion.div
                         key={testimonial._id}
+                        id={`card-${testimonial._id}`}
                         whileHover={{ scale: 1.01 }}
-                        className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10"
+                        className={`bg-[#1a1a1b] rounded-xl p-6 border transition-colors ${
+                          flashId === testimonial._id
+                            ? "border-[#FFB633] ring-2 ring-[#FFB633]"
+                            : "border-white/10"
+                        }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex gap-1">
@@ -951,5 +983,19 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center">
+          <div className="text-white">Loading...</div>
+        </div>
+      }
+    >
+      <DashboardInner />
+    </Suspense>
   );
 }

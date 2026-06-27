@@ -22,7 +22,26 @@ function timeAgo(d) {
   return `${days}d ago`;
 }
 
-export default function NotificationBell() {
+// Ordered categories per audience; maps a notification's entityType to a label.
+const CATEGORY_ORDER = {
+  admin: ["Messages", "Testimonials", "Requests", "Projects"],
+  client: ["My Projects", "Testimonials"],
+};
+
+function categoryOf(n, variant) {
+  if (variant === "admin") {
+    if (n.entityType === "contact") return "Messages";
+    if (n.entityType === "testimonial") return "Testimonials";
+    if (n.entityType === "request") return "Requests";
+    if (n.entityType === "project") return "Projects";
+    return "Projects";
+  }
+  // client
+  if (n.entityType === "testimonial") return "Testimonials";
+  return "My Projects"; // request + project
+}
+
+export default function NotificationBell({ variant = "client" }) {
   const router = useRouter();
   const { items, unreadCount, markRead } = useNotifications();
   const [open, setOpen] = useState(false);
@@ -32,6 +51,41 @@ export default function NotificationBell() {
     setOpen(false);
     if (n.link) router.push(n.link);
   };
+
+  // Group items by category, preserving the (recency-sorted) item order.
+  const grouped = items.reduce((acc, n) => {
+    const cat = categoryOf(n, variant);
+    (acc[cat] ||= []).push(n);
+    return acc;
+  }, {});
+  const categories = CATEGORY_ORDER[variant] || CATEGORY_ORDER.client;
+
+  const renderItem = (n) => (
+    <button
+      key={n._id}
+      onClick={() => handleClick(n)}
+      className={cn(
+        "w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors flex gap-2",
+        !n.read && "bg-[#FFB633]/5",
+      )}
+    >
+      <span
+        className={cn(
+          "mt-1.5 w-2 h-2 rounded-full shrink-0",
+          n.read ? "bg-transparent" : "bg-[#FFB633]",
+        )}
+      />
+      <span className="min-w-0">
+        <span className="block text-sm text-white truncate">{n.title}</span>
+        {n.body && (
+          <span className="block text-xs text-gray-400 truncate">{n.body}</span>
+        )}
+        <span className="block text-[10px] text-gray-500 mt-0.5">
+          {timeAgo(n.createdAt)}
+        </span>
+      </span>
+    </button>
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -70,36 +124,16 @@ export default function NotificationBell() {
               No notifications yet.
             </p>
           ) : (
-            items.map((n) => (
-              <button
-                key={n._id}
-                onClick={() => handleClick(n)}
-                className={cn(
-                  "w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors flex gap-2",
-                  !n.read && "bg-[#FFB633]/5",
-                )}
-              >
-                <span
-                  className={cn(
-                    "mt-1.5 w-2 h-2 rounded-full shrink-0",
-                    n.read ? "bg-transparent" : "bg-[#FFB633]",
-                  )}
-                />
-                <span className="min-w-0">
-                  <span className="block text-sm text-white truncate">
-                    {n.title}
-                  </span>
-                  {n.body && (
-                    <span className="block text-xs text-gray-400 truncate">
-                      {n.body}
-                    </span>
-                  )}
-                  <span className="block text-[10px] text-gray-500 mt-0.5">
-                    {timeAgo(n.createdAt)}
-                  </span>
-                </span>
-              </button>
-            ))
+            categories
+              .filter((cat) => grouped[cat]?.length)
+              .map((cat) => (
+                <div key={cat}>
+                  <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                    {cat}
+                  </p>
+                  {grouped[cat].map(renderItem)}
+                </div>
+              ))
           )}
         </div>
       </PopoverContent>

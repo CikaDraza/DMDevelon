@@ -797,9 +797,10 @@ export async function POST(request, context) {
           type: "project_message",
           title: `New message on ${project.title}`,
           body: msgPreview,
-          link: `/dashboard/projects/${project._id}`,
+          link: `/dashboard/projects/${project._id}?m=${message.milestoneId}`,
           entityType: "project",
           entityId: project._id,
+          milestoneId: message.milestoneId,
           email: true,
         });
       } else {
@@ -808,9 +809,10 @@ export async function POST(request, context) {
           type: "project_message",
           title: `Client message on ${project.title}`,
           body: `${project.clientName}: ${msgPreview}`,
-          link: "/admin",
+          link: `/admin?tab=client-projects&id=${project._id}`,
           entityType: "project",
           entityId: project._id,
+          milestoneId: message.milestoneId,
           email: false,
         });
       }
@@ -948,7 +950,7 @@ export async function POST(request, context) {
         type: "request_created",
         title: `New project request: ${reqDoc.title}`,
         body: `${clientName} submitted a new request.`,
-        link: "/admin",
+        link: `/admin?tab=project-requests&id=${reqDoc._id}`,
         entityType: "request",
         entityId: reqDoc._id,
         email: true,
@@ -1020,7 +1022,7 @@ export async function POST(request, context) {
             type: "request_message",
             title: `New message: ${reqDoc.title}`,
             body: `${reqDoc.clientName}: ${preview}`,
-            link: "/admin",
+            link: `/admin?tab=project-requests&id=${reqDoc._id}`,
             entityType: "request",
             entityId: reqDoc._id,
             email: true,
@@ -1081,7 +1083,7 @@ export async function POST(request, context) {
           type: "request_approved",
           title: `Proposal accepted: ${reqDoc.title}`,
           body: `${reqDoc.clientName} accepted the proposal — project created.`,
-          link: "/admin",
+          link: `/admin?tab=project-requests&id=${reqDoc._id}`,
           entityType: "request",
           entityId: reqDoc._id,
           email: true,
@@ -1123,7 +1125,7 @@ export async function POST(request, context) {
           type: "request_changes",
           title: `Changes requested: ${reqDoc.title}`,
           body: `${reqDoc.clientName} requested changes on the proposal.`,
-          link: "/admin",
+          link: `/admin?tab=project-requests&id=${reqDoc._id}`,
           entityType: "request",
           entityId: reqDoc._id,
           email: true,
@@ -1143,7 +1145,16 @@ export async function POST(request, context) {
       }
       const filter = { userId: user._id, read: false };
       if (body.id) filter._id = body.id;
-      else if (body.entityId) filter.entityId = body.entityId;
+      else if (body.entityId) {
+        filter.entityId = body.entityId;
+        if (body.milestoneId) filter.milestoneId = body.milestoneId;
+        else if (body.excludeMilestones)
+          filter.$or = [
+            { milestoneId: "" },
+            { milestoneId: { $exists: false } },
+            { milestoneId: null },
+          ];
+      }
       // else: all unread for this user
       await Notification.updateMany(filter, { $set: { read: true } });
       return NextResponse.json({ success: true }, { headers: getCorsHeaders() });
@@ -1218,6 +1229,15 @@ export async function POST(request, context) {
         ...body,
         userId: user?.userId || null,
       });
+      await notifyAdmins({
+        actorId: user?._id,
+        type: "testimonial_created",
+        title: `New testimonial from ${testimonial.clientName}`,
+        body: (testimonial.comment || "").slice(0, 140),
+        link: `/admin?tab=testimonials&id=${testimonial._id}`,
+        entityType: "testimonial",
+        entityId: testimonial._id,
+      });
       return NextResponse.json(testimonial, {
         status: 201,
         headers: getCorsHeaders(),
@@ -1254,6 +1274,16 @@ export async function POST(request, context) {
       } catch (error) {
         console.error("Failed to send contact notification:", error);
       }
+
+      await notifyAdmins({
+        actorId: null,
+        type: "contact_message",
+        title: `New message from ${name}`,
+        body: (message || "").slice(0, 140),
+        link: `/admin?tab=messages&id=${contactMessage._id}`,
+        entityType: "contact",
+        entityId: contactMessage._id,
+      });
 
       return NextResponse.json(contactMessage, {
         status: 201,
@@ -1471,6 +1501,20 @@ export async function PUT(request, context) {
           { error: "Testimonial not found" },
           { status: 404, headers: getCorsHeaders() },
         );
+      }
+      if (body.adminReply) {
+        const clientId = await resolveClientUserId(testimonial);
+        await notifyUser({
+          userId: clientId,
+          actorId: user._id,
+          type: "testimonial_reply",
+          title: "DMDevelon replied to your testimonial",
+          body: body.adminReply.slice(0, 140),
+          link: `/dashboard?tab=testimonials&id=${testimonial._id}`,
+          entityType: "testimonial",
+          entityId: testimonial._id,
+          email: true,
+        });
       }
       return NextResponse.json(testimonial, { headers: getCorsHeaders() });
     }

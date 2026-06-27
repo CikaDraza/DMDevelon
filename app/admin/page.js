@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useServices } from "@/hooks/useServices";
 import { useProjects } from "@/hooks/useProjects";
 import { useTestimonials } from "@/hooks/useTestimonials";
+import { useCardHighlight } from "@/hooks/useCardHighlight";
 import toast from "react-hot-toast";
 import axios from "axios";
 import {
@@ -1017,13 +1018,14 @@ function ProjectsManagement() {
 }
 
 // Testimonials Management Component
-function TestimonialsManagement() {
+function TestimonialsManagement({ highlightId }) {
   const { testimonials, isLoading, updateTestimonial, deleteTestimonial } =
     useTestimonials();
   const { getAuthHeaders } = useAuth();
   const [replyModalOpen, setReplyModalOpen] = useState(false);
   const [selectedTestimonial, setSelectedTestimonial] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const flashId = useCardHighlight(highlightId, !isLoading);
 
   const handleReply = async () => {
     if (!selectedTestimonial) return;
@@ -1072,8 +1074,13 @@ function TestimonialsManagement() {
           {testimonials.map((testimonial) => (
             <motion.div
               key={testimonial._id}
+              id={`card-${testimonial._id}`}
               whileHover={{ scale: 1.01 }}
-              className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10"
+              className={`bg-[#1a1a1b] rounded-xl p-6 border transition-colors ${
+                flashId === testimonial._id
+                  ? "border-[#FFB633] ring-2 ring-[#FFB633]"
+                  : "border-white/10"
+              }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
@@ -1389,13 +1396,14 @@ function UsersManagement() {
 }
 
 // Messages Management Component
-function MessagesManagement() {
+function MessagesManagement({ highlightId }) {
   const { getAuthHeaders } = useAuth();
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [replyModalOpen, setReplyModalOpen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const flashId = useCardHighlight(highlightId, !isLoading);
 
   useEffect(() => {
     fetchMessages();
@@ -1476,8 +1484,13 @@ function MessagesManagement() {
           {messages.map((message) => (
             <motion.div
               key={message._id}
+              id={`card-${message._id}`}
               whileHover={{ scale: 1.01 }}
-              className="bg-[#1a1a1b] rounded-xl p-6 border border-white/10"
+              className={`bg-[#1a1a1b] rounded-xl p-6 border transition-colors ${
+                flashId === message._id
+                  ? "border-[#FFB633] ring-2 ring-[#FFB633]"
+                  : "border-white/10"
+              }`}
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -2267,11 +2280,26 @@ function CMSPagesManagement() {
   );
 }
 
+const ADMIN_TABS = [
+  "dashboard",
+  "services",
+  "projects",
+  "client-projects",
+  "project-requests",
+  "testimonials",
+  "users",
+  "messages",
+  "company",
+  "cms",
+];
+
 // Main Admin Page Component
-export default function AdminPage() {
+function AdminPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, logout, loading, getAuthHeaders } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [highlightId, setHighlightId] = useState(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [stats, setStats] = useState({});
   const [statsLoading, setStatsLoading] = useState(true);
@@ -2282,6 +2310,13 @@ export default function AdminPage() {
       router.push("/");
     }
   }, [user, loading, router]);
+
+  // Deep-link from a notification: ?tab=<section>&id=<cardId>
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && ADMIN_TABS.includes(tab)) setActiveTab(tab);
+    setHighlightId(searchParams.get("id") || null);
+  }, [searchParams]);
 
   useEffect(() => {
     if (user?.isAdmin) {
@@ -2347,15 +2382,15 @@ export default function AdminPage() {
       case "projects":
         return <ProjectsManagement />;
       case "client-projects":
-        return <ClientProjectsManager />;
+        return <ClientProjectsManager highlightId={highlightId} />;
       case "project-requests":
-        return <ProjectRequestsManager />;
+        return <ProjectRequestsManager highlightId={highlightId} />;
       case "testimonials":
-        return <TestimonialsManagement />;
+        return <TestimonialsManagement highlightId={highlightId} />;
       case "users":
         return <UsersManagement />;
       case "messages":
-        return <MessagesManagement />;
+        return <MessagesManagement highlightId={highlightId} />;
       case "company":
         return <CompanyProfileManagement />;
       case "cms":
@@ -2402,7 +2437,7 @@ export default function AdminPage() {
                 <Home className="w-4 h-4" />
                 <span className="hidden sm:inline">Home</span>
               </Link>
-              <NotificationBell />
+              <NotificationBell variant="admin" />
               <span className="text-gray-400 text-sm">
                 Welcome, {user?.name}
               </span>
@@ -2417,5 +2452,19 @@ export default function AdminPage() {
         <main className="p-6">{renderContent()}</main>
       </div>
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center">
+          <div className="text-white">Loading...</div>
+        </div>
+      }
+    >
+      <AdminPageInner />
+    </Suspense>
   );
 }

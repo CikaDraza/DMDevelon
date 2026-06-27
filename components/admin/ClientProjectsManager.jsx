@@ -5,6 +5,8 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useClientProjects } from "@/hooks/useClientProjects";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useCardHighlight } from "@/hooks/useCardHighlight";
 import { MILESTONE_ICON_OPTIONS } from "@/components/ui/project-timeline";
 import { MilestoneChat } from "@/components/dashboard/MilestoneChat";
 import { Button } from "@/components/ui/button";
@@ -89,7 +91,7 @@ const emptyForm = {
   publishToHomepage: false,
 };
 
-export default function ClientProjectsManager() {
+export default function ClientProjectsManager({ highlightId }) {
   const { user, getAuthHeaders } = useAuth();
   const {
     projects,
@@ -100,6 +102,8 @@ export default function ClientProjectsManager() {
     updateMilestone,
     updateTask,
   } = useClientProjects();
+  const { unreadMilestoneIds, markRead } = useNotifications();
+  const flashId = useCardHighlight(highlightId, !isLoading);
 
   const [users, setUsers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -315,7 +319,12 @@ export default function ClientProjectsManager() {
             return (
               <div
                 key={project._id}
-                className="bg-[#1a1a1b] rounded-xl border border-white/10"
+                id={`card-${project._id}`}
+                className={`bg-[#1a1a1b] rounded-xl border transition-colors ${
+                  flashId === project._id
+                    ? "border-[#FFB633] ring-2 ring-[#FFB633]"
+                    : "border-white/10"
+                }`}
               >
                 <div className="p-6">
                   <div className="flex items-start justify-between gap-4">
@@ -414,10 +423,19 @@ export default function ClientProjectsManager() {
                               </span>
                             </button>
                             <button
-                              onClick={() =>
-                                setChat({ projectId: project._id, milestone: m })
-                              }
-                              className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#FFB633]"
+                              onClick={() => {
+                                setChat({ projectId: project._id, milestone: m });
+                                if (unreadMilestoneIds.has(m._id))
+                                  markRead.mutate({
+                                    entityId: project._id,
+                                    milestoneId: m._id,
+                                  });
+                              }}
+                              className={`flex items-center gap-1 text-xs ${
+                                unreadMilestoneIds.has(m._id)
+                                  ? "text-[#FFB633] animate-pulse"
+                                  : "text-gray-400 hover:text-[#FFB633]"
+                              }`}
                             >
                               <MessageSquare className="w-4 h-4" />
                               Chat

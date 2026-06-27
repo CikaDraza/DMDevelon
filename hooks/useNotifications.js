@@ -22,7 +22,8 @@ export function useNotifications() {
 
   const markRead = useMutation({
     mutationFn: async (payload = {}) => {
-      // payload: { id } | { entityId } | {} (all)
+      // payload: { id } | { entityId } | { entityId, milestoneId }
+      //   | { entityId, excludeMilestones: true } | {} (all)
       const res = await axios.post('/api/notifications/read', payload, {
         headers: getAuthHeaders(),
       });
@@ -37,6 +38,10 @@ export function useNotifications() {
   const unreadEntityIds = new Set(
     items.filter((n) => !n.read && n.entityId).map((n) => n.entityId),
   );
+  // Milestones with at least one unread chat message (drives the pulsing bubble)
+  const unreadMilestoneIds = new Set(
+    items.filter((n) => !n.read && n.milestoneId).map((n) => n.milestoneId),
+  );
 
   return {
     items,
@@ -44,5 +49,6 @@ export function useNotifications() {
     isLoading: query.isLoading,
     markRead,
     unreadEntityIds,
+    unreadMilestoneIds,
   };
 }
