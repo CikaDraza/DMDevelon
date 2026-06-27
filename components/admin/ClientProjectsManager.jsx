@@ -91,7 +91,10 @@ const emptyForm = {
   publishToHomepage: false,
 };
 
-export default function ClientProjectsManager({ highlightId }) {
+export default function ClientProjectsManager({
+  highlightId,
+  highlightMilestoneId,
+}) {
   const { user, getAuthHeaders } = useAuth();
   const {
     projects,
@@ -102,7 +105,7 @@ export default function ClientProjectsManager({ highlightId }) {
     updateMilestone,
     updateTask,
   } = useClientProjects();
-  const { unreadMilestoneIds, markRead } = useNotifications();
+  const { unreadMilestoneIds, unreadByMilestone, markRead } = useNotifications();
   const flashId = useCardHighlight(highlightId, !isLoading);
 
   const [users, setUsers] = useState([]);
@@ -119,6 +122,27 @@ export default function ClientProjectsManager({ highlightId }) {
       .then((res) => setUsers(res.data || []))
       .catch(() => {});
   }, [getAuthHeaders]);
+
+  // Deep-link from a project_message notification (?id=<project>&m=<milestone>):
+  // expand that project, scroll to the milestone and open its chat.
+  useEffect(() => {
+    if (!highlightMilestoneId || isLoading) return;
+    const project = projects.find((p) => p._id === highlightId);
+    const milestone = project?.milestones?.find(
+      (m) => m._id === highlightMilestoneId,
+    );
+    if (!project || !milestone) return;
+    setExpandedId(project._id);
+    const t = setTimeout(() => {
+      document
+        .getElementById(`ms-${milestone._id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setChat({ projectId: project._id, milestone });
+      markRead.mutate({ entityId: project._id, milestoneId: milestone._id });
+    }, 200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightMilestoneId, highlightId, isLoading]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -409,37 +433,48 @@ export default function ClientProjectsManager({ highlightId }) {
                       .map((m) => (
                         <div
                           key={m._id}
+                          id={`ms-${m._id}`}
                           className="bg-white/5 rounded-lg p-4"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <button
                               onClick={() => cycleMilestoneStatus(project._id, m)}
-                              className="flex items-center gap-2 text-left"
+                              className="flex items-center gap-2 text-left min-w-0"
                               title="Click to cycle status"
                             >
                               {ITEM_STATUS_ICON[m.status]}
-                              <span className="text-white font-medium">
+                              <span className="text-white font-medium truncate">
                                 {m.title || "Untitled milestone"}
                               </span>
                             </button>
-                            <button
-                              onClick={() => {
-                                setChat({ projectId: project._id, milestone: m });
-                                if (unreadMilestoneIds.has(m._id))
-                                  markRead.mutate({
-                                    entityId: project._id,
-                                    milestoneId: m._id,
+                            <div className="flex items-center gap-2 min-w-0 shrink-0">
+                              {unreadByMilestone[m._id]?.body && (
+                                <span className="max-w-[150px] truncate rounded-full bg-[#FFB633] text-black text-[10px] font-medium px-2 py-0.5">
+                                  {unreadByMilestone[m._id].body}
+                                </span>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setChat({
+                                    projectId: project._id,
+                                    milestone: m,
                                   });
-                              }}
-                              className={`flex items-center gap-1 text-xs ${
-                                unreadMilestoneIds.has(m._id)
-                                  ? "text-[#FFB633] animate-pulse"
-                                  : "text-gray-400 hover:text-[#FFB633]"
-                              }`}
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              Chat
-                            </button>
+                                  if (unreadMilestoneIds.has(m._id))
+                                    markRead.mutate({
+                                      entityId: project._id,
+                                      milestoneId: m._id,
+                                    });
+                                }}
+                                className={`flex items-center gap-1 text-xs ${
+                                  unreadMilestoneIds.has(m._id)
+                                    ? "text-[#FFB633] animate-pulse"
+                                    : "text-gray-400 hover:text-[#FFB633]"
+                                }`}
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                                Chat
+                              </button>
+                            </div>
                           </div>
                           {(m.tasks || []).length > 0 && (
                             <div className="mt-3 pl-6 space-y-2">

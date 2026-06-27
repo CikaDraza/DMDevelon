@@ -42,6 +42,14 @@ export function useNotifications() {
   const unreadMilestoneIds = new Set(
     items.filter((n) => !n.read && n.milestoneId).map((n) => n.milestoneId),
   );
+  // Latest unread notification per milestone (items are sorted newest-first),
+  // so callers can show its preview as a badge next to the chat icon.
+  const unreadByMilestone = {};
+  for (const n of items) {
+    if (!n.read && n.milestoneId && !unreadByMilestone[n.milestoneId]) {
+      unreadByMilestone[n.milestoneId] = n;
+    }
+  }
 
   return {
     items,
@@ -50,5 +58,6 @@ export function useNotifications() {
     markRead,
     unreadEntityIds,
     unreadMilestoneIds,
+    unreadByMilestone,
   };
 }

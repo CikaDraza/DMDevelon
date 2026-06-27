@@ -97,7 +97,7 @@ function ClientProjectDetailInner() {
 
   const [selectedMilestoneId, setSelectedMilestoneId] = useState(null);
   const [chatMilestone, setChatMilestone] = useState(null);
-  const { markRead, unreadMilestoneIds } = useNotifications();
+  const { markRead, unreadMilestoneIds, unreadByMilestone } = useNotifications();
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/");
@@ -249,17 +249,24 @@ function ClientProjectDetailInner() {
                       {m.title}
                     </h4>
                   </div>
-                  <button
-                    onClick={() => openChat(m)}
-                    className={`flex items-center gap-1 text-sm shrink-0 ${
-                      unreadMilestoneIds.has(m._id)
-                        ? "text-[#FFB633] animate-pulse"
-                        : "text-gray-400 hover:text-[#FFB633]"
-                    }`}
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span className="hidden sm:inline">Ask a question</span>
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0 min-w-0">
+                    {unreadByMilestone[m._id]?.body && (
+                      <span className="max-w-[150px] truncate rounded-full bg-[#FFB633] text-black text-[10px] font-medium px-2 py-0.5">
+                        {unreadByMilestone[m._id].body}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => openChat(m)}
+                      className={`flex items-center gap-1 text-sm shrink-0 ${
+                        unreadMilestoneIds.has(m._id)
+                          ? "text-[#FFB633] animate-pulse"
+                          : "text-gray-400 hover:text-[#FFB633]"
+                      }`}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span className="hidden sm:inline">Ask a question</span>
+                    </button>
+                  </div>
                 </div>
 
                 {m.description && (

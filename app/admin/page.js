@@ -2300,6 +2300,7 @@ function AdminPageInner() {
   const { user, logout, loading, getAuthHeaders } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [highlightId, setHighlightId] = useState(null);
+  const [highlightMilestoneId, setHighlightMilestoneId] = useState(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [stats, setStats] = useState({});
   const [statsLoading, setStatsLoading] = useState(true);
@@ -2311,11 +2312,12 @@ function AdminPageInner() {
     }
   }, [user, loading, router]);
 
-  // Deep-link from a notification: ?tab=<section>&id=<cardId>
+  // Deep-link from a notification: ?tab=<section>&id=<cardId>&m=<milestoneId>
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab && ADMIN_TABS.includes(tab)) setActiveTab(tab);
     setHighlightId(searchParams.get("id") || null);
+    setHighlightMilestoneId(searchParams.get("m") || null);
   }, [searchParams]);
 
   useEffect(() => {
@@ -2382,7 +2384,12 @@ function AdminPageInner() {
       case "projects":
         return <ProjectsManagement />;
       case "client-projects":
-        return <ClientProjectsManager highlightId={highlightId} />;
+        return (
+          <ClientProjectsManager
+            highlightId={highlightId}
+            highlightMilestoneId={highlightMilestoneId}
+          />
+        );
       case "project-requests":
         return <ProjectRequestsManager highlightId={highlightId} />;
       case "testimonials":

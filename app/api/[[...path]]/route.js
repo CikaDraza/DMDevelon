@@ -809,7 +809,7 @@ export async function POST(request, context) {
           type: "project_message",
           title: `Client message on ${project.title}`,
           body: `${project.clientName}: ${msgPreview}`,
-          link: `/admin?tab=client-projects&id=${project._id}`,
+          link: `/admin?tab=client-projects&id=${project._id}&m=${message.milestoneId}`,
           entityType: "project",
           entityId: project._id,
           milestoneId: message.milestoneId,
