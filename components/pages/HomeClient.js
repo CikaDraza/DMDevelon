@@ -1738,6 +1738,11 @@ export default function HomeClient({ initialServices }) {
   const { profile, isLoading: profileLoading } = useCompanyProfile();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
+  const handleLogout = () => {
+    logout();
+    toast.success("Logged out successfully");
+  };
+
   if (
     authLoading ||
     profileLoading ||
@@ -1753,7 +1758,7 @@ export default function HomeClient({ initialServices }) {
       <Header
         user={user}
         onLoginClick={() => setLoginModalOpen(true)}
-        onLogout={logout}
+        onLogout={handleLogout}
       />
       <HeroSection profile={profile} />
       <ServicesSection services={initialServices} />

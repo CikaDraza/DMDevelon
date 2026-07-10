@@ -2352,6 +2352,7 @@ function AdminPageInner() {
 
   const handleLogout = () => {
     logout();
+    toast.success("Logged out successfully");
     router.push("/");
   };
 

@@ -1212,7 +1212,12 @@ export async function POST(request, context) {
           ? adminFolder(kind)
           : clientFolder(reqDoc.clientSlug || slugify(reqDoc.clientName), kind);
       } else {
-        folder = adminFolder(kind);
+        // No project/request context (e.g. a profile avatar upload): route the
+        // file into the uploader's own folder — clients/<slug>/images for a
+        // client, admin/<kind> for staff.
+        folder = user.isAdmin
+          ? adminFolder(kind)
+          : clientFolder(slugify(user.name || user.email), kind);
       }
       const url = await uploadToCloudinary(file, { folder });
       return NextResponse.json(
@@ -1601,8 +1606,9 @@ export async function PUT(request, context) {
     if (pathStr.startsWith("users/")) {
       const user = await getUserFromRequest(request);
       const id = path[1];
-      // User can update their own profile, admin can update anyone
-      if (!user || (user.userId !== id && !user.isAdmin)) {
+      // User can update their own profile, admin can update anyone.
+      // getUserFromRequest returns the User doc, so compare against _id.
+      if (!user || (String(user._id) !== id && !user.isAdmin)) {
         return NextResponse.json(
           { error: "Unauthorized" },
           { status: 401, headers: getCorsHeaders() },
