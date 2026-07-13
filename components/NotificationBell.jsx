@@ -46,11 +46,18 @@ function categoryOf(n, variant) {
 export default function NotificationBell({ variant = "client" }) {
   const router = useRouter();
   const { items, unreadCount, markRead } = useNotifications();
-  const { supported, permission, isSubscribed, busy, subscribe, iosNeedsInstall } =
-    usePush();
+  const {
+    supported,
+    permission,
+    isSubscribed,
+    busy,
+    subscribe,
+    iosNeedsInstall,
+  } = usePush();
   const [open, setOpen] = useState(false);
 
-  const showEnablePush = supported && (permission !== "granted" || !isSubscribed);
+  const showEnablePush =
+    supported && (permission !== "granted" || !isSubscribed);
 
   const handleEnablePush = async () => {
     if (permission === "denied") {
@@ -62,7 +69,7 @@ export default function NotificationBell({ variant = "client" }) {
     try {
       const ok = await subscribe();
       if (ok) {
-        toast.success("Push notifikacije uključene ✅");
+        toast.success("Push notifikacije uključene");
       } else if (
         typeof Notification !== "undefined" &&
         Notification.permission === "denied"
