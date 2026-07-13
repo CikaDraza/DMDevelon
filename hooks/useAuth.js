@@ -17,6 +17,28 @@ export function useAuth() {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Pull the latest user from the server and refresh the cached copy. The
+  // localStorage user is only written at login, so fields like emailVerified /
+  // name / image can go stale (e.g. verified after that login) — this re-syncs.
+  const refreshUser = useCallback(async () => {
+    const currentToken = localStorage.getItem("token");
+    if (!currentToken) return null;
+    try {
+      const res = await axios.get("/api/auth/me", {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      });
+      const fresh = res.data;
+      if (fresh && fresh._id) {
+        localStorage.setItem("user", JSON.stringify(fresh));
+        setUser(fresh);
+        return fresh;
+      }
+    } catch (e) {
+      // Keep the cached user on network/401 errors — non-destructive.
+    }
+    return null;
+  }, []);
+
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
@@ -25,7 +47,9 @@ export function useAuth() {
       setUser(JSON.parse(storedUser));
     }
     setLoading(false);
-  }, []);
+    // Background re-sync with the server (clears a stale verify banner, etc.)
+    if (storedToken) refreshUser();
+  }, [refreshUser]);
 
   const login = useCallback(async (email, password) => {
     const response = await axios.post("/api/auth/login", { email, password });
@@ -148,5 +172,6 @@ export function useAuth() {
     resetPassword,
     verifyEmail,
     resendVerification,
+    refreshUser,
   };
 }

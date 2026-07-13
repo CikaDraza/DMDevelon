@@ -44,8 +44,15 @@ import Link from "next/link";
 function DashboardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, logout, loading, getAuthHeaders, resendVerification, uploadAvatar } =
-    useAuth();
+  const {
+    user,
+    logout,
+    loading,
+    getAuthHeaders,
+    resendVerification,
+    refreshUser,
+    uploadAvatar,
+  } = useAuth();
   const {
     testimonials,
     createTestimonial,
@@ -117,8 +124,17 @@ function DashboardInner() {
   const handleResendVerification = async () => {
     setResending(true);
     try {
-      await resendVerification();
-      toast.success("Verification email sent — check your inbox.");
+      const res = await resendVerification();
+      // Already verified in the DB → the banner was stale; re-sync and clear it.
+      if (res?.message === "Email already verified") {
+        await refreshUser();
+        toast.success(
+          "Your email is already verified — sorry for the confusion! You can ignore that message.",
+          { duration: 5000 },
+        );
+      } else {
+        toast.success("Verification email sent — check your inbox.");
+      }
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to send email");
     } finally {

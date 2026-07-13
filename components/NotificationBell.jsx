@@ -62,25 +62,25 @@ export default function NotificationBell({ variant = "client" }) {
   const handleEnablePush = async () => {
     if (permission === "denied") {
       toast.error(
-        "Notifikacije su blokirane u browseru. Uključi ih u podešavanjima sajta.",
+        "Notifications are blocked in your browser. Enable them in the site settings.",
       );
       return;
     }
     try {
       const ok = await subscribe();
       if (ok) {
-        toast.success("Push notifikacije uključene");
+        toast.success("Push notifications enabled");
       } else if (
         typeof Notification !== "undefined" &&
         Notification.permission === "denied"
       ) {
-        toast.error("Dozvola odbijena. Uključi je u podešavanjima browsera.");
+        toast.error("Permission denied. Enable it in your browser settings.");
       } else {
-        toast.error("Nije moguće uključiti push notifikacije.");
+        toast.error("Couldn't enable push notifications.");
       }
     } catch {
       // subscribe() never throws, but guard anyway so the dashboard never breaks
-      toast.error("Nije moguće uključiti push notifikacije.");
+      toast.error("Couldn't enable push notifications.");
     }
   };
 
@@ -181,21 +181,21 @@ export default function NotificationBell({ variant = "client" }) {
             className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-[#FFB633] hover:bg-white/5 transition-colors disabled:opacity-60"
           >
             <BellRing className="w-4 h-4 shrink-0" />
-            {busy ? "Uključivanje..." : "Uključi push notifikacije"}
+            {busy ? "Enabling…" : "Enable push notifications"}
           </button>
         )}
         {iosNeedsInstall && (
           <button
             onClick={() =>
               toast(
-                "Dodaj na početni ekran: Share → „Add to Home Screen”, pa otvori app odatle za push.",
+                "Add to your home screen: Share → “Add to Home Screen”, then open the app from there for push.",
                 { icon: "📲", duration: 6000 },
               )
             }
             className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-gray-300 hover:bg-white/5 transition-colors text-left"
           >
             <Share className="w-4 h-4 shrink-0" />
-            Instaliraj app za push notifikacije
+            Install app for push notifications
           </button>
         )}
       </PopoverContent>

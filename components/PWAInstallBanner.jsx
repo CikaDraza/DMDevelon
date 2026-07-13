@@ -66,18 +66,18 @@ export default function PWAInstallBanner() {
     <div className="fixed bottom-0 inset-x-0 z-50 md:hidden p-3">
       <div className="mx-auto max-w-md flex items-start gap-3 bg-[#1a1a1b] border border-[#FFB633]/30 rounded-xl px-4 py-3 shadow-lg">
         <div className="flex-1 min-w-0">
-          <p className="text-white text-sm font-medium">Instaliraj aplikaciju</p>
+          <p className="text-white text-sm font-medium">Install the app</p>
           {mode === "android" ? (
             <p className="text-gray-400 text-xs">
-              Dodaj DMDevelon na početni ekran i primaj notifikacije.
+              Add DMDevelon to your home screen and get notifications.
             </p>
           ) : (
             <p className="text-gray-400 text-xs leading-relaxed">
-              Za push notifikacije dodaj na početni ekran: dodirni{" "}
+              For push notifications, add to your home screen: tap{" "}
               <Share className="inline w-3.5 h-3.5 -mt-0.5" />{" "}
-              <strong className="text-gray-300">Share</strong>, pa{" "}
-              <strong className="text-gray-300">„Add to Home Screen”</strong>,
-              i otvori app odatle.
+              <strong className="text-gray-300">Share</strong>, then{" "}
+              <strong className="text-gray-300">“Add to Home Screen”</strong>,
+              and open the app from there.
             </p>
           )}
         </div>
@@ -87,12 +87,12 @@ export default function PWAInstallBanner() {
             className="flex items-center gap-1.5 bg-[#FFB633] text-black text-sm font-semibold px-3 py-2 rounded-lg shrink-0"
           >
             <Download className="w-4 h-4" />
-            Instaliraj
+            Install
           </button>
         )}
         <button
           onClick={dismiss}
-          aria-label="Zatvori"
+          aria-label="Close"
           className="text-gray-400 hover:text-white shrink-0"
         >
           <X className="w-5 h-5" />

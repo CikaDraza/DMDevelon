@@ -427,7 +427,8 @@ export async function GET(request, context) {
       return NextResponse.json(users, { headers: getCorsHeaders() });
     }
 
-    // User profile
+    // User profile — getUserFromRequest already returns the user doc without
+    // sensitive fields, so return it directly.
     if (pathStr === "auth/me") {
       const user = await getUserFromRequest(request);
       if (!user) {
@@ -436,16 +437,7 @@ export async function GET(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
-      const userData = await User.findById(user.userId).select(
-        "-password -verifyToken -resetToken -resetTokenExpiry",
-      );
-      if (!userData) {
-        return NextResponse.json(
-          { error: "User not found" },
-          { status: 404, headers: getCorsHeaders() },
-        );
-      }
-      return NextResponse.json(userData, { headers: getCorsHeaders() });
+      return NextResponse.json(user, { headers: getCorsHeaders() });
     }
 
     // Notifications (current user)

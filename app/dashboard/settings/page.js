@@ -52,7 +52,7 @@ export default function SettingsPage() {
         headers: getAuthHeaders(),
       });
     } catch (e) {
-      toast.error("Greška pri čuvanju");
+      toast.error("Failed to save");
       throw e;
     } finally {
       setSaving(false);
@@ -64,7 +64,9 @@ export default function SettingsPage() {
     setEmailOn(checked);
     try {
       await save({ emailNotifications: checked });
-      toast.success(checked ? "Email obaveštenja uključena" : "Email obaveštenja isključena");
+      toast.success(
+        checked ? "Email notifications on" : "Email notifications off",
+      );
     } catch {
       setEmailOn(prev);
     }
@@ -80,8 +82,8 @@ export default function SettingsPage() {
           setPushOn(prev);
           toast.error(
             push.permission === "denied"
-              ? "Notifikacije su blokirane u browseru."
-              : "Nije moguće uključiti push na ovom uređaju.",
+              ? "Notifications are blocked in your browser."
+              : "Couldn't enable push on this device.",
           );
           return;
         }
@@ -89,7 +91,9 @@ export default function SettingsPage() {
         await push.unsubscribe();
       }
       await save({ pushNotifications: checked });
-      toast.success(checked ? "Push notifikacije uključene" : "Push notifikacije isključene");
+      toast.success(
+        checked ? "Push notifications on" : "Push notifications off",
+      );
     } catch {
       setPushOn(prev);
     }
@@ -112,9 +116,9 @@ export default function SettingsPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-2xl">
-        <h1 className="text-2xl font-bold mb-1">Podešavanja obaveštenja</h1>
+        <h1 className="text-2xl font-bold mb-1">Notification settings</h1>
         <p className="text-gray-400 text-sm mb-8">
-          Izaberi kako želiš da te obaveštavamo o porukama i aktivnostima.
+          Choose how you&apos;d like to be notified about messages and activity.
         </p>
 
         <div className="space-y-4">
@@ -122,9 +126,9 @@ export default function SettingsPage() {
             <div className="flex gap-3">
               <Mail className="w-5 h-5 text-[#FFB633] shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium">Email obaveštenja</p>
+                <p className="font-medium">Email notifications</p>
                 <p className="text-sm text-gray-400">
-                  Zbirni email o novim porukama (šalje se povremeno, ne za svaku poruku).
+                  A periodic summary email of new messages (not one per message).
                 </p>
               </div>
             </div>
@@ -139,13 +143,13 @@ export default function SettingsPage() {
             <div className="flex gap-3">
               <BellRing className="w-5 h-5 text-[#FFB633] shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium">Push notifikacije</p>
+                <p className="font-medium">Push notifications</p>
                 <p className="text-sm text-gray-400">
                   {push.supported
-                    ? "Obaveštenja na ovom uređaju, i kada aplikacija nije otvorena."
+                    ? "Notifications on this device, even when the app is closed."
                     : push.iosNeedsInstall
-                      ? "Na iPhone-u: dodaj app na početni ekran (Share → „Add to Home Screen”) pa je otvori odatle da uključiš push."
-                      : "Nije podržano na ovom uređaju/browseru."}
+                      ? "On iPhone: add the app to your home screen (Share → “Add to Home Screen”), then open it from there to enable push."
+                      : "Not supported on this device/browser."}
                 </p>
               </div>
             </div>
