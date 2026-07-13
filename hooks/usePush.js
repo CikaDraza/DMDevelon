@@ -6,9 +6,11 @@ import { useAuth } from "./useAuth";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
-// iOS (iPhone/iPad) is deliberately excluded: Safari only supports web push in
-// an installed PWA and prompting there tends to break the dashboard, so we skip
-// service worker + push entirely on iOS.
+// iOS (iPhone/iPad) supports Web Push only from iOS 16.4+ AND only when the site
+// is installed as a PWA (running in standalone mode). In a normal Safari/Chrome
+// tab, PushManager/Notification are missing or throw — so we never call them
+// there. Instead the install banner guides the user to "Add to Home Screen",
+// and once launched standalone the Notification Bell exposes the enable button.
 export function isIOS() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
@@ -17,6 +19,15 @@ export function isIOS() {
   const iPadOS =
     navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
   return iOSDevice || iPadOS;
+}
+
+// Is the app running as an installed PWA (home-screen / standalone)?
+export function isStandalone() {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -39,17 +50,27 @@ export function usePush() {
   const [permission, setPermission] = useState("default");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [ios, setIos] = useState(false);
+  const [standalone, setStandalone] = useState(false);
 
   useEffect(() => {
-    const ok =
+    const onIOS = isIOS();
+    const inStandalone = isStandalone();
+    setIos(onIOS);
+    setStandalone(inStandalone);
+
+    const hasApis =
       typeof window !== "undefined" &&
       "serviceWorker" in navigator &&
       "PushManager" in window &&
       "Notification" in window &&
-      !isIOS() &&
       !!VAPID_PUBLIC_KEY;
+
+    // On iOS, push is only usable once installed as a PWA (standalone).
+    const ok = hasApis && (!onIOS || inStandalone);
     setSupported(ok);
     if (!ok) return;
+
     setPermission(Notification.permission);
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
@@ -65,7 +86,8 @@ export function usePush() {
       setPermission(perm);
       if (perm !== "granted") return false;
 
-      const reg = (await registerServiceWorker()) || (await navigator.serviceWorker.ready);
+      const reg =
+        (await registerServiceWorker()) || (await navigator.serviceWorker.ready);
       await navigator.serviceWorker.ready;
 
       let sub = await reg.pushManager.getSubscription();
@@ -119,7 +141,8 @@ export function usePush() {
   const ensureSubscribed = useCallback(async () => {
     if (!supported || Notification.permission !== "granted") return;
     try {
-      const reg = (await registerServiceWorker()) || (await navigator.serviceWorker.ready);
+      const reg =
+        (await registerServiceWorker()) || (await navigator.serviceWorker.ready);
       await navigator.serviceWorker.ready;
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
@@ -144,6 +167,10 @@ export function usePush() {
     permission,
     isSubscribed,
     busy,
+    isIOS: ios,
+    isStandalone: standalone,
+    // iOS user in a browser tab who must install the PWA before push works.
+    iosNeedsInstall: ios && !standalone,
     subscribe,
     unsubscribe,
     ensureSubscribed,

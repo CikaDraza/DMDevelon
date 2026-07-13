@@ -195,9 +195,13 @@ npx web-push generate-vapid-keys
   https://dmdevelon.website/api/cron/email-digest
 ```
 
-Users toggle email/push at `/dashboard/settings`. iOS is intentionally excluded
-from push and the install banner (Safari only supports push in an installed PWA
-and prompting there breaks the dashboard).
+Users toggle email/push at `/dashboard/settings`. **iOS** supports Web Push only
+from iOS 16.4+ and only when the app is installed as a PWA (standalone). So on
+iOS the code never touches `PushManager` in a plain Safari tab (which would
+throw); instead the install banner shows manual "Add to Home Screen" steps, and
+once launched from the home screen the Notification Bell exposes the enable
+button. Android/Chromium uses the native `beforeinstallprompt`. Push is never
+requested automatically — always behind an explicit user action.
 
 **Email sender routing** ([lib/email.js](lib/email.js) `FROM_EMAIL_MAP` / `REPLY_TO_MAP`):
 sending goes through Resend (only the domain must be verified there), while the

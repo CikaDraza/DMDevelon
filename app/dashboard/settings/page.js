@@ -143,7 +143,9 @@ export default function SettingsPage() {
                 <p className="text-sm text-gray-400">
                   {push.supported
                     ? "Obaveštenja na ovom uređaju, i kada aplikacija nije otvorena."
-                    : "Nije podržano na ovom uređaju/browseru (iPhone nije podržan)."}
+                    : push.iosNeedsInstall
+                      ? "Na iPhone-u: dodaj app na početni ekran (Share → „Add to Home Screen”) pa je otvori odatle da uključiš push."
+                      : "Nije podržano na ovom uređaju/browseru."}
                 </p>
               </div>
             </div>
