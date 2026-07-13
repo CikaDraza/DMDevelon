@@ -6,7 +6,7 @@ import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { Lightbulb, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export default function CMSPage({ initialSlug }) {
   const [page, setPage] = useState(null);
@@ -49,7 +49,7 @@ export default function CMSPage({ initialSlug }) {
         <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
           <div className="container mx-auto flex items-center justify-between">
             <a href="/" className="flex items-center gap-3">
-              <Lightbulb className="w-8 h-8 text-[#FFB633]" />
+              <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
               <div>
                 <h1 className="font-bold text-white">DMDevelon</h1>
                 <p className="text-xs text-gray-400">
@@ -85,7 +85,7 @@ export default function CMSPage({ initialSlug }) {
       <header className="bg-[#1a1a1b] border-b border-white/10 px-6 py-4">
         <div className="container mx-auto flex items-center justify-between">
           <a href="/" className="flex items-center gap-3">
-            <Lightbulb className="w-8 h-8 text-[#FFB633]" />
+            <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
               <p className="text-xs text-gray-400">

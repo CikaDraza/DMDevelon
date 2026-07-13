@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
-import { Lightbulb, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
 function VerifyEmailInner() {
   const searchParams = useSearchParams();
@@ -29,7 +29,7 @@ function VerifyEmailInner() {
     <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-[#1a1a1b] border border-white/10 rounded-2xl p-8 text-center">
         <div className="flex items-center justify-center gap-3 mb-6">
-          <Lightbulb className="w-8 h-8 text-[#FFB633]" />
+          <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
           <span className="font-bold text-white">DMDevelon</span>
         </div>
 

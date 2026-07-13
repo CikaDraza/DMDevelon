@@ -5,6 +5,10 @@ import QueryProvider from "@/providers/QueryProvider";
 import { Toaster } from "react-hot-toast";
 import GeoStructuredData from "@/components/geo/GeoStructuredData";
 
+export const viewport = {
+  themeColor: "#0f0f10",
+};
+
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const seo = await getSeoMeta(slug);
@@ -13,6 +17,15 @@ export async function generateMetadata({ params }) {
   return {
     title: seo.title,
     description: seo.description,
+    manifest: "/manifest.json",
+    icons: {
+      apple: "/icons/dmdevelon_logo-notifications.png",
+    },
+    appleWebApp: {
+      capable: true,
+      title: "DMDevelon",
+      statusBarStyle: "black-translucent",
+    },
     robots: seo.noIndex ? "noindex, nofollow" : "index, follow",
     canonical: `${baseUrl}/${slug === "/" ? "" : slug}`,
     openGraph: {

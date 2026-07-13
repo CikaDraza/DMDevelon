@@ -11,6 +11,7 @@ import ClientProject from "@/models/ClientProject";
 import ProjectMessage from "@/models/ProjectMessage";
 import ProjectRequest from "@/models/ProjectRequest";
 import Notification from "@/models/Notification";
+import PushSubscription from "@/models/PushSubscription";
 import {
   notifyUser,
   notifyAdmins,
@@ -434,7 +435,153 @@ export async function POST(request, context) {
   const pathStr = path.join("/");
 
   try {
-    const body = await request.json();
+    // Tolerate empty/no JSON body (e.g. cron/unsubscribe calls without a payload)
+    const body = await request.json().catch(() => ({}));
+
+    // Push - save a browser push subscription for the current user
+    if (pathStr === "push/subscribe") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const sub = body?.subscription || body;
+      if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+        return NextResponse.json(
+          { error: "Invalid subscription" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      await PushSubscription.findOneAndUpdate(
+        { endpoint: sub.endpoint },
+        {
+          $set: {
+            userId: user._id,
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+            userAgent: request.headers.get("user-agent") || "",
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+      return NextResponse.json(
+        { success: true },
+        { status: 201, headers: getCorsHeaders() },
+      );
+    }
+
+    // Push - remove a subscription (by endpoint) for the current user
+    if (pathStr === "push/unsubscribe") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const endpoint = body?.endpoint || body?.subscription?.endpoint;
+      if (endpoint) {
+        await PushSubscription.deleteOne({ endpoint, userId: user._id });
+      }
+      return NextResponse.json(
+        { success: true },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // Cron - batched email digest of unread message notifications.
+    // Guarded by CRON_SECRET; call every ~15 min from an external scheduler.
+    if (pathStr === "cron/email-digest") {
+      const auth = request.headers.get("authorization") || "";
+      const secret = process.env.CRON_SECRET;
+      if (!secret || auth !== `Bearer ${secret}`) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+
+      const pending = await Notification.find({
+        type: { $in: ["project_message", "request_message"] },
+        emailedAt: null,
+        read: false,
+      }).sort({ createdAt: 1 });
+
+      if (!pending.length) {
+        return NextResponse.json(
+          { sent: 0, processed: 0 },
+          { headers: getCorsHeaders() },
+        );
+      }
+
+      // Group per recipient, then per conversation (entityId).
+      const byUser = new Map();
+      for (const n of pending) {
+        if (!byUser.has(n.userId)) byUser.set(n.userId, []);
+        byUser.get(n.userId).push(n);
+      }
+
+      const logoUrl = `${APP_URL}/icons/dmdevelon_logo-notifications.png`;
+      const wordmarkUrl = `${APP_URL}/icons/dmd-email-logo.png`;
+      let sent = 0;
+      const processedIds = [];
+
+      for (const [userId, notes] of byUser) {
+        processedIds.push(...notes.map((n) => n._id));
+        const recipient = await User.findById(userId);
+        // Skip (but still mark processed) if user opted out or has no email.
+        if (!recipient?.email || recipient.emailNotifications === false) {
+          continue;
+        }
+
+        const convMap = new Map();
+        for (const n of notes) {
+          const key = n.entityId || n.title;
+          if (!convMap.has(key)) {
+            convMap.set(key, {
+              title: n.title,
+              count: 0,
+              preview: n.body || "",
+              link: n.link,
+            });
+          }
+          const c = convMap.get(key);
+          c.count += 1;
+          c.preview = n.body || c.preview; // latest message preview
+          c.link = n.link || c.link;
+        }
+        const conversations = Array.from(convMap.values());
+        const totalCount = notes.length;
+        const ctaUrl = `${APP_URL}${conversations[0]?.link || "/dashboard"}`;
+
+        try {
+          const tpl = emailTemplates.newMessageDigest({
+            name: recipient.name,
+            logoUrl,
+            wordmarkUrl,
+            ctaUrl,
+            totalCount,
+            conversations,
+          });
+          await sendEmail({ to: recipient.email, ...tpl, type: "project" });
+          sent += 1;
+        } catch (e) {
+          console.error("digest email failed for", userId, e);
+        }
+      }
+
+      await Notification.updateMany(
+        { _id: { $in: processedIds } },
+        { $set: { emailedAt: new Date() } },
+      );
+
+      return NextResponse.json(
+        { sent, processed: processedIds.length },
+        { headers: getCorsHeaders() },
+      );
+    }
 
     // Auth - Register
     if (pathStr === "auth/register") {
@@ -813,7 +960,7 @@ export async function POST(request, context) {
           entityType: "project",
           entityId: project._id,
           milestoneId: message.milestoneId,
-          email: false,
+          email: true,
         });
       }
       return NextResponse.json(message, {
@@ -1333,6 +1480,34 @@ export async function PUT(request, context) {
 
   try {
     const body = await request.json();
+
+    // User - update notification preferences (current user)
+    if (pathStr === "user/settings") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const update = {};
+      if (typeof body.emailNotifications === "boolean") {
+        update.emailNotifications = body.emailNotifications;
+      }
+      if (typeof body.pushNotifications === "boolean") {
+        update.pushNotifications = body.pushNotifications;
+      }
+      const updated = await User.findByIdAndUpdate(user._id, update, {
+        new: true,
+      }).select("emailNotifications pushNotifications");
+      return NextResponse.json(
+        {
+          emailNotifications: updated?.emailNotifications ?? true,
+          pushNotifications: updated?.pushNotifications ?? true,
+        },
+        { headers: getCorsHeaders() },
+      );
+    }
 
     // Services
     if (pathStr.startsWith("services/")) {

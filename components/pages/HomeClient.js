@@ -11,9 +11,7 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import {
   Bot,
-  ShoppingCart,
-  Lightbulb,
-  CodeXml,
+  ShoppingCart,  CodeXml,
   LockIcon,
   Menu,
   X,
@@ -256,7 +254,12 @@ function Header({ user, onLoginClick, onLogout }) {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3">
             <div className="relative">
-              <Lightbulb className="w-7 h-7 lg:w-10 lg:h-10 text-[#FFB633]" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/dmd-logo.png"
+                alt="DMDevelon"
+                className="h-7 w-auto lg:h-10"
+              />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFB633] rounded-full animate-pulse" />
             </div>
             <div className="w-auto flex flex-wrap">

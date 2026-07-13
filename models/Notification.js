@@ -13,12 +13,15 @@ const NotificationSchema = new mongoose.Schema(
     entityId: { type: String, default: '' },
     milestoneId: { type: String, default: '' }, // set for per-milestone chat messages
     read: { type: Boolean, default: false },
+    emailedAt: { type: Date, default: null }, // set once included in a digest email
   },
   { timestamps: true, _id: false }
 );
 
 NotificationSchema.index({ userId: 1, read: 1 });
 NotificationSchema.index({ userId: 1, entityId: 1 });
+// Digest sweep: pull un-emailed, still-unread message notifications by type
+NotificationSchema.index({ type: 1, emailedAt: 1, read: 1 });
 
 export default mongoose.models.Notification ||
   mongoose.model('Notification', NotificationSchema);

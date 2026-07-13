@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, BellRing, CheckCheck } from "lucide-react";
+import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/useNotifications";
+import { usePush } from "@/hooks/usePush";
 import {
   Popover,
   PopoverTrigger,
@@ -44,7 +46,23 @@ function categoryOf(n, variant) {
 export default function NotificationBell({ variant = "client" }) {
   const router = useRouter();
   const { items, unreadCount, markRead } = useNotifications();
+  const { supported, permission, isSubscribed, busy, subscribe } = usePush();
   const [open, setOpen] = useState(false);
+
+  const showEnablePush = supported && (permission !== "granted" || !isSubscribed);
+
+  const handleEnablePush = async () => {
+    if (permission === "denied") {
+      toast.error(
+        "Notifikacije su blokirane u browseru. Uključi ih u podešavanjima sajta.",
+      );
+      return;
+    }
+    const ok = await subscribe();
+    if (ok) toast.success("Push notifikacije uključene");
+    else if (Notification.permission === "denied")
+      toast.error("Dozvola odbijena. Uključi je u podešavanjima browsera.");
+  };
 
   const handleClick = (n) => {
     if (!n.read) markRead.mutate({ id: n._id });
@@ -136,6 +154,16 @@ export default function NotificationBell({ variant = "client" }) {
               ))
           )}
         </div>
+        {showEnablePush && (
+          <button
+            onClick={handleEnablePush}
+            disabled={busy}
+            className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-[#FFB633] hover:bg-white/5 transition-colors disabled:opacity-60"
+          >
+            <BellRing className="w-4 h-4 shrink-0" />
+            {busy ? "Uključivanje..." : "Uključi push notifikacije"}
+          </button>
+        )}
       </PopoverContent>
     </Popover>
   );

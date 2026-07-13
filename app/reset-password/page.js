@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lightbulb, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 
 function ResetPasswordInner() {
   const router = useRouter();
@@ -46,7 +46,7 @@ function ResetPasswordInner() {
     <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-[#1a1a1b] border border-white/10 rounded-2xl p-8">
         <div className="flex items-center gap-3 mb-6">
-          <Lightbulb className="w-8 h-8 text-[#FFB633]" />
+          <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
           <span className="font-bold text-white">DMDevelon</span>
         </div>
 

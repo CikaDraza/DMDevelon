@@ -14,6 +14,8 @@ const UserSchema = new mongoose.Schema(
     isAdmin: { type: Boolean, default: false },
     provider: { type: String, default: 'local' },
     emailVerified: { type: Boolean, default: false },
+    emailNotifications: { type: Boolean, default: true },
+    pushNotifications: { type: Boolean, default: true },
     verifyToken: { type: String },
     resetToken: { type: String },
     resetTokenExpiry: { type: Date },

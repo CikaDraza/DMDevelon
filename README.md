@@ -172,6 +172,53 @@ Services support `gridSpan` (1-7) for flexible layouts.
 
 Supports both **Markdown** and **HTML** content.
 
+## 🔔 Notifications (email digest + web push)
+
+In-app notifications are created in [lib/notify.js](lib/notify.js), which also fires
+a **web push** to the recipient's devices and leaves message notifications for a
+**batched email digest** (anti-spam — one email per sweep, not per message).
+
+**Env vars** (see `.env.example`): `RESEND_API_KEY`, `VAPID_PUBLIC_KEY`,
+`VAPID_PRIVATE_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`, `CRON_SECRET`.
+Generate VAPID keys with:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+**Email digest cron** — call the guarded endpoint every ~15 min from any scheduler
+(server crontab, cron-job.org, Vercel Cron, etc.):
+
+```bash
+*/15 * * * * curl -s -X POST \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  https://dmdevelon.website/api/cron/email-digest
+```
+
+Users toggle email/push at `/dashboard/settings`. iOS is intentionally excluded
+from push and the install banner (Safari only supports push in an installed PWA
+and prompting there breaks the dashboard).
+
+**Email sender routing** ([lib/email.js](lib/email.js) `FROM_EMAIL_MAP` / `REPLY_TO_MAP`):
+sending goes through Resend (only the domain must be verified there), while the
+**Reply-To** decides which Zoho inbox receives replies.
+
+| Context (entityType) | From | Reply-To |
+| --- | --- | --- |
+| Contact form, messages, testimonials | `contact@dmdevelon.website` | `contact@dmdevelon.website` |
+| Projects / requests (incl. message digest) | `milan.drazic@dmdevelon.website` | `milan.drazic@dmdevelon.website` |
+| Verification / password reset | `noreply@dmdevelon.website` | — |
+
+**Brand assets** (in `public/icons/`):
+
+| File | Used for |
+| --- | --- |
+| `dmd-logo.png` | Site logo — header & footer everywhere |
+| `dmdevelon_logo-notifications.png` (192×192) | Email header logo, web-push icon, PWA/home-screen icon |
+| `dmdevelon_logo-notifications-512.png` | PWA 512 icon (any + maskable), generated from the 192 |
+| `dmd-email-logo.png` (400×120) | Email body wordmark, shown in a 200×60 container |
+| `badge-72.png` | Monochrome Android push badge |
+
 ## 📄 License
 
 MIT License - feel free to use this project for your own portfolio!

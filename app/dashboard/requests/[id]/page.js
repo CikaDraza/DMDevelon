@@ -9,7 +9,7 @@ import { useProjectRequest } from "@/hooks/useProjectRequests";
 import { useNotifications } from "@/hooks/useNotifications";
 import { RequestConversation } from "@/components/dashboard/RequestConversation";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Lightbulb, Check, Edit3, ArrowRight } from "lucide-react";
+import { ArrowLeft, Check, Edit3, ArrowRight } from "lucide-react";
 
 const STATUS = {
   new: {
@@ -98,7 +98,7 @@ export default function ClientRequestDetailPage() {
       <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
         <div className="container mx-auto flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <Lightbulb className="w-8 h-8 text-[#FFB633]" />
+            <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
               <p className="text-xs text-gray-400">Project Request</p>

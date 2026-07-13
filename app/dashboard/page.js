@@ -10,6 +10,8 @@ import { useProjectRequests } from "@/hooks/useProjectRequests";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useCardHighlight } from "@/hooks/useCardHighlight";
 import NotificationBell from "@/components/NotificationBell";
+import PushManager from "@/components/PushManager";
+import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { AvatarUploader } from "@/components/dashboard/AvatarUploader";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -17,9 +19,7 @@ import {
   Briefcase,
   MessageSquare,
   Settings,
-  LogOut,
-  Lightbulb,
-  Star,
+  LogOut,  Star,
   Plus,
   Edit,
   Trash2,
@@ -328,11 +328,13 @@ function DashboardInner() {
 
   return (
     <div className="min-h-screen bg-[#0f0f10]">
+      <PushManager />
+      <PWAInstallBanner />
       {/* Header */}
       <header className="bg-[#1a1a1b] border-b border-white/10 px-3 lg:px-6 py-4">
         <div className="container mx-auto flex items-center justify-between px-1 lg:px-3">
           <a href="/" className="flex items-center lg:gap-3">
-            <Lightbulb className="w-8 h-8 text-[#FFB633]" />
+            <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
               <p className="text-xs text-gray-400">Client Dashboard</p>
@@ -340,6 +342,14 @@ function DashboardInner() {
           </a>
           <div className="flex items-center gap-4">
             <NotificationBell />
+            <Link
+              href="/dashboard/settings"
+              className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+              aria-label="Settings"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Settings</span>
+            </Link>
             <Link
               href="/"
               className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"

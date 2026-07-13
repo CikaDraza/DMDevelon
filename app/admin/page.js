@@ -42,9 +42,7 @@ import {
   Database,
   Layers,
   Building,
-  Mail,
-  Lightbulb,
-  Monitor,
+  Mail,  Monitor,
   ShoppingCart,
   Home,
   NotebookPen,
@@ -92,6 +90,7 @@ import { useCompanyProfile } from "@/hooks/useCompanyProfile";
 import ClientProjectsManager from "@/components/admin/ClientProjectsManager";
 import ProjectRequestsManager from "@/components/admin/ProjectRequestsManager";
 import NotificationBell from "@/components/NotificationBell";
+import PushManager from "@/components/PushManager";
 
 // Icon mapping
 const iconMap = {
@@ -213,7 +212,7 @@ function AdminSidebar({
         {/* Logo */}
         <div className="p-6 border-b border-white/10">
           <a href="/" className="flex items-center gap-3">
-            <Lightbulb className="w-8 h-8 text-[#FFB633]" />
+            <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
               <p className="text-xs text-gray-400">Admin Panel</p>
@@ -2418,6 +2417,7 @@ function AdminPageInner() {
 
   return (
     <div className="min-h-screen bg-[#0f0f10]">
+      <PushManager />
       <AdminSidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}

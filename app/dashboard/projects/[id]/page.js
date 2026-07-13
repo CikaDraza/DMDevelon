@@ -17,9 +17,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  ArrowLeft,
-  Lightbulb,
-  MessageSquare,
+  ArrowLeft,  MessageSquare,
   Check,
   CircleDot,
   Circle,
@@ -164,7 +162,7 @@ function ClientProjectDetailInner() {
       <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
         <div className="container mx-auto flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <Lightbulb className="w-8 h-8 text-[#FFB633]" />
+            <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
               <p className="text-xs text-gray-400">Project Progress</p>
