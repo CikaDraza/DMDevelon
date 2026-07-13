@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import MarkdownContent from "@/components/ui/markdown-content";
 import { useAuth } from "@/hooks/useAuth";
 import { useClientProject } from "@/hooks/useClientProjects";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -24,6 +25,8 @@ import {
   ExternalLink,
   Github,
   Activity,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 function eventTimeAgo(d) {
@@ -96,6 +99,24 @@ function ClientProjectDetailInner() {
   const [selectedMilestoneId, setSelectedMilestoneId] = useState(null);
   const [chatMilestone, setChatMilestone] = useState(null);
   const { markRead, unreadMilestoneIds, unreadByMilestone } = useNotifications();
+
+  // Scope accordion — open by default here (unlike the proposal), and the
+  // open/closed choice persists across visits/refreshes.
+  const [scopeOpen, setScopeOpen] = useState(true);
+  useEffect(() => {
+    const stored = localStorage.getItem("projectScopeClosed");
+    const closed = stored === null ? false : stored === "true";
+    setScopeOpen(!closed);
+  }, []);
+  const toggleScope = () => {
+    setScopeOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("projectScopeClosed", String(!next));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/");
@@ -181,14 +202,7 @@ function ClientProjectDetailInner() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Title + status */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="text-3xl font-bold text-white">{project.title}</h2>
-            {project.description && (
-              <p className="text-gray-400 mt-2 max-w-2xl">
-                {project.description}
-              </p>
-            )}
-          </div>
+          <h2 className="text-3xl font-bold text-white">{project.title}</h2>
           <span
             className={`px-3 py-1 rounded-full text-xs font-medium ${
               STATUS_BADGE[project.status] || STATUS_BADGE.planning
@@ -197,6 +211,41 @@ function ClientProjectDetailInner() {
             {project.status.replace("_", " ")}
           </span>
         </div>
+
+        {/* Scope (markdown, collapsible — open by default) */}
+        {project.description && (
+          <div className="mt-6 border border-white/10 rounded-xl overflow-hidden bg-[#1a1a1b]">
+            <button
+              type="button"
+              onClick={toggleScope}
+              aria-expanded={scopeOpen}
+              className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/5 transition-colors"
+            >
+              <span className="text-sm font-semibold text-white">Scope</span>
+              {scopeOpen ? (
+                <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+              )}
+            </button>
+            {scopeOpen && (
+              <div className="px-5 pb-3">
+                <MarkdownContent
+                  content={project.description}
+                  className="text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={toggleScope}
+                  className="mt-1 w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-white py-1.5 border-t border-white/5"
+                >
+                  <ChevronUp className="w-4 h-4" />
+                  Collapse
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Timeline */}
         <div className="mt-8 bg-[#1a1a1b] rounded-xl p-6 border border-white/10 overflow-x-auto">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -8,8 +8,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjectRequest } from "@/hooks/useProjectRequests";
 import { useNotifications } from "@/hooks/useNotifications";
 import { RequestConversation } from "@/components/dashboard/RequestConversation";
+import MarkdownContent from "@/components/ui/markdown-content";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Check, Edit3, ArrowRight } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Edit3,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 
 const STATUS = {
   new: {
@@ -40,6 +48,24 @@ export default function ClientRequestDetailPage() {
   } = useProjectRequest(id);
 
   const { markRead } = useNotifications();
+
+  // Scope accordion — collapsed by default; the choice persists across visits
+  // (Scope is read once, then usually just referenced, so keep it out of the way).
+  const [scopeOpen, setScopeOpen] = useState(false);
+  useEffect(() => {
+    const stored = localStorage.getItem("proposalScopeClosed");
+    const closed = stored === null ? true : stored === "true";
+    setScopeOpen(!closed);
+  }, []);
+  const toggleScope = () => {
+    setScopeOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("proposalScopeClosed", String(!next));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/");
@@ -152,16 +178,53 @@ export default function ClientRequestDetailPage() {
         {/* Proposal panel */}
         {showProposal && (
           <div className="mt-6 bg-[#1a1a1b] border border-[#FFB633]/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">
-                {proposal.title || "Proposal"}
-              </h3>
-              <span className="text-xs text-gray-500">v{proposal.version}</span>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <h3 className="text-lg font-bold text-white truncate">
+                  {proposal.title || "Proposal"}
+                </h3>
+                <span
+                  className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full ${status.cls}`}
+                >
+                  {status.label}
+                </span>
+              </div>
+              <span className="text-xs text-gray-500 shrink-0">
+                v{proposal.version}
+              </span>
             </div>
             {proposal.scope && (
-              <p className="text-gray-300 text-sm mt-3 whitespace-pre-wrap">
-                {proposal.scope}
-              </p>
+              <div className="mt-3 border border-white/10 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={toggleScope}
+                  aria-expanded={scopeOpen}
+                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/5 transition-colors"
+                >
+                  <span className="text-sm font-semibold text-white">Scope</span>
+                  {scopeOpen ? (
+                    <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                  )}
+                </button>
+                {scopeOpen && (
+                  <div className="px-4 pb-2">
+                    <MarkdownContent
+                      content={proposal.scope}
+                      className="text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={toggleScope}
+                      className="mt-1 w-full flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-white py-1.5 border-t border-white/5"
+                    >
+                      <ChevronUp className="w-4 h-4" />
+                      Collapse
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="bg-white/5 rounded-lg p-3">

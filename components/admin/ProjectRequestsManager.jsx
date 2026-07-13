@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import MarkdownContent from "@/components/ui/markdown-content";
 import {
   ArrowLeft,
   ArrowRight,
@@ -197,16 +198,32 @@ function RequestDetail({ id, onBack }) {
               />
             </div>
             <div>
-              <Label className="text-white">Scope</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-white">Scope</Label>
+                <span className="text-[11px] text-gray-500">
+                  Markdown supported
+                </span>
+              </div>
               <Textarea
                 value={proposal.scope}
                 onChange={(e) =>
                   setProposal((p) => ({ ...p, scope: e.target.value }))
                 }
-                rows={4}
-                placeholder="What we'll build…"
-                className="bg-white/5 border-white/10 text-white mt-1"
+                rows={6}
+                placeholder={"What we'll build…\n\n**Deliverables**\n- Feature one\n- Feature two"}
+                className="bg-white/5 border-white/10 text-white mt-1 font-mono text-sm"
               />
+              {proposal.scope?.trim() && (
+                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">
+                    Preview
+                  </p>
+                  <MarkdownContent
+                    content={proposal.scope}
+                    className="text-sm"
+                  />
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
