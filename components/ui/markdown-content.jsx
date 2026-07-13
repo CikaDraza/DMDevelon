@@ -23,12 +23,21 @@ const components = {
       {children}
     </ul>
   ),
-  ol: ({ children }) => (
-    <ol className="list-decimal list-inside text-gray-300 mb-2 space-y-1">
+  // Forward `start` (and other attrs) so split ordered lists keep counting
+  // (e.g. "2." after an intervening paragraph) instead of restarting at 1.
+  ol: ({ node, children, ...props }) => (
+    <ol
+      {...props}
+      className="list-decimal list-inside text-gray-300 mb-2 space-y-1"
+    >
       {children}
     </ol>
   ),
-  li: ({ children }) => <li className="marker:text-[#FFB633]">{children}</li>,
+  li: ({ node, children, ...props }) => (
+    <li {...props} className="marker:text-[#FFB633]">
+      {children}
+    </li>
+  ),
   strong: ({ children }) => (
     <strong className="text-white font-semibold">{children}</strong>
   ),

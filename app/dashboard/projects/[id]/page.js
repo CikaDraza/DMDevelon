@@ -67,8 +67,11 @@ const markdownComponents = {
       {children}
     </ul>
   ),
-  ol: ({ children }) => (
-    <ol className="list-decimal list-inside text-gray-300 mb-3 space-y-1">
+  ol: ({ node, children, ...props }) => (
+    <ol
+      {...props}
+      className="list-decimal list-inside text-gray-300 mb-3 space-y-1"
+    >
       {children}
     </ol>
   ),
