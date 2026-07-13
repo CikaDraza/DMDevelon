@@ -59,10 +59,22 @@ export default function NotificationBell({ variant = "client" }) {
       );
       return;
     }
-    const ok = await subscribe();
-    if (ok) toast.success("Push notifikacije uključene");
-    else if (Notification.permission === "denied")
-      toast.error("Dozvola odbijena. Uključi je u podešavanjima browsera.");
+    try {
+      const ok = await subscribe();
+      if (ok) {
+        toast.success("Push notifikacije uključene ✅");
+      } else if (
+        typeof Notification !== "undefined" &&
+        Notification.permission === "denied"
+      ) {
+        toast.error("Dozvola odbijena. Uključi je u podešavanjima browsera.");
+      } else {
+        toast.error("Nije moguće uključiti push notifikacije.");
+      }
+    } catch {
+      // subscribe() never throws, but guard anyway so the dashboard never breaks
+      toast.error("Nije moguće uključiti push notifikacije.");
+    }
   };
 
   const handleClick = (n) => {

@@ -74,6 +74,90 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: getCorsHeaders() });
 }
 
+// Verify the digest cron secret. Vercel Cron auto-sends `Authorization:
+// Bearer <CRON_SECRET>` when the CRON_SECRET env var is set.
+function isCronAuthorized(request) {
+  const auth = request.headers.get("authorization") || "";
+  const secret = process.env.CRON_SECRET;
+  return !!secret && auth === `Bearer ${secret}`;
+}
+
+// Batched email digest of unread message notifications. Shared by GET (Vercel
+// Cron sends GET) and POST (manual/external schedulers). Idempotent: once a
+// notification is included it gets `emailedAt` set so it won't be re-sent.
+async function runEmailDigest() {
+  const pending = await Notification.find({
+    type: { $in: ["project_message", "request_message"] },
+    emailedAt: null,
+    read: false,
+  }).sort({ createdAt: 1 });
+
+  if (!pending.length) return { sent: 0, processed: 0 };
+
+  // Group per recipient, then per conversation (entityId).
+  const byUser = new Map();
+  for (const n of pending) {
+    if (!byUser.has(n.userId)) byUser.set(n.userId, []);
+    byUser.get(n.userId).push(n);
+  }
+
+  const logoUrl = `${APP_URL}/icons/dmdevelon_logo-notifications.png`;
+  const wordmarkUrl = `${APP_URL}/icons/dmd-email-logo.png`;
+  let sent = 0;
+  const processedIds = [];
+
+  for (const [userId, notes] of byUser) {
+    processedIds.push(...notes.map((n) => n._id));
+    const recipient = await User.findById(userId);
+    // Skip (but still mark processed) if user opted out or has no email.
+    if (!recipient?.email || recipient.emailNotifications === false) {
+      continue;
+    }
+
+    const convMap = new Map();
+    for (const n of notes) {
+      const key = n.entityId || n.title;
+      if (!convMap.has(key)) {
+        convMap.set(key, {
+          title: n.title,
+          count: 0,
+          preview: n.body || "",
+          link: n.link,
+        });
+      }
+      const c = convMap.get(key);
+      c.count += 1;
+      c.preview = n.body || c.preview; // latest message preview
+      c.link = n.link || c.link;
+    }
+    const conversations = Array.from(convMap.values());
+    const totalCount = notes.length;
+    const ctaUrl = `${APP_URL}${conversations[0]?.link || "/dashboard"}`;
+
+    try {
+      const tpl = emailTemplates.newMessageDigest({
+        name: recipient.name,
+        logoUrl,
+        wordmarkUrl,
+        ctaUrl,
+        totalCount,
+        conversations,
+      });
+      await sendEmail({ to: recipient.email, ...tpl, type: "project" });
+      sent += 1;
+    } catch (e) {
+      console.error("digest email failed for", userId, e);
+    }
+  }
+
+  await Notification.updateMany(
+    { _id: { $in: processedIds } },
+    { $set: { emailedAt: new Date() } },
+  );
+
+  return { sent, processed: processedIds.length };
+}
+
 export async function GET(request, context) {
   await connectDB();
   const params = await context.params;
@@ -88,6 +172,19 @@ export async function GET(request, context) {
         { status: "ok", timestamp: new Date().toISOString() },
         { headers: getCorsHeaders() },
       );
+    }
+
+    // Cron - batched email digest. Vercel Cron triggers this via GET and
+    // auto-sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is set.
+    if (pathStr === "cron/email-digest") {
+      if (!isCronAuthorized(request)) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const result = await runEmailDigest();
+      return NextResponse.json(result, { headers: getCorsHeaders() });
     }
 
     // Services
@@ -491,96 +588,16 @@ export async function POST(request, context) {
       );
     }
 
-    // Cron - batched email digest of unread message notifications.
-    // Guarded by CRON_SECRET; call every ~15 min from an external scheduler.
+    // Cron - batched email digest (manual/external schedulers via POST).
     if (pathStr === "cron/email-digest") {
-      const auth = request.headers.get("authorization") || "";
-      const secret = process.env.CRON_SECRET;
-      if (!secret || auth !== `Bearer ${secret}`) {
+      if (!isCronAuthorized(request)) {
         return NextResponse.json(
           { error: "Unauthorized" },
           { status: 401, headers: getCorsHeaders() },
         );
       }
-
-      const pending = await Notification.find({
-        type: { $in: ["project_message", "request_message"] },
-        emailedAt: null,
-        read: false,
-      }).sort({ createdAt: 1 });
-
-      if (!pending.length) {
-        return NextResponse.json(
-          { sent: 0, processed: 0 },
-          { headers: getCorsHeaders() },
-        );
-      }
-
-      // Group per recipient, then per conversation (entityId).
-      const byUser = new Map();
-      for (const n of pending) {
-        if (!byUser.has(n.userId)) byUser.set(n.userId, []);
-        byUser.get(n.userId).push(n);
-      }
-
-      const logoUrl = `${APP_URL}/icons/dmdevelon_logo-notifications.png`;
-      const wordmarkUrl = `${APP_URL}/icons/dmd-email-logo.png`;
-      let sent = 0;
-      const processedIds = [];
-
-      for (const [userId, notes] of byUser) {
-        processedIds.push(...notes.map((n) => n._id));
-        const recipient = await User.findById(userId);
-        // Skip (but still mark processed) if user opted out or has no email.
-        if (!recipient?.email || recipient.emailNotifications === false) {
-          continue;
-        }
-
-        const convMap = new Map();
-        for (const n of notes) {
-          const key = n.entityId || n.title;
-          if (!convMap.has(key)) {
-            convMap.set(key, {
-              title: n.title,
-              count: 0,
-              preview: n.body || "",
-              link: n.link,
-            });
-          }
-          const c = convMap.get(key);
-          c.count += 1;
-          c.preview = n.body || c.preview; // latest message preview
-          c.link = n.link || c.link;
-        }
-        const conversations = Array.from(convMap.values());
-        const totalCount = notes.length;
-        const ctaUrl = `${APP_URL}${conversations[0]?.link || "/dashboard"}`;
-
-        try {
-          const tpl = emailTemplates.newMessageDigest({
-            name: recipient.name,
-            logoUrl,
-            wordmarkUrl,
-            ctaUrl,
-            totalCount,
-            conversations,
-          });
-          await sendEmail({ to: recipient.email, ...tpl, type: "project" });
-          sent += 1;
-        } catch (e) {
-          console.error("digest email failed for", userId, e);
-        }
-      }
-
-      await Notification.updateMany(
-        { _id: { $in: processedIds } },
-        { $set: { emailedAt: new Date() } },
-      );
-
-      return NextResponse.json(
-        { sent, processed: processedIds.length },
-        { headers: getCorsHeaders() },
-      );
+      const result = await runEmailDigest();
+      return NextResponse.json(result, { headers: getCorsHeaders() });
     }
 
     // Auth - Register
