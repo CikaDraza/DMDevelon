@@ -13,13 +13,16 @@ import {
   ShieldCheck,
   Bug,
   FileCog,
+  Bot,
+  Monitor,
+  Smartphone,
   Boxes,
   GitBranch,
   Globe,
 } from "lucide-react";
 
 // Curated Lucide icons admins can attach to a milestone. The key is what gets
-// stored on milestone.icon; ICON_MAP resolves it for rendering.
+// stored on milestone.icon; MILESTONE_ICON_COMPONENTS resolves it for rendering.
 export const MILESTONE_ICON_OPTIONS = [
   "Circle",
   "Rocket",
@@ -31,12 +34,22 @@ export const MILESTONE_ICON_OPTIONS = [
   "ShieldCheck",
   "Bug",
   "FileCog",
+  "Bot",
+  "Monitor",
+  "Smartphone",
   "Boxes",
   "GitBranch",
   "Globe",
 ];
 
-const ICON_MAP = {
+export const MILESTONE_ICON_LABELS = {
+  FileCog: "Engine / backend",
+  Bot: "Robot / AI",
+  Monitor: "Frontend / screen",
+  Smartphone: "Mobile app / view",
+};
+
+export const MILESTONE_ICON_COMPONENTS = {
   Circle,
   Rocket,
   Database,
@@ -47,6 +60,9 @@ const ICON_MAP = {
   ShieldCheck,
   Bug,
   FileCog,
+  Bot,
+  Monitor,
+  Smartphone,
   Boxes,
   GitBranch,
   Globe,
@@ -120,7 +136,7 @@ export function ProjectTimeline({
   return (
     <ol className="items-center sm:flex">
       {items.map((m, i) => {
-        const Icon = ICON_MAP[m.icon] || Circle;
+        const Icon = MILESTONE_ICON_COMPONENTS[m.icon] || Circle;
         const phase = getMilestonePhase(m);
         const nextPhase = items[i + 1]
           ? getMilestonePhase(items[i + 1])

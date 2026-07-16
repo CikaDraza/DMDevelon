@@ -41,6 +41,9 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 
+const DASHBOARD_TABS = ["services", "testimonials"];
+const DASHBOARD_TAB_STORAGE_KEY = "dmdevelonDashboardActiveTab";
+
 // Client Dashboard Page
 function DashboardInner() {
   const router = useRouter();
@@ -100,8 +103,25 @@ function DashboardInner() {
   // Deep-link from a notification: ?tab=services|testimonials switches view.
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "services" || tab === "testimonials") setActiveTab(tab);
+    if (DASHBOARD_TABS.includes(tab)) {
+      setActiveTab(tab);
+      localStorage.setItem(DASHBOARD_TAB_STORAGE_KEY, tab);
+    } else {
+      const storedTab = localStorage.getItem(DASHBOARD_TAB_STORAGE_KEY);
+      if (DASHBOARD_TABS.includes(storedTab)) setActiveTab(storedTab);
+    }
   }, [searchParams]);
+
+  const handleTabChange = (tab) => {
+    if (!DASHBOARD_TABS.includes(tab)) return;
+    setActiveTab(tab);
+    localStorage.setItem(DASHBOARD_TAB_STORAGE_KEY, tab);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    params.delete("id");
+    router.replace(`/dashboard?${params.toString()}`, { scroll: false });
+  };
 
   useEffect(() => {
     if (user) {
@@ -451,7 +471,7 @@ function DashboardInner() {
             {/* Navigation */}
             <nav className="bg-[#1a1a1b] rounded-xl p-4 border border-white/10 space-y-2">
               <button
-                onClick={() => setActiveTab("services")}
+                onClick={() => handleTabChange("services")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   activeTab === "services"
                     ? "bg-[#FFB633] text-black"
@@ -462,7 +482,7 @@ function DashboardInner() {
                 <span>My Projects</span>
               </button>
               <button
-                onClick={() => setActiveTab("testimonials")}
+                onClick={() => handleTabChange("testimonials")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   activeTab === "testimonials"
                     ? "bg-[#FFB633] text-black"

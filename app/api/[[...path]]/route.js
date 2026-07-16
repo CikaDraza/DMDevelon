@@ -2683,6 +2683,94 @@ export async function PUT(request, context) {
       return NextResponse.json(project, { headers: getCorsHeaders() });
     }
 
+    // One-time bootstrap for projects that were created/accepted without a
+    // live plan. Existing live milestones must still use proposal/audit flows.
+    if (
+      path[0] === "client-projects" &&
+      path[1] &&
+      path[2] === "initial-milestones"
+    ) {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      if (!user.isAdmin) {
+        return NextResponse.json(
+          { error: "Forbidden" },
+          { status: 403, headers: getCorsHeaders() },
+        );
+      }
+
+      const project = await ClientProject.findById(path[1]);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      if ((project.milestones || []).length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Initial milestones can only be added before the live plan exists",
+          },
+          { status: 409, headers: getCorsHeaders() },
+        );
+      }
+
+      const rawPlan = body.milestones ?? body.milestonePlan ?? [];
+      const normalizedPlan = normalizeMilestonePlan(rawPlan, []);
+      if (normalizedPlan.length === 0) {
+        throw apiError("Add at least one milestone");
+      }
+
+      const startedAt = new Date();
+      project.milestones = normalizedPlan.map((milestone, index) => {
+        const source = rawPlan[index] || {};
+        const milestoneStatus = source.status || "pending";
+        if (!ITEM_STATUSES.has(milestoneStatus)) {
+          throw apiError("Invalid milestone status");
+        }
+        const normalizedTasks = milestone.tasks.map((task, taskIndex) => {
+          const taskStatus = source.tasks?.[taskIndex]?.status || "pending";
+          if (!ITEM_STATUSES.has(taskStatus)) throw apiError("Invalid task status");
+          return {
+            ...task,
+            status: taskStatus,
+            workStartedAt: taskStatus === "pending" ? null : startedAt,
+          };
+        });
+        return {
+          ...milestone,
+          status: milestoneStatus,
+          workStartedAt:
+            milestoneStatus !== "pending" ||
+            normalizedTasks.some((task) => task.workStartedAt)
+              ? startedAt
+              : null,
+          revision: 1,
+          changeHistory: [],
+          tasks: normalizedTasks,
+        };
+      });
+      project.events.push({
+        _id: uuidv4(),
+        type: "initial_milestones_added",
+        body: `${project.milestones.length} initial milestone${
+          project.milestones.length === 1 ? "" : "s"
+        } added`,
+        actorName: user.name || "Admin",
+        createdAt: startedAt,
+      });
+      project.markModified("milestones");
+      await project.save();
+
+      return NextResponse.json(project, { headers: getCorsHeaders() });
+    }
+
     // User - update notification preferences (current user)
     if (pathStr === "user/settings") {
       const user = await getUserFromRequest(request);

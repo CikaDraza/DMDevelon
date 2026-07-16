@@ -2311,6 +2311,7 @@ const ADMIN_TABS = [
   "company",
   "cms",
 ];
+const ADMIN_TAB_STORAGE_KEY = "dmdevelonAdminActiveTab";
 
 // Main Admin Page Component
 function AdminPageInner() {
@@ -2335,11 +2336,35 @@ function AdminPageInner() {
   // Deep-link from a notification: ?tab=<section>&id=<cardId>&m=<milestoneId>
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ADMIN_TABS.includes(tab)) setActiveTab(tab);
+    if (tab && ADMIN_TABS.includes(tab)) {
+      setActiveTab(tab);
+      localStorage.setItem(ADMIN_TAB_STORAGE_KEY, tab);
+    } else {
+      const storedTab = localStorage.getItem(ADMIN_TAB_STORAGE_KEY);
+      if (storedTab && ADMIN_TABS.includes(storedTab)) {
+        setActiveTab(storedTab);
+      }
+    }
     setHighlightId(searchParams.get("id") || null);
     setHighlightMilestoneId(searchParams.get("m") || null);
     setHighlightProposalId(searchParams.get("proposal") || null);
   }, [searchParams]);
+
+  const handleTabChange = (tab) => {
+    if (!ADMIN_TABS.includes(tab)) return;
+    setActiveTab(tab);
+    localStorage.setItem(ADMIN_TAB_STORAGE_KEY, tab);
+    setHighlightId(null);
+    setHighlightMilestoneId(null);
+    setHighlightProposalId(null);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tab);
+    params.delete("id");
+    params.delete("m");
+    params.delete("proposal");
+    router.replace(`/admin?${params.toString()}`, { scroll: false });
+  };
 
   useEffect(() => {
     if (user?.isAdmin) {
@@ -2443,7 +2468,7 @@ function AdminPageInner() {
       <PushManager />
       <AdminSidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         onLogout={handleLogout}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}

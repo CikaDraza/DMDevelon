@@ -11,7 +11,12 @@ import { useCardHighlight } from "@/hooks/useCardHighlight";
 import ProposalEditorDialog from "@/components/admin/ProposalEditorDialog";
 import DeletePhaseDialog from "@/components/admin/DeletePhaseDialog";
 import MilestoneEditorDialog from "@/components/admin/MilestoneEditorDialog";
-import { MilestonePlanEditor } from "@/components/admin/MilestonePlanEditor";
+import {
+  MilestonePlanEditor,
+  createEmptyMilestone,
+  normalizeMilestonePlan,
+  validateMilestonePlan,
+} from "@/components/admin/MilestonePlanEditor";
 import { MilestoneChat } from "@/components/dashboard/MilestoneChat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -475,6 +480,7 @@ export default function ClientProjectsManager({
     updateMilestone,
     updateTask,
     updateMilestoneAgreed,
+    addInitialMilestones,
   } = useClientProjects();
   const { unreadMilestoneIds, unreadByMilestone, markRead } = useNotifications();
   const flashId = useCardHighlight(highlightId, !isLoading);
@@ -487,6 +493,9 @@ export default function ClientProjectsManager({
   const [expandedId, setExpandedId] = useState(null);
   const [chat, setChat] = useState(null); // { projectId, milestone }
   const [milestoneEdit, setMilestoneEdit] = useState(null); // { projectId, milestone }
+  const [initialPlanTarget, setInitialPlanTarget] = useState(null);
+  const [initialPlan, setInitialPlan] = useState([]);
+  const [initialPlanError, setInitialPlanError] = useState("");
 
   useEffect(() => {
     axios
@@ -632,6 +641,48 @@ export default function ClientProjectsManager({
     }
   };
 
+  const openInitialMilestones = (project) => {
+    setInitialPlanTarget(project);
+    setInitialPlan([createEmptyMilestone(0)]);
+    setInitialPlanError("");
+  };
+
+  const closeInitialMilestones = () => {
+    setInitialPlanTarget(null);
+    setInitialPlan([]);
+    setInitialPlanError("");
+  };
+
+  const handleInitialMilestonesSubmit = async (event) => {
+    event.preventDefault();
+    if (!initialPlanTarget) return;
+
+    const normalized = normalizeMilestonePlan(initialPlan);
+    const validation = validateMilestonePlan(normalized);
+    if (!validation.valid) {
+      setInitialPlanError(
+        validation.errors[0]?.message || "Check the milestone plan.",
+      );
+      return;
+    }
+    if (normalized.length === 0) {
+      setInitialPlanError("Add at least one milestone.");
+      return;
+    }
+
+    try {
+      await addInitialMilestones.mutateAsync({
+        id: initialPlanTarget._id,
+        data: { milestones: normalized },
+      });
+      closeInitialMilestones();
+      toast.success("Initial milestones added");
+    } catch (err) {
+      setInitialPlanError("");
+      toast.error(err.response?.data?.error || "Failed to add milestones");
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -760,9 +811,29 @@ export default function ClientProjectsManager({
                     />
 
                     {(project.milestones || []).length === 0 && (
-                      <p className="text-gray-500 text-sm">
-                        No milestones — use Edit to add them.
-                      </p>
+                      <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.03] p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-white">
+                              No live milestones yet
+                            </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                              Add the initial live plan here. Later additions
+                              should go through a proposal, and agreed changes
+                              use Edit milestone.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => openInitialMilestones(project)}
+                            className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
+                          >
+                            <Plus className="mr-1 h-4 w-4" />
+                            Add initial milestones
+                          </Button>
+                        </div>
+                      </div>
                     )}
                     {[...(project.milestones || [])]
                       .sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -864,7 +935,9 @@ export default function ClientProjectsManager({
               {editingId ? "Edit Client Project" : "New Client Project"}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              Define the project, assign a client, and break it into milestones.
+              {editingId
+                ? "Update project details, assignment, and publishing settings."
+                : "Define the project, assign a client, and break it into milestones."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1024,7 +1097,9 @@ export default function ClientProjectsManager({
               <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-gray-400">
                 Live milestones are edited individually through the audited
                 <span className="text-white"> Edit milestone </span>
-                action, where a change summary is required.
+                action, where a change summary is required. If this project has
+                no live milestones yet, expand it and use
+                <span className="text-white"> Add initial milestones</span>.
               </div>
             ) : (
               <MilestonePlanEditor
@@ -1042,6 +1117,61 @@ export default function ClientProjectsManager({
             >
               {editingId ? "Save Changes" : "Create Project"}
             </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!initialPlanTarget}
+        onOpenChange={(open) => {
+          if (!open) closeInitialMilestones();
+        }}
+      >
+        <DialogContent className="bg-[#1a1a1b] border-white/10 text-white max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add initial milestones</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Create the first live milestone plan for this project. This is
+              only available while the project has no live milestones.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleInitialMilestonesSubmit} className="mt-2 space-y-5">
+            <MilestonePlanEditor
+              value={initialPlan}
+              onChange={(next) => {
+                setInitialPlan(normalizeMilestonePlan(next));
+                setInitialPlanError("");
+              }}
+              mode="operational"
+              heading="Initial milestones & tasks"
+              description="These milestones become live immediately for the client."
+            />
+
+            {initialPlanError && (
+              <p role="alert" className="text-sm text-red-400">
+                {initialPlanError}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeInitialMilestones}
+                disabled={addInitialMilestones.isPending}
+                className="border-white/20 text-gray-300 hover:text-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={addInitialMilestones.isPending}
+                className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
+              >
+                {addInitialMilestones.isPending ? "Saving…" : "Add milestones"}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

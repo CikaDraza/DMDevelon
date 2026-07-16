@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { MILESTONE_ICON_OPTIONS } from "@/components/ui/project-timeline";
+import {
+  MILESTONE_ICON_COMPONENTS,
+  MILESTONE_ICON_LABELS,
+  MILESTONE_ICON_OPTIONS,
+} from "@/components/ui/project-timeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -347,11 +351,17 @@ export function MilestonePlanEditor({
                   <SelectValue placeholder="Icon" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MILESTONE_ICON_OPTIONS.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
-                    </SelectItem>
-                  ))}
+                  {MILESTONE_ICON_OPTIONS.map((name) => {
+                    const IconOption = MILESTONE_ICON_COMPONENTS[name];
+                    return (
+                      <SelectItem key={name} value={name}>
+                        <span className="flex items-center gap-2">
+                          {IconOption && <IconOption className="h-4 w-4" />}
+                          {MILESTONE_ICON_LABELS[name] || name}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
 

@@ -119,6 +119,18 @@ export function useClientProjects() {
     onSuccess: (project, variables) => invalidate(project?._id || variables.id),
   });
 
+  const addInitialMilestones = useMutation({
+    mutationFn: async ({ id, data }) => {
+      const res = await axios.put(
+        `/api/client-projects/${id}/initial-milestones`,
+        data,
+        { headers: getAuthHeaders() },
+      );
+      return res.data;
+    },
+    onSuccess: (project, variables) => invalidate(project?._id || variables.id),
+  });
+
   return {
     projects: projectsQuery.data || [],
     isLoading: projectsQuery.isLoading,
@@ -130,6 +142,7 @@ export function useClientProjects() {
     updateMilestone,
     updateTask,
     updateMilestoneAgreed,
+    addInitialMilestones,
   };
 }
 
