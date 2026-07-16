@@ -105,6 +105,12 @@ function phaseWorkHasStarted(milestones, proposalId) {
   );
 }
 
+function getProposalMilestonePlan(proposal) {
+  return normalizeMilestonePlan(
+    proposal?.milestonePlan || proposal?.milestones || [],
+  );
+}
+
 function ProjectProposalsAdmin({
   project,
   highlightProposalId,
@@ -183,7 +189,11 @@ function ProjectProposalsAdmin({
           proposalId: editor.sourceProposalId,
           data,
         });
-        toast.success("Proposal revision created");
+        toast.success(
+          editor?.addMilestoneMode
+            ? "Milestone proposal draft created"
+            : "Proposal revision created",
+        );
       } else if (editor?.proposal?._id) {
         await updateProposal.mutateAsync({
           proposalId: editor.proposal._id,
@@ -239,6 +249,46 @@ function ProjectProposalsAdmin({
         sentAt: null,
         acceptedAt: null,
         rejectedAt: null,
+      },
+      readOnly: false,
+    });
+  };
+
+  const openAddMilestone = (proposal) => {
+    const newMilestone = createEmptyMilestone(0);
+
+    if (["draft", "changes_requested"].includes(proposal.status)) {
+      const milestonePlan = getProposalMilestonePlan(proposal);
+      setEditor({
+        addMilestoneMode: true,
+        proposal: {
+          ...proposal,
+          milestonePlan: normalizeMilestonePlan([
+            ...milestonePlan,
+            { ...newMilestone, order: milestonePlan.length },
+          ]),
+        },
+        readOnly: false,
+      });
+      return;
+    }
+
+    setEditor({
+      sourceProposalId: proposal._id,
+      addMilestoneMode: true,
+      proposal: {
+        ...proposal,
+        _id: undefined,
+        kind: "phase",
+        phaseNumber: nextPhaseNumber,
+        phaseLabel: `Faza ${nextPhaseNumber}`,
+        title: `Faza ${nextPhaseNumber}`,
+        status: "draft",
+        sentAt: null,
+        acceptedAt: null,
+        rejectedAt: null,
+        archivedAt: null,
+        milestonePlan: normalizeMilestonePlan([newMilestone]),
       },
       readOnly: false,
     });
@@ -373,6 +423,19 @@ function ProjectProposalsAdmin({
                         <RotateCcw className="mr-1 h-3.5 w-3.5" /> Create revision
                       </Button>
                     )}
+                    {["draft", "changes_requested", "accepted", "rejected"].includes(
+                      proposal.status,
+                    ) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openAddMilestone(proposal)}
+                        className="border-[#FFB633]/30 text-[#FFB633] hover:bg-[#FFB633]/10 hover:text-[#FFD47A]"
+                      >
+                        <Plus className="mr-1 h-3.5 w-3.5" /> Add milestone
+                      </Button>
+                    )}
                     {proposal.status === "accepted" &&
                       proposal.kind === "phase" &&
                       Number(proposal.phaseNumber) > 1 && (
@@ -412,13 +475,30 @@ function ProjectProposalsAdmin({
         dialogTitle={
           editor?.readOnly
             ? editor?.proposal?.phaseLabel || "Proposal"
+            : editor?.addMilestoneMode
+              ? editor?.sourceProposalId
+                ? "Add milestone proposal"
+                : "Add milestone to proposal"
             : editor?.sourceProposalId
               ? "Create proposal revision"
               : editor?.proposal?._id
                 ? "Edit proposal draft"
                 : "Add project proposal"
         }
-        submitLabel={editor?.sourceProposalId ? "Create revision" : "Save draft"}
+        dialogDescription={
+          editor?.addMilestoneMode && editor?.sourceProposalId
+            ? "Create a follow-up proposal with one new milestone. It becomes live after the client accepts it."
+            : editor?.addMilestoneMode
+              ? "Add another planned milestone to this editable proposal draft."
+              : undefined
+        }
+        submitLabel={
+          editor?.addMilestoneMode && editor?.sourceProposalId
+            ? "Create milestone proposal"
+            : editor?.sourceProposalId
+              ? "Create revision"
+              : "Save draft"
+        }
         showPhaseFields
       />
       <DeletePhaseDialog
