@@ -24,6 +24,7 @@ import {
   Edit,
   Trash2,
   Home,
+  Shield,
   AlertTriangle,
   ArrowRight,
   MessageCircle,
@@ -373,6 +374,16 @@ function DashboardInner() {
               <Home className="w-4 h-4" />
               <span className="hidden sm:inline">Home</span>
             </Link>
+            {user.isAdmin && (
+              <Link
+                href="/admin"
+                className="text-gray-400 hover:text-[#FFB633] transition-colors flex items-center gap-2"
+                aria-label="Admin panel"
+              >
+                <Shield className="w-4 h-4" />
+                <span className="hidden sm:inline">Admin</span>
+              </Link>
+            )}
             <Button
               onClick={handleLogout}
               variant="outline"

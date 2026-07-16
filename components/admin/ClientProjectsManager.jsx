@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useClientProjects } from "@/hooks/useClientProjects";
+import { useProjectProposals } from "@/hooks/useProjectProposals";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useCardHighlight } from "@/hooks/useCardHighlight";
-import { MILESTONE_ICON_OPTIONS } from "@/components/ui/project-timeline";
+import ProposalEditorDialog from "@/components/admin/ProposalEditorDialog";
+import DeletePhaseDialog from "@/components/admin/DeletePhaseDialog";
+import MilestoneEditorDialog from "@/components/admin/MilestoneEditorDialog";
+import { MilestonePlanEditor } from "@/components/admin/MilestonePlanEditor";
 import { MilestoneChat } from "@/components/dashboard/MilestoneChat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +48,10 @@ import {
   Check,
   CircleDot,
   Circle,
-  GripVertical,
+  Eye,
+  FileText,
+  RotateCcw,
+  Send,
 } from "lucide-react";
 
 const STATUS_BADGE = {
@@ -60,6 +67,368 @@ const ITEM_STATUS_ICON = {
   in_progress: <CircleDot className="w-4 h-4 text-blue-400" />,
   pending: <Circle className="w-4 h-4 text-gray-500" />,
 };
+
+const PROPOSAL_STATUS_BADGE = {
+  draft: "bg-gray-500/20 text-gray-300",
+  sent: "bg-blue-500/20 text-blue-300",
+  changes_requested: "bg-amber-500/20 text-amber-300",
+  accepted: "bg-green-500/20 text-green-300",
+  rejected: "bg-red-500/20 text-red-300",
+  archived: "bg-purple-500/20 text-purple-300",
+};
+
+function sortProposals(items) {
+  return [...items].sort((a, b) => {
+    if (a.kind === "master" && b.kind !== "master") return -1;
+    if (b.kind === "master" && a.kind !== "master") return 1;
+    return (a.phaseNumber || 0) - (b.phaseNumber || 0);
+  });
+}
+
+function phaseWorkHasStarted(milestones, proposalId) {
+  return (milestones || []).some(
+    (milestone) =>
+      String(milestone.proposalId || "") === String(proposalId || "") &&
+      (milestone.workStartedAt ||
+        ![undefined, null, "", "pending"].includes(milestone.status) ||
+        (milestone.tasks || []).some(
+          (task) =>
+            task.workStartedAt ||
+            ![undefined, null, "", "pending"].includes(task.status),
+        ) ||
+        (milestone.changeHistory || []).length > 0),
+  );
+}
+
+function ProjectProposalsAdmin({
+  project,
+  highlightProposalId,
+  onPhaseDeleted,
+}) {
+  const { markRead } = useNotifications();
+  const {
+    proposals,
+    isLoading,
+    error,
+    createProposal,
+    updateProposal,
+    sendProposal,
+    archiveProposal,
+    createRevision,
+  } = useProjectProposals(project._id);
+  const [editor, setEditor] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const openedHighlight = useRef(null);
+
+  const sorted = useMemo(() => sortProposals(proposals), [proposals]);
+  const nextPhaseNumber = Math.max(
+    2,
+    ...sorted.map((proposal) => (proposal.phaseNumber || 0) + 1),
+  );
+  const isSaving =
+    createProposal.isPending ||
+    updateProposal.isPending ||
+    createRevision.isPending;
+
+  useEffect(() => {
+    if (
+      !highlightProposalId ||
+      openedHighlight.current === highlightProposalId ||
+      !sorted.length
+    ) {
+      return;
+    }
+    const proposal = sorted.find((item) => item._id === highlightProposalId);
+    if (!proposal) return;
+    openedHighlight.current = highlightProposalId;
+    markRead.mutate({
+      entityId: project._id,
+      proposalId: highlightProposalId,
+    });
+    const timer = setTimeout(() => {
+      document
+        .getElementById(`proposal-${proposal._id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setEditor({ proposal, readOnly: true });
+    }, 150);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightProposalId, sorted, project._id]);
+
+  const openNew = () => {
+    setEditor({
+      proposal: {
+        kind: "phase",
+        phaseNumber: nextPhaseNumber,
+        phaseLabel: `Faza ${nextPhaseNumber}`,
+        title: `Faza ${nextPhaseNumber}`,
+        scope: "",
+        timeline: "",
+        budget: "",
+        milestonePlan: [],
+      },
+      readOnly: false,
+    });
+  };
+
+  const handleSave = async (data) => {
+    try {
+      if (editor?.sourceProposalId) {
+        await createRevision.mutateAsync({
+          proposalId: editor.sourceProposalId,
+          data,
+        });
+        toast.success("Proposal revision created");
+      } else if (editor?.proposal?._id) {
+        await updateProposal.mutateAsync({
+          proposalId: editor.proposal._id,
+          data,
+        });
+        toast.success("Proposal draft updated");
+      } else {
+        await createProposal.mutateAsync(data);
+        toast.success("Proposal draft created");
+      }
+      setEditor(null);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to save proposal");
+    }
+  };
+
+  const handleSend = async (proposal) => {
+    try {
+      await sendProposal.mutateAsync({ proposalId: proposal._id });
+      toast.success("Proposal sent to the client");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to send proposal");
+    }
+  };
+
+  const handleDeletePhase = async (data) => {
+    if (!deleteTarget?._id) return;
+    const target = deleteTarget;
+    try {
+      const result = await archiveProposal.mutateAsync({
+        proposalId: target._id,
+        data,
+      });
+      onPhaseDeleted?.(target._id, result);
+      setDeleteTarget(null);
+      toast.success("Phase removed from the live project");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to delete phase");
+    }
+  };
+
+  const openRevision = (proposal) => {
+    setEditor({
+      sourceProposalId: proposal._id,
+      proposal: {
+        ...proposal,
+        _id: undefined,
+        kind: "phase",
+        phaseNumber: nextPhaseNumber,
+        phaseLabel: `Faza ${nextPhaseNumber}`,
+        title: `Faza ${nextPhaseNumber}`,
+        status: "draft",
+        sentAt: null,
+        acceptedAt: null,
+        rejectedAt: null,
+      },
+      readOnly: false,
+    });
+  };
+
+  return (
+    <section className="rounded-xl border border-white/10 bg-black/10 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 className="flex items-center gap-2 font-semibold text-white">
+            <FileText className="h-4 w-4 text-[#FFB633]" /> Proposals
+          </h4>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Master scope and all follow-up phases for this project.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          onClick={openNew}
+          className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
+        >
+          <Plus className="mr-1 h-4 w-4" /> Add proposal
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <p className="mt-4 text-sm text-gray-500">Loading proposals…</p>
+      ) : error ? (
+        <p className="mt-4 text-sm text-red-400">
+          Proposals could not be loaded.
+        </p>
+      ) : sorted.length === 0 ? (
+        <p className="mt-4 text-sm text-gray-500">
+          No proposal snapshots yet. Existing milestones remain available below.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {sorted.map((proposal) => {
+            const canEdit = ["draft", "changes_requested"].includes(
+              proposal.status,
+            );
+            const phaseWorkStarted = phaseWorkHasStarted(
+              project.milestones,
+              proposal._id,
+            );
+            return (
+              <div
+                id={`proposal-${proposal._id}`}
+                key={proposal._id}
+                className={`rounded-lg border p-3 transition-colors ${
+                  highlightProposalId === proposal._id
+                    ? "border-[#FFB633] bg-[#FFB633]/5"
+                    : "border-white/10 bg-white/5"
+                }`}
+              >
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-white">
+                        {proposal.phaseLabel ||
+                          (proposal.kind === "master"
+                            ? "Master Proposal"
+                            : `Faza ${proposal.phaseNumber || ""}`)}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          PROPOSAL_STATUS_BADGE[proposal.status] ||
+                          PROPOSAL_STATUS_BADGE.draft
+                        }`}
+                      >
+                        {(proposal.status || "draft").replaceAll("_", " ")}
+                      </span>
+                      <span className="text-[11px] text-gray-500">
+                        v{proposal.version || 1}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-sm text-gray-300">
+                      {proposal.title || "Untitled proposal"}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {proposal.budget || "No price"} · {proposal.timeline || "No duration"}
+                      {" · "}
+                      {(proposal.milestonePlan || proposal.milestones || []).length}{" "}
+                      milestones
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditor({ proposal, readOnly: true })}
+                      className="border-white/15 text-gray-300 hover:text-white"
+                    >
+                      <Eye className="mr-1 h-3.5 w-3.5" /> View
+                    </Button>
+                    {canEdit && (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditor({ proposal, readOnly: false })}
+                          className="border-white/15 text-gray-300 hover:text-white"
+                        >
+                          <Edit className="mr-1 h-3.5 w-3.5" /> Edit
+                        </Button>
+                        {proposal.status === "draft" && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={sendProposal.isPending}
+                            onClick={() => handleSend(proposal)}
+                            className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
+                          >
+                            <Send className="mr-1 h-3.5 w-3.5" /> Send
+                          </Button>
+                        )}
+                      </>
+                    )}
+                    {["accepted", "rejected"].includes(
+                      proposal.status,
+                    ) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openRevision(proposal)}
+                        className="border-white/15 text-gray-300 hover:text-white"
+                      >
+                        <RotateCcw className="mr-1 h-3.5 w-3.5" /> Create revision
+                      </Button>
+                    )}
+                    {proposal.status === "accepted" &&
+                      proposal.kind === "phase" &&
+                      Number(proposal.phaseNumber) > 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            archiveProposal.isPending || phaseWorkStarted
+                          }
+                          title={
+                            phaseWorkStarted
+                              ? "This phase cannot be deleted because work has already started"
+                              : "Delete this untouched phase from active work"
+                          }
+                          onClick={() => setDeleteTarget(proposal)}
+                          className="border-red-500/30 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete phase
+                        </Button>
+                      )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <ProposalEditorDialog
+        open={!!editor}
+        onOpenChange={(open) => !open && setEditor(null)}
+        proposal={editor?.proposal || null}
+        onSubmit={handleSave}
+        isSubmitting={isSaving}
+        readOnly={!!editor?.readOnly}
+        dialogTitle={
+          editor?.readOnly
+            ? editor?.proposal?.phaseLabel || "Proposal"
+            : editor?.sourceProposalId
+              ? "Create proposal revision"
+              : editor?.proposal?._id
+                ? "Edit proposal draft"
+                : "Add project proposal"
+        }
+        submitLabel={editor?.sourceProposalId ? "Create revision" : "Save draft"}
+        showPhaseFields
+      />
+      <DeletePhaseDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        proposal={deleteTarget}
+        affectedMilestoneCount={(project.milestones || []).filter(
+          (milestone) => milestone.proposalId === deleteTarget?._id,
+        ).length}
+        onConfirm={handleDeletePhase}
+        isSubmitting={archiveProposal.isPending}
+      />
+    </section>
+  );
+}
 
 function computeProgress(project) {
   const milestones = project.milestones || [];
@@ -94,6 +463,7 @@ const emptyForm = {
 export default function ClientProjectsManager({
   highlightId,
   highlightMilestoneId,
+  highlightProposalId,
 }) {
   const { user, getAuthHeaders } = useAuth();
   const {
@@ -104,6 +474,7 @@ export default function ClientProjectsManager({
     deleteProject,
     updateMilestone,
     updateTask,
+    updateMilestoneAgreed,
   } = useClientProjects();
   const { unreadMilestoneIds, unreadByMilestone, markRead } = useNotifications();
   const flashId = useCardHighlight(highlightId, !isLoading);
@@ -115,6 +486,7 @@ export default function ClientProjectsManager({
   const [milestones, setMilestones] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [chat, setChat] = useState(null); // { projectId, milestone }
+  const [milestoneEdit, setMilestoneEdit] = useState(null); // { projectId, milestone }
 
   useEffect(() => {
     axios
@@ -144,6 +516,15 @@ export default function ClientProjectsManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightMilestoneId, highlightId, isLoading]);
 
+  // Proposal notifications open the owning project and let the proposals
+  // section handle scrolling/opening the exact proposal snapshot.
+  useEffect(() => {
+    if (!highlightProposalId || !highlightId || isLoading) return;
+    if (projects.some((project) => project._id === highlightId)) {
+      setExpandedId(highlightId);
+    }
+  }, [highlightProposalId, highlightId, isLoading, projects]);
+
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
@@ -166,88 +547,6 @@ export default function ClientProjectsManager({
       clientName: u?.name || f.clientName,
       clientEmail: u?.email || f.clientEmail,
     }));
-  };
-
-  // --- Milestone builder helpers (local state, saved via full PUT) ---
-  const addMilestone = () => {
-    setMilestones((ms) => [
-      ...ms,
-      {
-        _id: crypto.randomUUID(),
-        title: "",
-        description: "",
-        icon: "Circle",
-        status: "pending",
-        githubBranch: "",
-        order: ms.length,
-        tasks: [],
-      },
-    ]);
-  };
-
-  const updateLocalMilestone = (idx, patch) => {
-    setMilestones((ms) =>
-      ms.map((m, i) => (i === idx ? { ...m, ...patch } : m)),
-    );
-  };
-
-  const removeMilestone = (idx) => {
-    setMilestones((ms) => ms.filter((_, i) => i !== idx).map((m, i) => ({ ...m, order: i })));
-  };
-
-  const moveMilestone = (idx, dir) => {
-    setMilestones((ms) => {
-      const next = [...ms];
-      const j = idx + dir;
-      if (j < 0 || j >= next.length) return ms;
-      [next[idx], next[j]] = [next[j], next[idx]];
-      return next.map((m, i) => ({ ...m, order: i }));
-    });
-  };
-
-  const addTask = (mIdx) => {
-    setMilestones((ms) =>
-      ms.map((m, i) =>
-        i === mIdx
-          ? {
-              ...m,
-              tasks: [
-                ...(m.tasks || []),
-                {
-                  _id: crypto.randomUUID(),
-                  title: "",
-                  description: "",
-                  status: "pending",
-                  order: (m.tasks || []).length,
-                },
-              ],
-            }
-          : m,
-      ),
-    );
-  };
-
-  const updateLocalTask = (mIdx, tIdx, patch) => {
-    setMilestones((ms) =>
-      ms.map((m, i) =>
-        i === mIdx
-          ? {
-              ...m,
-              tasks: m.tasks.map((t, j) => (j === tIdx ? { ...t, ...patch } : t)),
-            }
-          : m,
-      ),
-    );
-  };
-
-  const removeTask = (mIdx, tIdx) => {
-    setMilestones((ms) =>
-      ms.map((m, i) =>
-        i === mIdx
-          ? { ...m, tasks: m.tasks.filter((_, j) => j !== tIdx) }
-          : m,
-      ),
-    );
   };
 
   const handleSubmit = async (e) => {
@@ -308,6 +607,28 @@ export default function ClientProjectsManager({
       });
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to update");
+    }
+  };
+
+  const handleMilestoneAgreedChange = async (payload) => {
+    if (!milestoneEdit) return;
+    try {
+      const result = await updateMilestoneAgreed.mutateAsync({
+        id: milestoneEdit.projectId,
+        mid: milestoneEdit.milestone._id,
+        data: payload,
+      });
+      const updatedProject = result?.project || result;
+      const updatedMilestone = updatedProject?.milestones?.find(
+        (item) => item._id === milestoneEdit.milestone._id,
+      );
+      if (updatedMilestone && chat?.milestone?._id === updatedMilestone._id) {
+        setChat({ projectId: milestoneEdit.projectId, milestone: updatedMilestone });
+      }
+      setMilestoneEdit(null);
+      toast.success("Agreed milestone change saved");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to update milestone");
     }
   };
 
@@ -415,7 +736,7 @@ export default function ClientProjectsManager({
                     ) : (
                       <ChevronDown className="w-4 h-4" />
                     )}
-                    {expanded ? "Hide" : "Manage"} progress (
+                    {expanded ? "Hide" : "Manage"} proposals &amp; milestones (
                     {project.milestones?.length || 0} milestones)
                   </button>
                 </div>
@@ -423,6 +744,21 @@ export default function ClientProjectsManager({
                 {/* Inline granular progress management (PATCH) */}
                 {expanded && (
                   <div className="border-t border-white/10 p-6 space-y-4">
+                    <ProjectProposalsAdmin
+                      project={project}
+                      highlightProposalId={
+                        highlightId === project._id ? highlightProposalId : null
+                      }
+                      onPhaseDeleted={(proposalId) => {
+                        if (chat?.milestone?.proposalId === proposalId) {
+                          setChat(null);
+                        }
+                        if (milestoneEdit?.milestone?.proposalId === proposalId) {
+                          setMilestoneEdit(null);
+                        }
+                      }}
+                    />
+
                     {(project.milestones || []).length === 0 && (
                       <p className="text-gray-500 text-sm">
                         No milestones — use Edit to add them.
@@ -453,6 +789,19 @@ export default function ClientProjectsManager({
                                   {unreadByMilestone[m._id].body}
                                 </span>
                               )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setMilestoneEdit({
+                                    projectId: project._id,
+                                    milestone: m,
+                                  })
+                                }
+                                className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#FFB633]"
+                              >
+                                <Edit className="w-4 h-4" />
+                                Edit milestone
+                              </button>
                               <button
                                 onClick={() => {
                                   setChat({
@@ -671,163 +1020,21 @@ export default function ClientProjectsManager({
               </div>
             )}
 
-            {/* Milestone builder */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-white">Milestones &amp; tasks</Label>
-                <Button
-                  type="button"
-                  onClick={addMilestone}
-                  variant="outline"
-                  size="sm"
-                  className="border-white/20 text-gray-300 hover:text-white"
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Milestone
-                </Button>
+            {editingId ? (
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-gray-400">
+                Live milestones are edited individually through the audited
+                <span className="text-white"> Edit milestone </span>
+                action, where a change summary is required.
               </div>
-
-              {milestones.map((m, mIdx) => (
-                <div
-                  key={m._id}
-                  className="rounded-lg border border-white/10 bg-white/5 p-4 space-y-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <GripVertical className="w-4 h-4 text-gray-600 shrink-0" />
-                    <Input
-                      value={m.title}
-                      onChange={(e) =>
-                        updateLocalMilestone(mIdx, { title: e.target.value })
-                      }
-                      placeholder={`Milestone ${mIdx + 1} title`}
-                      className="bg-white/5 border-white/10 text-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => moveMilestone(mIdx, -1)}
-                      className="p-1 text-gray-400 hover:text-white"
-                    >
-                      <ChevronUp className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveMilestone(mIdx, 1)}
-                      className="p-1 text-gray-400 hover:text-white"
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeMilestone(mIdx)}
-                      className="p-1 text-gray-400 hover:text-red-400"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <Select
-                      value={m.icon}
-                      onValueChange={(v) => updateLocalMilestone(mIdx, { icon: v })}
-                    >
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                        <SelectValue placeholder="Icon" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MILESTONE_ICON_OPTIONS.map((name) => (
-                          <SelectItem key={name} value={name}>
-                            {name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={m.status}
-                      onValueChange={(v) =>
-                        updateLocalMilestone(mIdx, { status: v })
-                      }
-                    >
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ITEM_STATUS.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s.replace("_", " ")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={m.githubBranch}
-                      onChange={(e) =>
-                        updateLocalMilestone(mIdx, { githubBranch: e.target.value })
-                      }
-                      placeholder="git branch"
-                      className="bg-white/5 border-white/10 text-white"
-                    />
-                  </div>
-
-                  <Textarea
-                    value={m.description}
-                    onChange={(e) =>
-                      updateLocalMilestone(mIdx, { description: e.target.value })
-                    }
-                    rows={2}
-                    placeholder="What this part covers…"
-                    className="bg-white/5 border-white/10 text-white"
-                  />
-
-                  {/* Tasks */}
-                  <div className="pl-4 space-y-2 border-l border-white/10">
-                    {(m.tasks || []).map((t, tIdx) => (
-                      <div key={t._id} className="flex items-center gap-2">
-                        <Input
-                          value={t.title}
-                          onChange={(e) =>
-                            updateLocalTask(mIdx, tIdx, { title: e.target.value })
-                          }
-                          placeholder={`Task ${tIdx + 1}`}
-                          className="bg-white/5 border-white/10 text-white"
-                        />
-                        <Select
-                          value={t.status}
-                          onValueChange={(v) =>
-                            updateLocalTask(mIdx, tIdx, { status: v })
-                          }
-                        >
-                          <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ITEM_STATUS.map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {s.replace("_", " ")}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <button
-                          type="button"
-                          onClick={() => removeTask(mIdx, tIdx)}
-                          className="p-1 text-gray-400 hover:text-red-400"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      onClick={() => addTask(mIdx)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-gray-400 hover:text-white"
-                    >
-                      <Plus className="w-4 h-4 mr-1" /> Task
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ) : (
+              <MilestonePlanEditor
+                value={milestones}
+                onChange={setMilestones}
+                mode="operational"
+                heading="Milestones & tasks"
+                description="Define the initial live project plan. Later content edits use the audited milestone action."
+              />
+            )}
 
             <Button
               type="submit"
@@ -838,6 +1045,14 @@ export default function ClientProjectsManager({
           </form>
         </DialogContent>
       </Dialog>
+
+      <MilestoneEditorDialog
+        open={!!milestoneEdit}
+        onOpenChange={(open) => !open && setMilestoneEdit(null)}
+        milestone={milestoneEdit?.milestone || null}
+        onSubmit={handleMilestoneAgreedChange}
+        isSubmitting={updateMilestoneAgreed.isPending}
+      />
 
       {/* Admin chat per milestone */}
       <Sheet open={!!chat} onOpenChange={(o) => !o && setChat(null)}>

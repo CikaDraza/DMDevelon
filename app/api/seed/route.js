@@ -96,6 +96,26 @@ export async function POST(request) {
           displayOrder: 6,
           gridSpan: 2,
         },
+        {
+          title: "AI Tasks & Automation",
+          description:
+            "AI-powered task execution, assistants, and workflow automation tailored to your business",
+          icon: "Bot",
+          color: "yellow",
+          category: "AI & Automation",
+          displayOrder: 7,
+          gridSpan: 2,
+        },
+        {
+          title: "Business Engine",
+          description:
+            "Reliable business engines, integrations, and internal systems that keep operations moving",
+          icon: "Cog",
+          color: "indigo",
+          category: "Engineering",
+          displayOrder: 8,
+          gridSpan: 2,
+        },
       ];
 
       for (const service of defaultServices) {

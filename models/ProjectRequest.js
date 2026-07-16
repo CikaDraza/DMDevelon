@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  ProposalMilestonePlanSchema,
+  ProposalRevisionSchema,
+} from './ProjectProposal.js';
 
 const AttachmentSchema = new mongoose.Schema(
   {
@@ -30,9 +34,28 @@ const ProposalSchema = new mongoose.Schema(
     scope: { type: String, default: '' },
     timeline: { type: String, default: '' },
     budget: { type: String, default: '' },
+    kind: { type: String, enum: ['master'], default: 'master' },
+    phaseNumber: { type: Number, default: 1, min: 1 },
+    phaseLabel: { type: String, default: 'Master Proposal' },
+    status: {
+      type: String,
+      enum: [
+        'draft',
+        'sent',
+        'changes_requested',
+        'accepted',
+        'rejected',
+        'archived',
+      ],
+      default: 'draft',
+    },
     version: { type: Number, default: 0 },
+    milestonePlan: { type: [ProposalMilestonePlanSchema], default: [] },
+    revisionHistory: { type: [ProposalRevisionSchema], default: [] },
+    createdByUserId: { type: String, default: null },
     sentAt: { type: Date, default: null },
     acceptedAt: { type: Date, default: null },
+    rejectedAt: { type: Date, default: null },
   },
   { _id: false }
 );

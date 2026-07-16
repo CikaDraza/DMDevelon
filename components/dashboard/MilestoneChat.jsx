@@ -4,7 +4,16 @@ import { useState, useRef, useEffect } from "react";
 import { useProjectMessages } from "@/hooks/useClientProjects";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
-import { Send, Paperclip, FileText, X, Loader2 } from "lucide-react";
+import {
+  Send,
+  Paperclip,
+  FileText,
+  X,
+  Loader2,
+  HelpCircle,
+  RefreshCw,
+  CheckCircle2,
+} from "lucide-react";
 
 function readAsDataURL(file) {
   return new Promise((resolve, reject) => {
@@ -32,6 +41,7 @@ export function MilestoneChat({
   const [text, setText] = useState("");
   const [pending, setPending] = useState([]); // staged attachments {url,type,name}
   const [uploading, setUploading] = useState(false);
+  const [messageType, setMessageType] = useState("question");
   const fileRef = useRef(null);
   const endRef = useRef(null);
 
@@ -73,14 +83,24 @@ export function MilestoneChat({
   const handleSend = async (e) => {
     e.preventDefault();
     if (!text.trim() && pending.length === 0) return;
+    if (
+      viewerRole === "client" &&
+      messageType === "change_request" &&
+      !text.trim()
+    ) {
+      toast.error("Describe the change you are requesting");
+      return;
+    }
     try {
       await sendMessage.mutateAsync({
         body: text.trim(),
         attachments: pending,
         authorName: viewerName,
+        messageType: viewerRole === "client" ? messageType : "message",
       });
       setText("");
       setPending([]);
+      setMessageType("question");
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to send");
     }
@@ -103,6 +123,7 @@ export function MilestoneChat({
         ) : (
           messages.map((m) => {
             const mine = m.authorRole === viewerRole;
+            const type = m.messageType || "message";
             return (
               <div
                 key={m._id}
@@ -119,6 +140,24 @@ export function MilestoneChat({
                   <p className="text-[10px] opacity-70 mb-0.5">
                     {m.authorName || (m.authorRole === "admin" ? "Admin" : "Client")}
                   </p>
+                  {type === "question" && (
+                    <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      <HelpCircle className="h-3 w-3" />
+                      Question
+                    </span>
+                  )}
+                  {type === "change_request" && (
+                    <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      <RefreshCw className="h-3 w-3" />
+                      Change request
+                    </span>
+                  )}
+                  {type === "change_agreed" && (
+                    <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Agreed change applied
+                    </span>
+                  )}
                   {m.body && (
                     <p className="text-sm whitespace-pre-wrap break-words">
                       {m.body}
@@ -194,6 +233,38 @@ export function MilestoneChat({
         </div>
       )}
 
+      {viewerRole === "client" && (
+        <div className="flex items-center gap-2 border-t border-white/10 px-4 pt-3">
+          <span className="mr-1 text-xs text-gray-500">Send as:</span>
+          <button
+            type="button"
+            onClick={() => setMessageType("question")}
+            aria-pressed={messageType === "question"}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors",
+              messageType === "question"
+                ? "border-[#FFB633] bg-[#FFB633]/15 text-[#FFB633]"
+                : "border-white/10 text-gray-400 hover:text-white",
+            )}
+          >
+            <HelpCircle className="h-3.5 w-3.5" /> Question
+          </button>
+          <button
+            type="button"
+            onClick={() => setMessageType("change_request")}
+            aria-pressed={messageType === "change_request"}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors",
+              messageType === "change_request"
+                ? "border-red-400 bg-red-500/15 text-red-300"
+                : "border-white/10 text-gray-400 hover:text-white",
+            )}
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Request a change
+          </button>
+        </div>
+      )}
+
       <form
         onSubmit={handleSend}
         className="flex items-center gap-2 px-4 py-3 border-t border-white/10"
@@ -222,7 +293,13 @@ export function MilestoneChat({
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Type a message…"
+          placeholder={
+            viewerRole === "client" && messageType === "change_request"
+              ? "Describe the requested change…"
+              : viewerRole === "client"
+                ? "Ask a question…"
+                : "Type a message…"
+          }
           className="flex-1 bg-white/5 border border-white/10 text-white rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#FFB633]/50"
         />
         <button

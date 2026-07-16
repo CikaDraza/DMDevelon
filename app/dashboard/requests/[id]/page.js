@@ -240,6 +240,30 @@ export default function ClientRequestDetailPage() {
                 </p>
               </div>
             </div>
+            {(proposal.milestonePlan || proposal.milestones || []).length > 0 && (
+              <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Planned milestones
+                </p>
+                <div className="mt-2 space-y-2">
+                  {[...(proposal.milestonePlan || proposal.milestones || [])]
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((milestone, index) => (
+                      <div
+                        key={milestone._id || `${milestone.title}-${index}`}
+                        className="flex items-center justify-between gap-3 rounded-md bg-black/20 px-3 py-2"
+                      >
+                        <span className="text-sm text-gray-200">
+                          {milestone.title || `Milestone ${index + 1}`}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-gray-500">
+                          {(milestone.tasks || []).length} tasks
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-3 mt-5">
               <Button
                 onClick={handleAccept}

@@ -12,6 +12,8 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import {
   Bot,
+  BrainCircuit,
+  Cog,
   Code,
   LayoutDashboard,
   CodeXml,
@@ -95,6 +97,8 @@ import PushManager from "@/components/PushManager";
 // Icon mapping
 const iconMap = {
   Bot,
+  BrainCircuit,
+  Cog,
   Code,
   CodeXml,
   Palette,
@@ -115,10 +119,13 @@ const iconMap = {
   Store,
   MapPinHouse,
   Handshake,
+  HandshakeIcon: Cog,
 };
 
 const iconOptions = [
   "Bot",
+  "BrainCircuit",
+  "Cog",
   "Code",
   "CodeXml",
   "Palette",
@@ -138,7 +145,7 @@ const iconOptions = [
   "NotebookPen",
   "Store",
   "MapPinHouse",
-  "HandshakeIcon",
+  "Handshake",
 ];
 const colorOptions = [
   "blue",
@@ -372,6 +379,7 @@ function DashboardStats({ stats, isLoading, error, onRetry, onRelogin }) {
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
               <XAxis dataKey="name" stroke="#888" />
               <YAxis stroke="#888" />
+              <Bar dataKey="value" fill="#FFB633" radius={[4, 4, 0, 0]} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#1a1a1b",
@@ -379,7 +387,6 @@ function DashboardStats({ stats, isLoading, error, onRetry, onRelogin }) {
                 }}
                 labelStyle={{ color: "#fff" }}
               />
-              <Bar dataKey="value" fill="#FFB633" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -471,7 +478,7 @@ function ServicesManagement() {
     setFormData({
       title: service.title,
       description: service.description,
-      icon: service.icon || "Code",
+      icon: service.icon === "HandshakeIcon" ? "Cog" : service.icon || "Code",
       color: service.color || "blue",
       category: service.category,
       displayOrder: service.displayOrder || 0,
@@ -628,15 +635,28 @@ function ServicesManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#2a2a2b] border-white/10">
-                    {iconOptions.map((icon) => (
-                      <SelectItem
-                        key={icon}
-                        value={icon}
-                        className="text-white hover:bg-white/10"
-                      >
-                        {icon}
-                      </SelectItem>
-                    ))}
+                    {iconOptions.map((icon) => {
+                      const IconOption = iconMap[icon] || Code;
+                      const label =
+                        icon === "Bot"
+                          ? "Robot (AI Tasks)"
+                          : icon === "BrainCircuit"
+                            ? "AI / Brain Circuit"
+                            : icon === "Cog"
+                              ? "Engine"
+                              : icon;
+                      return (
+                        <SelectItem
+                          key={icon}
+                          value={icon}
+                          className="text-white hover:bg-white/10"
+                        >
+                          <span className="flex items-center gap-2">
+                            <IconOption className="h-4 w-4" /> {label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -2300,6 +2320,7 @@ function AdminPageInner() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [highlightId, setHighlightId] = useState(null);
   const [highlightMilestoneId, setHighlightMilestoneId] = useState(null);
+  const [highlightProposalId, setHighlightProposalId] = useState(null);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [stats, setStats] = useState({});
   const [statsLoading, setStatsLoading] = useState(true);
@@ -2317,6 +2338,7 @@ function AdminPageInner() {
     if (tab && ADMIN_TABS.includes(tab)) setActiveTab(tab);
     setHighlightId(searchParams.get("id") || null);
     setHighlightMilestoneId(searchParams.get("m") || null);
+    setHighlightProposalId(searchParams.get("proposal") || null);
   }, [searchParams]);
 
   useEffect(() => {
@@ -2388,6 +2410,7 @@ function AdminPageInner() {
           <ClientProjectsManager
             highlightId={highlightId}
             highlightMilestoneId={highlightMilestoneId}
+            highlightProposalId={highlightProposalId}
           />
         );
       case "project-requests":

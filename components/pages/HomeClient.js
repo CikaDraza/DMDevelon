@@ -11,6 +11,8 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import {
   Bot,
+  BrainCircuit,
+  Cog,
   ShoppingCart,  CodeXml,
   LockIcon,
   Menu,
@@ -80,6 +82,8 @@ import { useCompanyProfile } from "@/hooks/useCompanyProfile";
 // Icon mapping
 const iconMap = {
   Bot,
+  BrainCircuit,
+  Cog,
   Code,
   CodeXml,
   Palette,
@@ -100,6 +104,9 @@ const iconMap = {
   Store,
   MapPinHouse,
   Handshake,
+  // Backward compatibility for the old admin option. Existing Engineering
+  // service records render with the new engine icon without a data migration.
+  HandshakeIcon: Cog,
 };
 
 const socialIconMap = {

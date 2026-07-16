@@ -218,7 +218,7 @@ sending goes through Resend (only the domain must be verified there), while the
 | File | Used for |
 | --- | --- |
 | `dmd-logo.png` | Site logo — header & footer everywhere |
-| `dmdevelon_logo-notifications.png` (192×192) | Email header logo, web-push icon, PWA/home-screen icon |
+| `dmdevelon_logo-notifications.png` (192×192) | Web-push icon, PWA/home-screen icon |
 | `dmdevelon_logo-notifications-512.png` | PWA 512 icon (any + maskable), generated from the 192 |
 | `dmd-email-logo.png` (400×120) | Email body wordmark, shown in a 200×60 container |
 | `badge-72.png` | Monochrome Android push badge |

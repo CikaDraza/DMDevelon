@@ -9,6 +9,11 @@ import {
 } from "@/hooks/useProjectRequests";
 import { useNotifications } from "@/hooks/useNotifications";
 import { RequestConversation } from "@/components/dashboard/RequestConversation";
+import {
+  MilestonePlanEditor,
+  normalizeMilestonePlan,
+  validateMilestonePlan,
+} from "@/components/admin/MilestonePlanEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,10 +60,14 @@ function RequestDetail({ id, onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
   const [proposal, setProposal] = useState({
+    kind: "master",
+    phaseNumber: 1,
+    phaseLabel: "Master Proposal",
     title: "",
     scope: "",
     timeline: "",
     budget: "",
+    milestonePlan: [],
   });
 
   // Seed the form once when this request first loads (keyed by id), NOT on
@@ -67,10 +76,18 @@ function RequestDetail({ id, onBack }) {
   useEffect(() => {
     if (request) {
       setProposal({
+        kind: "master",
+        phaseNumber: 1,
+        phaseLabel: request.proposal?.phaseLabel || "Master Proposal",
         title: request.proposal?.title || request.title || "",
         scope: request.proposal?.scope || "",
         timeline: request.proposal?.timeline || "",
         budget: request.proposal?.budget || "",
+        milestonePlan: normalizeMilestonePlan(
+          request.proposal?.milestonePlan ||
+            request.proposal?.milestones ||
+            [],
+        ),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,8 +101,26 @@ function RequestDetail({ id, onBack }) {
 
   const handleSendProposal = async (e) => {
     e.preventDefault();
+    if (!proposal.title.trim()) {
+      toast.error("Proposal title is required");
+      return;
+    }
+    const planValidation = validateMilestonePlan(proposal.milestonePlan);
+    if (!planValidation.valid) {
+      toast.error(planValidation.errors[0]?.message || "Check the milestone plan");
+      return;
+    }
     try {
-      await saveProposal.mutateAsync({ id, data: proposal });
+      await saveProposal.mutateAsync({
+        id,
+        data: {
+          ...proposal,
+          kind: "master",
+          phaseNumber: 1,
+          phaseLabel: proposal.phaseLabel || "Master Proposal",
+          milestonePlan: normalizeMilestonePlan(proposal.milestonePlan),
+        },
+      });
       toast.success("Proposal sent");
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to send proposal");
@@ -178,7 +213,7 @@ function RequestDetail({ id, onBack }) {
         {/* Proposal builder */}
         <div className="bg-[#1a1a1b] rounded-xl p-5 border border-white/10 h-fit">
           <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-[#FFB633]" /> Proposal
+            <FileText className="w-5 h-5 text-[#FFB633]" /> Master Proposal
           </h3>
           {request.proposal?.version > 0 && (
             <p className="text-xs text-gray-500 mb-3">
@@ -194,6 +229,7 @@ function RequestDetail({ id, onBack }) {
                 onChange={(e) =>
                   setProposal((p) => ({ ...p, title: e.target.value }))
                 }
+                disabled={request.status === "approved"}
                 className="bg-white/5 border-white/10 text-white mt-1"
               />
             </div>
@@ -209,6 +245,7 @@ function RequestDetail({ id, onBack }) {
                 onChange={(e) =>
                   setProposal((p) => ({ ...p, scope: e.target.value }))
                 }
+                disabled={request.status === "approved"}
                 rows={6}
                 placeholder={"What we'll build…\n\n**Deliverables**\n- Feature one\n- Feature two"}
                 className="bg-white/5 border-white/10 text-white mt-1 font-mono text-sm"
@@ -233,6 +270,7 @@ function RequestDetail({ id, onBack }) {
                   onChange={(e) =>
                     setProposal((p) => ({ ...p, timeline: e.target.value }))
                   }
+                  disabled={request.status === "approved"}
                   placeholder="10 weeks"
                   className="bg-white/5 border-white/10 text-white mt-1"
                 />
@@ -244,11 +282,20 @@ function RequestDetail({ id, onBack }) {
                   onChange={(e) =>
                     setProposal((p) => ({ ...p, budget: e.target.value }))
                   }
+                  disabled={request.status === "approved"}
                   placeholder="$4,000"
                   className="bg-white/5 border-white/10 text-white mt-1"
                 />
               </div>
             </div>
+            <MilestonePlanEditor
+              value={proposal.milestonePlan}
+              onChange={(milestonePlan) =>
+                setProposal((current) => ({ ...current, milestonePlan }))
+              }
+              mode="plan"
+              readOnly={request.status === "approved"}
+            />
             <Button
               type="submit"
               disabled={saveProposal.isPending || request.status === "approved"}

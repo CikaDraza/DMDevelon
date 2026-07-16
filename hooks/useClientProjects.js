@@ -10,8 +10,22 @@ export function useClientProjects() {
   const queryClient = useQueryClient();
   const { getAuthHeaders } = useAuth();
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['client-projects'] });
+  const invalidate = async (projectId) => {
+    const invalidations = [
+      queryClient.invalidateQueries({ queryKey: ['client-projects'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    ];
+    if (projectId) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: ['client-projects', projectId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['project-proposals', projectId],
+        }),
+      );
+    }
+    await Promise.all(invalidations);
   };
 
   const projectsQuery = useQuery({
@@ -31,7 +45,7 @@ export function useClientProjects() {
       });
       return res.data;
     },
-    onSuccess: invalidate,
+    onSuccess: (project) => invalidate(project?._id),
   });
 
   const updateProject = useMutation({
@@ -41,7 +55,7 @@ export function useClientProjects() {
       });
       return res.data;
     },
-    onSuccess: invalidate,
+    onSuccess: (project, variables) => invalidate(project?._id || variables.id),
   });
 
   const deleteProject = useMutation({
@@ -51,7 +65,7 @@ export function useClientProjects() {
       });
       return res.data;
     },
-    onSuccess: invalidate,
+    onSuccess: (_, id) => invalidate(id),
   });
 
   // --- Granular (patch-based) progress updates ---
@@ -64,7 +78,7 @@ export function useClientProjects() {
       );
       return res.data;
     },
-    onSuccess: invalidate,
+    onSuccess: (project, variables) => invalidate(project?._id || variables.id),
   });
 
   const updateMilestone = useMutation({
@@ -76,7 +90,7 @@ export function useClientProjects() {
       );
       return res.data;
     },
-    onSuccess: invalidate,
+    onSuccess: (project, variables) => invalidate(project?._id || variables.id),
   });
 
   const updateTask = useMutation({
@@ -88,7 +102,21 @@ export function useClientProjects() {
       );
       return res.data;
     },
-    onSuccess: invalidate,
+    onSuccess: (project, variables) => invalidate(project?._id || variables.id),
+  });
+
+  // Full, audited milestone/task edit. Unlike the quick status PATCH above,
+  // this endpoint requires changeSummary and records before/after snapshots.
+  const updateMilestoneAgreed = useMutation({
+    mutationFn: async ({ id, mid, data }) => {
+      const res = await axios.put(
+        `/api/client-projects/${id}/milestones/${mid}`,
+        data,
+        { headers: getAuthHeaders() },
+      );
+      return res.data;
+    },
+    onSuccess: (project, variables) => invalidate(project?._id || variables.id),
   });
 
   return {
@@ -101,6 +129,7 @@ export function useClientProjects() {
     updateProjectStatus,
     updateMilestone,
     updateTask,
+    updateMilestoneAgreed,
   };
 }
 

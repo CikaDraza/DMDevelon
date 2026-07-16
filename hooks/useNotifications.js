@@ -24,7 +24,8 @@ export function useNotifications() {
   const markRead = useMutation({
     mutationFn: async (payload = {}) => {
       // payload: { id } | { entityId } | { entityId, milestoneId }
-      //   | { entityId, excludeMilestones: true } | {} (all)
+      //   | { entityId, proposalId } | { entityId, excludeMilestones: true,
+      //       excludeProposals?: true } | {} (all)
       const res = await axios.post('/api/notifications/read', payload, {
         headers: getAuthHeaders(),
       });
@@ -50,12 +51,19 @@ export function useNotifications() {
   const unreadMilestoneIds = new Set(
     items.filter((n) => !n.read && n.milestoneId).map((n) => n.milestoneId),
   );
+  const unreadProposalIds = new Set(
+    items.filter((n) => !n.read && n.proposalId).map((n) => n.proposalId),
+  );
   // Latest unread notification per milestone (items are sorted newest-first),
   // so callers can show its preview as a badge next to the chat icon.
   const unreadByMilestone = {};
+  const unreadByProposal = {};
   for (const n of items) {
     if (!n.read && n.milestoneId && !unreadByMilestone[n.milestoneId]) {
       unreadByMilestone[n.milestoneId] = n;
+    }
+    if (!n.read && n.proposalId && !unreadByProposal[n.proposalId]) {
+      unreadByProposal[n.proposalId] = n;
     }
   }
 
@@ -67,5 +75,7 @@ export function useNotifications() {
     unreadEntityIds,
     unreadMilestoneIds,
     unreadByMilestone,
+    unreadProposalIds,
+    unreadByProposal,
   };
 }

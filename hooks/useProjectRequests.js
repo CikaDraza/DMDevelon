@@ -145,7 +145,19 @@ export function useProjectRequest(id) {
       );
       return res.data; // { projectId, request }
     },
-    onSuccess: invalidate,
+    onSuccess: (data) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['client-projects'] });
+      if (data?.projectId) {
+        queryClient.invalidateQueries({
+          queryKey: ['client-projects', data.projectId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['project-proposals', data.projectId],
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
   });
 
   const requestChanges = useMutation({
@@ -157,7 +169,10 @@ export function useProjectRequest(id) {
       );
       return res.data;
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
   });
 
   return {

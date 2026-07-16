@@ -10,6 +10,7 @@ import CMSPage from "@/models/CMSPage";
 import ClientProject from "@/models/ClientProject";
 import ProjectMessage from "@/models/ProjectMessage";
 import ProjectRequest from "@/models/ProjectRequest";
+import ProjectProposal from "@/models/ProjectProposal";
 import Notification from "@/models/Notification";
 import PushSubscription from "@/models/PushSubscription";
 import {
@@ -23,7 +24,7 @@ import {
   generateToken,
   getUserFromRequest,
 } from "@/lib/auth";
-import { v4 as uuidv4 } from "uuid";
+import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
 import { randomBytes } from "crypto";
 import { emailTemplates } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
@@ -41,6 +42,12 @@ import {
   adminFolder,
 } from "@/lib/cloudinary";
 import { slugify } from "@/lib/slugify";
+import {
+  canAccessClientEntity,
+  canPerformClientProposalAction,
+  materializeMilestonePlan as materializeProposalMilestones,
+  preparePhaseArchive,
+} from "@/lib/project-proposal-domain.mjs";
 
 function getCorsHeaders() {
   return {
@@ -52,21 +59,258 @@ function getCorsHeaders() {
 
 // Admin gets full access; client only to their own projects (by id or email).
 function canAccessClientProject(user, project) {
-  if (!user || !project) return false;
-  if (user.isAdmin) return true;
-  return (
-    (project.clientUserId && project.clientUserId === user.userId) ||
-    (project.clientEmail && project.clientEmail === user.email)
-  );
+  return canAccessClientEntity(user, project);
 }
 
 // Same ownership rule for project requests.
 function canAccessRequest(user, req) {
-  if (!user || !req) return false;
-  if (user.isAdmin) return true;
-  return (
-    (req.clientUserId && req.clientUserId === user.userId) ||
-    (req.clientEmail && req.clientEmail === user.email)
+  return canAccessClientEntity(user, req);
+}
+
+const CLIENT_PROPOSAL_STATUSES = [
+  "sent",
+  "changes_requested",
+  "accepted",
+];
+const ITEM_STATUSES = new Set(["pending", "in_progress", "completed"]);
+const PROJECT_STATUSES = new Set([
+  "planning",
+  "in_progress",
+  "completed",
+  "on_hold",
+]);
+
+function apiError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
+function cleanString(value, field, max, { required = false } = {}) {
+  if (value === undefined || value === null) value = "";
+  if (typeof value !== "string") throw apiError(`${field} must be a string`);
+  const cleaned = value.trim();
+  if (required && !cleaned) throw apiError(`${field} is required`);
+  if (cleaned.length > max) throw apiError(`${field} is too long`);
+  return cleaned;
+}
+
+function proposalSnapshot(proposal) {
+  return {
+    kind: proposal.kind || "phase",
+    phaseNumber: proposal.phaseNumber || 1,
+    phaseLabel:
+      proposal.phaseLabel ||
+      (proposal.kind === "master" ? "Master Proposal" : "Proposal"),
+    title: proposal.title || "",
+    scope: proposal.scope || "",
+    timeline: proposal.timeline || "",
+    budget: proposal.budget || "",
+    status: proposal.status || "sent",
+    version: proposal.version || 1,
+    milestonePlan: JSON.parse(JSON.stringify(proposal.milestonePlan || [])),
+    sentAt: proposal.sentAt || null,
+    capturedAt: new Date(),
+    capturedByUserId: null,
+  };
+}
+
+function milestoneAuditSnapshot(milestone) {
+  return {
+    _id: milestone._id,
+    title: milestone.title || "",
+    description: milestone.description || "",
+    icon: milestone.icon || "Circle",
+    order: Number.isInteger(milestone.order) ? milestone.order : 0,
+    status: milestone.status || "pending",
+    githubBranch: milestone.githubBranch || "",
+    tasks: (milestone.tasks || []).map((task) => ({
+      _id: task._id,
+      title: task.title || "",
+      description: task.description || "",
+      order: Number.isInteger(task.order) ? task.order : 0,
+      status: task.status || "pending",
+    })),
+  };
+}
+
+function normalizeMilestonePlan(value, existingPlan = []) {
+  if (value === undefined) return JSON.parse(JSON.stringify(existingPlan || []));
+  if (!Array.isArray(value)) throw apiError("milestonePlan must be an array");
+  if (value.length > 60) throw apiError("milestonePlan has too many milestones");
+
+  const explicitOrders = value
+    .filter((item) => Number.isInteger(item?.order))
+    .map((item) => item.order);
+  if (explicitOrders.some((order) => order < 0)) {
+    throw apiError("Milestone order values must be non-negative");
+  }
+  if (new Set(explicitOrders).size !== explicitOrders.length) {
+    throw apiError("Milestone order values must be unique");
+  }
+
+  const existingById = new Map(
+    (existingPlan || []).map((item) => [String(item._id), item]),
+  );
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== "object") {
+      throw apiError(`Milestone ${index + 1} is invalid`);
+    }
+    const existing = raw._id ? existingById.get(String(raw._id)) : null;
+    const tasks = Array.isArray(raw.tasks) ? raw.tasks : [];
+    if (tasks.length > 100) {
+      throw apiError(`Milestone ${index + 1} has too many tasks`);
+    }
+    const taskOrders = tasks
+      .filter((task) => Number.isInteger(task?.order))
+      .map((task) => task.order);
+    if (taskOrders.some((order) => order < 0)) {
+      throw apiError(
+        `Task order values must be non-negative in milestone ${index + 1}`,
+      );
+    }
+    if (new Set(taskOrders).size !== taskOrders.length) {
+      throw apiError(`Task order values must be unique in milestone ${index + 1}`);
+    }
+    const existingTasks = new Map(
+      (existing?.tasks || []).map((task) => [String(task._id), task]),
+    );
+    return {
+      _id: existing?._id || uuidv4(),
+      title: cleanString(raw.title, `Milestone ${index + 1} title`, 200, {
+        required: true,
+      }),
+      description: cleanString(
+        raw.description,
+        `Milestone ${index + 1} description`,
+        10000,
+      ),
+      icon: cleanString(raw.icon || "Circle", "Milestone icon", 80),
+      githubBranch: cleanString(
+        raw.githubBranch,
+        "Milestone git branch",
+        250,
+      ),
+      order: Number.isInteger(raw.order) ? raw.order : index,
+      tasks: tasks.map((task, taskIndex) => {
+        if (!task || typeof task !== "object") {
+          throw apiError(
+            `Task ${taskIndex + 1} in milestone ${index + 1} is invalid`,
+          );
+        }
+        const existingTask = task._id
+          ? existingTasks.get(String(task._id))
+          : null;
+        return {
+          _id: existingTask?._id || uuidv4(),
+          title: cleanString(
+            task.title,
+            `Task ${taskIndex + 1} title`,
+            200,
+            { required: true },
+          ),
+          description: cleanString(
+            task.description,
+            `Task ${taskIndex + 1} description`,
+            5000,
+          ),
+          order: Number.isInteger(task.order) ? task.order : taskIndex,
+        };
+      }),
+    };
+  });
+}
+
+function normalizeProposalFields(body, existing = null) {
+  const sourcePlan = body.milestonePlan ?? body.milestones;
+  return {
+    title: cleanString(
+      body.title ?? existing?.title,
+      "Proposal title",
+      200,
+      { required: true },
+    ),
+    scope: cleanString(body.scope ?? existing?.scope, "Proposal scope", 100000),
+    timeline: cleanString(
+      body.timeline ?? existing?.timeline,
+      "Proposal timeline",
+      500,
+    ),
+    budget: cleanString(
+      body.budget ?? existing?.budget,
+      "Proposal budget",
+      500,
+    ),
+    phaseLabel: cleanString(
+      body.phaseLabel ?? existing?.phaseLabel,
+      "Phase label",
+      120,
+      { required: true },
+    ),
+    milestonePlan: normalizeMilestonePlan(
+      sourcePlan,
+      existing?.milestonePlan || [],
+    ),
+  };
+}
+
+function materializeMilestonePlan(proposal) {
+  return materializeProposalMilestones(proposal, { baseOrder: 0 });
+}
+
+async function reconcileProposalMilestones(projectId, proposal, actorName) {
+  let added = 0;
+  for (const milestone of materializeMilestonePlan(proposal)) {
+    const result = await ClientProject.updateOne(
+      {
+        _id: projectId,
+        archivedProposalIds: { $ne: proposal._id },
+        "milestones._id": { $ne: milestone._id },
+      },
+      { $push: { milestones: milestone }, $inc: { __v: 1 } },
+    );
+    added += result.modifiedCount || 0;
+  }
+
+  const plannedCount = (proposal.milestonePlan || []).length;
+  const eventId = uuidv5(`proposal-accepted:${proposal._id}`, uuidv5.URL);
+  await ClientProject.updateOne(
+    { _id: projectId, "events._id": { $ne: eventId } },
+    {
+      $push: {
+        events: {
+          _id: eventId,
+          type: "proposal_accepted",
+          body: `${proposal.phaseLabel} accepted — ${plannedCount} milestone${plannedCount === 1 ? "" : "s"} in this phase`,
+          actorName: actorName || "Client",
+          createdAt: proposal.acceptedAt || new Date(),
+        },
+      },
+      $inc: { __v: 1 },
+    },
+  );
+  if (added > 0) {
+    await ClientProject.updateOne(
+      { _id: projectId, status: "completed" },
+      { $set: { status: "in_progress" }, $inc: { __v: 1 } },
+    );
+  }
+  return added;
+}
+
+function errorResponse(error, label) {
+  console.error(`${label} Error:`, error);
+  const status =
+    error?.status ||
+    error?.statusCode ||
+    (error?.name === "ValidationError"
+      ? 400
+      : error?.name === "VersionError" || error?.code === 11000
+        ? 409
+        : 500);
+  return NextResponse.json(
+    { error: status === 500 ? error.message : error.message },
+    { status, headers: getCorsHeaders() },
   );
 }
 
@@ -101,7 +345,7 @@ async function runEmailDigest() {
     byUser.get(n.userId).push(n);
   }
 
-  const logoUrl = `${APP_URL}/icons/dmdevelon_logo-notifications.png`;
+  const logoUrl = `${APP_URL}/icons/dmd-email-logo.png`;
   const wordmarkUrl = `${APP_URL}/icons/dmd-email-logo.png`;
   let sent = 0;
   const processedIds = [];
@@ -248,7 +492,7 @@ export async function GET(request, context) {
       }
       const query = user.isAdmin
         ? {}
-        : { $or: [{ clientUserId: user.userId }, { clientEmail: user.email }] };
+        : { $or: [{ clientUserId: user._id }, { clientEmail: user.email }] };
       const projects = await ClientProject.find(query).sort({ createdAt: -1 });
       return NextResponse.json(projects, { headers: getCorsHeaders() });
     }
@@ -271,9 +515,35 @@ export async function GET(request, context) {
       }
       if (!canAccessClientProject(user, project)) {
         return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
+          { error: "Forbidden" },
+          { status: 403, headers: getCorsHeaders() },
         );
+      }
+      // Proposals belonging to this single client project. Drafts are never
+      // returned to clients, even when a proposal id is guessed directly.
+      if (path[2] === "proposals") {
+        const proposalQuery = {
+          projectId: id,
+          ...(user.isAdmin
+            ? {}
+            : { status: { $in: CLIENT_PROPOSAL_STATUSES } }),
+        };
+        if (path[3]) proposalQuery._id = path[3];
+        if (path[3]) {
+          const proposal = await ProjectProposal.findOne(proposalQuery);
+          if (!proposal) {
+            return NextResponse.json(
+              { error: "Proposal not found" },
+              { status: 404, headers: getCorsHeaders() },
+            );
+          }
+          return NextResponse.json(proposal, { headers: getCorsHeaders() });
+        }
+        const proposals = await ProjectProposal.find(proposalQuery).sort({
+          phaseNumber: 1,
+          createdAt: 1,
+        });
+        return NextResponse.json(proposals, { headers: getCorsHeaders() });
       }
       // Per-milestone chat thread: client-projects/:id/messages?milestoneId=...
       if (path[2] === "messages") {
@@ -297,7 +567,7 @@ export async function GET(request, context) {
       }
       const query = user.isAdmin
         ? {}
-        : { $or: [{ clientUserId: user.userId }, { clientEmail: user.email }] };
+        : { $or: [{ clientUserId: user._id }, { clientEmail: user.email }] };
       const requests = await ProjectRequest.find(query).sort({
         lastActivityAt: -1,
       });
@@ -509,11 +779,7 @@ export async function GET(request, context) {
       { status: 404, headers: getCorsHeaders() },
     );
   } catch (error) {
-    console.error("GET Error:", error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500, headers: getCorsHeaders() },
-    );
+    return errorResponse(error, "GET");
   }
 }
 
@@ -869,11 +1135,61 @@ export async function POST(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
-      const clientSlug = slugify(body.clientName || body.title);
+      const title = cleanString(body.title, "Project title", 200, {
+        required: true,
+      });
+      const status = body.status || "in_progress";
+      if (!PROJECT_STATUSES.has(status)) throw apiError("Invalid project status");
+      const normalizedPlan = normalizeMilestonePlan(body.milestones || [], []);
+      const milestones = normalizedPlan.map((milestone, index) => {
+        const source = body.milestones?.[index] || {};
+        const milestoneStatus = source.status || "pending";
+        if (!ITEM_STATUSES.has(milestoneStatus)) {
+          throw apiError("Invalid milestone status");
+        }
+        const startedAt = new Date();
+        const normalizedTasks = milestone.tasks.map((task, taskIndex) => {
+          const taskStatus = source.tasks?.[taskIndex]?.status || "pending";
+          if (!ITEM_STATUSES.has(taskStatus)) throw apiError("Invalid task status");
+          return {
+            ...task,
+            status: taskStatus,
+            workStartedAt: taskStatus === "pending" ? null : startedAt,
+          };
+        });
+        return {
+          ...milestone,
+          status: milestoneStatus,
+          workStartedAt:
+            milestoneStatus !== "pending" ||
+            normalizedTasks.some((task) => task.workStartedAt)
+              ? startedAt
+              : null,
+          revision: 1,
+          changeHistory: [],
+          tasks: normalizedTasks,
+        };
+      });
+      const clientName = cleanString(body.clientName, "Client name", 200);
+      const clientSlug = slugify(clientName || title);
       const project = await ClientProject.create({
         _id: uuidv4(),
-        ...body,
+        clientUserId:
+          typeof body.clientUserId === "string" ? body.clientUserId : null,
+        clientName,
+        clientEmail: cleanString(body.clientEmail, "Client email", 320),
         clientSlug,
+        title,
+        description: cleanString(body.description, "Project description", 100000),
+        requirements: cleanString(body.requirements, "Project requirements", 100000),
+        status,
+        githubRepoUrl: cleanString(body.githubRepoUrl, "GitHub URL", 2000),
+        livePreviewUrl: cleanString(body.livePreviewUrl, "Live preview URL", 2000),
+        coverImageUrl: cleanString(body.coverImageUrl, "Cover image URL", 2000),
+        category: cleanString(body.category, "Category", 200),
+        color: cleanString(body.color || "blue", "Color", 100),
+        publishToHomepage: body.publishToHomepage === true,
+        milestones,
         events: [
           {
             _id: uuidv4(),
@@ -905,6 +1221,523 @@ export async function POST(request, context) {
       });
     }
 
+    // Project proposal lifecycle. A proposal always belongs to an existing
+    // ClientProject; accepting a later phase appends to that same project.
+    if (path[0] === "client-projects" && path[1] && path[2] === "proposals") {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const project = await ClientProject.findById(path[1]);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      if (!canAccessClientProject(user, project)) {
+        return NextResponse.json(
+          { error: "Forbidden" },
+          { status: 403, headers: getCorsHeaders() },
+        );
+      }
+
+      // POST /client-projects/:projectId/proposals (admin creates a draft).
+      if (!path[3]) {
+        if (!user.isAdmin) {
+          return NextResponse.json(
+            { error: "Forbidden" },
+            { status: 403, headers: getCorsHeaders() },
+          );
+        }
+        const lastProposal = await ProjectProposal.findOne({
+          projectId: project._id,
+        })
+          .sort({ phaseNumber: -1 })
+          .select("phaseNumber");
+        const phaseNumber = Math.max(2, (lastProposal?.phaseNumber || 1) + 1);
+        const sourceProposal = body.sourceProposalId
+          ? await ProjectProposal.findOne({
+              _id: body.sourceProposalId,
+              projectId: project._id,
+            })
+          : null;
+        if (body.sourceProposalId && !sourceProposal) {
+          return NextResponse.json(
+            { error: "Source proposal not found" },
+            { status: 404, headers: getCorsHeaders() },
+          );
+        }
+        const fields = normalizeProposalFields(
+          {
+            ...(sourceProposal?.toObject?.() || {}),
+            ...body,
+            phaseLabel: body.phaseLabel || `Faza ${phaseNumber}`,
+          },
+          null,
+        );
+        try {
+          const proposal = await ProjectProposal.create({
+            _id: uuidv4(),
+            projectId: project._id,
+            requestId: null,
+            clientUserId: project.clientUserId || null,
+            kind: "phase",
+            phaseNumber,
+            ...fields,
+            status: "draft",
+            version: 1,
+            revisionHistory: [],
+            createdByUserId: user._id,
+            sentAt: null,
+            acceptedAt: null,
+            rejectedAt: null,
+          });
+          return NextResponse.json(proposal, {
+            status: 201,
+            headers: getCorsHeaders(),
+          });
+        } catch (error) {
+          if (error?.code === 11000) {
+            throw apiError(
+              "Another proposal already uses that phase number; refresh and try again",
+              409,
+            );
+          }
+          throw error;
+        }
+      }
+
+      const proposal = await ProjectProposal.findOne({
+        _id: path[3],
+        projectId: project._id,
+      });
+      if (!proposal) {
+        return NextResponse.json(
+          { error: "Proposal not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      const action = path[4];
+      const now = new Date();
+
+      if (action === "send") {
+        if (!user.isAdmin) {
+          return NextResponse.json(
+            { error: "Forbidden" },
+            { status: 403, headers: getCorsHeaders() },
+          );
+        }
+        if (proposal.status !== "draft") {
+          return NextResponse.json(
+            { error: "Only a draft proposal can be sent" },
+            { status: 409, headers: getCorsHeaders() },
+          );
+        }
+        if (proposal.sentAt) proposal.version += 1;
+        proposal.status = "sent";
+        proposal.sentAt = now;
+        await proposal.save();
+        await ClientProject.updateOne(
+          { _id: project._id },
+          {
+            $push: {
+              events: {
+                _id: uuidv4(),
+                type: "project_proposal_sent",
+                body: `${proposal.phaseLabel} v${proposal.version} sent`,
+                actorName: user.name || "Admin",
+                createdAt: now,
+              },
+            },
+            $inc: { __v: 1 },
+          },
+        );
+        const clientId = await resolveClientUserId(project);
+        await notifyUser({
+          userId: clientId,
+          actorId: user._id,
+          type: "project_proposal_sent",
+          title: `Proposal ready: ${proposal.phaseLabel}`,
+          body: `${proposal.title} is ready for your review.`,
+          link: `/dashboard/projects/${project._id}?proposal=${proposal._id}`,
+          entityType: "project",
+          entityId: project._id,
+          proposalId: proposal._id,
+          email: true,
+        });
+        return NextResponse.json(proposal, { headers: getCorsHeaders() });
+      }
+
+      // Admin-only removal of an accepted follow-up phase. The accepted
+      // proposal snapshot and all messages remain archived for audit; only
+      // untouched operational milestones are removed from the live project.
+      if (action === "archive") {
+        if (!user.isAdmin) {
+          return NextResponse.json(
+            { error: "Forbidden" },
+            { status: 403, headers: getCorsHeaders() },
+          );
+        }
+        const reason = cleanString(body.reason, "Deletion reason", 5000, {
+          required: true,
+        });
+        if (body.confirmation !== "DELETE") {
+          return NextResponse.json(
+            { error: "Deletion confirmation is required" },
+            { status: 400, headers: getCorsHeaders() },
+          );
+        }
+
+        const proposalHasStoredRecipient =
+          proposal.archiveRecipientUserId !== null &&
+          proposal.archiveRecipientUserId !== undefined;
+        const fallbackRecipientUserId = proposalHasStoredRecipient
+          ? proposal.archiveRecipientUserId || null
+          : (await resolveClientUserId(project)) || null;
+        const session = await ClientProject.db.startSession();
+        let archivePlan;
+        let archived;
+        let transitioned = false;
+
+        try {
+          await session.withTransaction(async () => {
+            const txProject = await ClientProject.findById(project._id).session(
+              session,
+            );
+            const txProposal = await ProjectProposal.findOne({
+              _id: proposal._id,
+              projectId: project._id,
+            }).session(session);
+            if (!txProject) throw apiError("Project not found", 404);
+            if (!txProposal) throw apiError("Proposal not found", 404);
+
+            archivePlan = preparePhaseArchive(
+              txProposal,
+              txProject.milestones,
+            );
+            const hasStoredRecipient =
+              txProposal.archiveRecipientUserId !== null &&
+              txProposal.archiveRecipientUserId !== undefined;
+            let recipientUserId = hasStoredRecipient
+              ? txProposal.archiveRecipientUserId || null
+              : txProject.clientUserId || null;
+            if (!hasStoredRecipient && !recipientUserId && txProject.clientEmail) {
+              const recipient = await User.findOne({
+                email: txProject.clientEmail,
+              })
+                .select("_id")
+                .session(session);
+              recipientUserId = recipient?._id || null;
+            }
+            if (!hasStoredRecipient && !recipientUserId) {
+              recipientUserId = fallbackRecipientUserId || null;
+            }
+
+            const projectUpdate = await ClientProject.updateOne(
+              { _id: txProject._id, __v: txProject.__v },
+              {
+                $addToSet: { archivedProposalIds: txProposal._id },
+                $pull: { milestones: { proposalId: txProposal._id } },
+                $inc: { __v: 1 },
+              },
+              { session },
+            );
+            if (projectUpdate.matchedCount !== 1) {
+              throw apiError(
+                "Project state changed; refresh and try deleting the phase again",
+                409,
+              );
+            }
+
+            if (!archivePlan.alreadyArchived) {
+              archived = await ProjectProposal.findOneAndUpdate(
+                {
+                  _id: txProposal._id,
+                  projectId: txProject._id,
+                  status: "accepted",
+                },
+                {
+                  $set: {
+                    status: "archived",
+                    archivedAt: now,
+                    archivedByUserId: user._id,
+                    archivedByName: user.name || "Admin",
+                    // Empty string deliberately records that there was no
+                    // recipient at archive time; a later project reassignment
+                    // must not receive this historical notification.
+                    archiveRecipientUserId: recipientUserId || "",
+                    archiveReason: reason,
+                  },
+                },
+                { new: true, runValidators: true, session },
+              );
+              transitioned = !!archived;
+            } else {
+              const recoveryFields = {};
+              if (!txProposal.archivedAt) recoveryFields.archivedAt = now;
+              if (!txProposal.archivedByUserId) {
+                recoveryFields.archivedByUserId = user._id;
+              }
+              if (!txProposal.archivedByName) {
+                recoveryFields.archivedByName = user.name || "Admin";
+              }
+              if (!hasStoredRecipient) {
+                recoveryFields.archiveRecipientUserId = recipientUserId || "";
+              }
+              if (!txProposal.archiveReason) {
+                recoveryFields.archiveReason = reason;
+              }
+              archived = Object.keys(recoveryFields).length
+                ? await ProjectProposal.findOneAndUpdate(
+                    {
+                      _id: txProposal._id,
+                      projectId: txProject._id,
+                      status: "archived",
+                    },
+                    { $set: recoveryFields },
+                    { new: true, runValidators: true, session },
+                  )
+                : txProposal;
+            }
+
+            if (archived?.status !== "archived") {
+              throw apiError(
+                "Proposal state changed; only an accepted phase can be deleted",
+                409,
+              );
+            }
+
+            const archivedReason = String(
+              archived.archiveReason || reason || "Phase removed by agreement",
+            );
+            const eventId = uuidv5(
+              `proposal-archived:${txProposal._id}`,
+              uuidv5.URL,
+            );
+            await ClientProject.updateOne(
+              { _id: txProject._id, "events._id": { $ne: eventId } },
+              {
+                $push: {
+                  events: {
+                    _id: eventId,
+                    type: "project_proposal_archived",
+                    body: `${archived.phaseLabel} removed from active work — ${archivedReason.slice(0, 180)}`,
+                    actorName:
+                      archived.archivedByName || user.name || "Admin",
+                    createdAt: archived.archivedAt || now,
+                  },
+                },
+                $inc: { __v: 1 },
+              },
+              { session },
+            );
+          });
+        } catch (error) {
+          if (
+            /transaction numbers are only allowed|does not support transactions/i.test(
+              String(error?.message || ""),
+            )
+          ) {
+            throw apiError(
+              "Safe phase deletion requires MongoDB transaction support",
+              503,
+            );
+          }
+          throw error;
+        } finally {
+          await session.endSession();
+        }
+
+        const archivedReason = String(
+          archived.archiveReason || reason || "Phase removed by agreement",
+        );
+        const clientId = archived.archiveRecipientUserId || null;
+        const notificationActorId = archived.archivedByUserId || user._id;
+        const notificationResult = await notifyUser({
+          userId: clientId,
+          actorId: notificationActorId,
+          type: "project_proposal_archived",
+          title: `Phase removed: ${archived.phaseLabel}`,
+          body: archivedReason,
+          link: `/dashboard/projects/${project._id}`,
+          entityType: "project",
+          entityId: project._id,
+          dedupeKey: `project-proposal-archived:${proposal._id}`,
+          email: true,
+        });
+        if (
+          clientId &&
+          String(clientId) !== String(notificationActorId) &&
+          !notificationResult
+        ) {
+          throw apiError(
+            "Phase was removed, but the client notification could not be queued; retry this action",
+            503,
+          );
+        }
+
+        const refreshedProject = await ClientProject.findById(project._id);
+        return NextResponse.json(
+          {
+            proposal: archived,
+            project: refreshedProject,
+            removedMilestoneIds: archivePlan.milestoneIds,
+            removedMilestoneCount: archivePlan.milestoneCount,
+            alreadyArchived: !transitioned,
+          },
+          { headers: getCorsHeaders() },
+        );
+      }
+
+      // Client decisions cannot be performed by an admin on the client's
+      // behalf through these ordinary lifecycle endpoints.
+      if (["accept", "request-changes", "reject"].includes(action)) {
+        if (!canPerformClientProposalAction(user, project)) {
+          return NextResponse.json(
+            { error: "Only the project owner can perform this action" },
+            { status: 403, headers: getCorsHeaders() },
+          );
+        }
+      }
+
+      if (action === "accept") {
+        // An already accepted proposal is a successful idempotent replay. The
+        // reconciliation still runs so a previous partial failure self-heals.
+        let accepted = proposal;
+        let transitioned = false;
+        if (proposal.status === "sent") {
+          accepted = await ProjectProposal.findOneAndUpdate(
+            { _id: proposal._id, projectId: project._id, status: "sent" },
+            { $set: { status: "accepted", acceptedAt: now } },
+            { new: true },
+          );
+          transitioned = !!accepted;
+          if (!accepted) {
+            accepted = await ProjectProposal.findOne({
+              _id: proposal._id,
+              projectId: project._id,
+            });
+          }
+        }
+        if (accepted?.status !== "accepted") {
+          return NextResponse.json(
+            { error: "Only a sent proposal can be accepted" },
+            { status: 409, headers: getCorsHeaders() },
+          );
+        }
+        const addedMilestones = await reconcileProposalMilestones(
+          project._id,
+          accepted,
+          project.clientName || user.name || "Client",
+        );
+        if (transitioned) {
+          await notifyAdmins({
+            actorId: user._id,
+            type: "project_proposal_accepted",
+            title: `Proposal accepted: ${accepted.phaseLabel}`,
+            body: `${project.clientName || "The client"} accepted ${accepted.title}.`,
+            link: `/admin?tab=client-projects&id=${project._id}&proposal=${accepted._id}`,
+            entityType: "project",
+            entityId: project._id,
+            proposalId: accepted._id,
+            email: true,
+          });
+        }
+        const refreshedProject = await ClientProject.findById(project._id);
+        return NextResponse.json(
+          { proposal: accepted, project: refreshedProject, addedMilestones },
+          { headers: getCorsHeaders() },
+        );
+      }
+
+      if (action === "request-changes") {
+        if (proposal.status !== "sent") {
+          return NextResponse.json(
+            { error: "Changes can only be requested on a sent proposal" },
+            { status: 409, headers: getCorsHeaders() },
+          );
+        }
+        const reason = cleanString(
+          body.reason ?? body.body,
+          "Change request",
+          5000,
+        );
+        const changed = await ProjectProposal.findOneAndUpdate(
+          { _id: proposal._id, projectId: project._id, status: "sent" },
+          { $set: { status: "changes_requested" } },
+          { new: true },
+        );
+        if (!changed) {
+          return NextResponse.json(
+            { error: "Proposal state changed; refresh and try again" },
+            { status: 409, headers: getCorsHeaders() },
+          );
+        }
+        await ClientProject.updateOne(
+          { _id: project._id },
+          {
+            $push: {
+              events: {
+                _id: uuidv4(),
+                type: "project_proposal_changes_requested",
+                body: `${proposal.phaseLabel}: changes requested${reason ? ` — ${reason.slice(0, 180)}` : ""}`,
+                actorName: project.clientName || user.name || "Client",
+                createdAt: now,
+              },
+            },
+            $inc: { __v: 1 },
+          },
+        );
+        await notifyAdmins({
+          actorId: user._id,
+          type: "project_proposal_changes_requested",
+          title: `Changes requested: ${proposal.phaseLabel}`,
+          body: reason || `${project.clientName || "The client"} requested changes.`,
+          link: `/admin?tab=client-projects&id=${project._id}&proposal=${proposal._id}`,
+          entityType: "project",
+          entityId: project._id,
+          proposalId: proposal._id,
+          email: true,
+        });
+        return NextResponse.json(changed, { headers: getCorsHeaders() });
+      }
+
+      if (action === "reject") {
+        const rejected = await ProjectProposal.findOneAndUpdate(
+          { _id: proposal._id, projectId: project._id, status: "sent" },
+          { $set: { status: "rejected", rejectedAt: now } },
+          { new: true },
+        );
+        if (!rejected) {
+          return NextResponse.json(
+            { error: "Only a sent proposal can be rejected" },
+            { status: 409, headers: getCorsHeaders() },
+          );
+        }
+        await notifyAdmins({
+          actorId: user._id,
+          type: "project_proposal_rejected",
+          title: `Proposal rejected: ${proposal.phaseLabel}`,
+          body: `${project.clientName || "The client"} rejected ${proposal.title}.`,
+          link: `/admin?tab=client-projects&id=${project._id}&proposal=${proposal._id}`,
+          entityType: "project",
+          entityId: project._id,
+          proposalId: proposal._id,
+          email: true,
+        });
+        return NextResponse.json(rejected, { headers: getCorsHeaders() });
+      }
+
+      return NextResponse.json(
+        { error: "Not found" },
+        { status: 404, headers: getCorsHeaders() },
+      );
+    }
+
     // Post a chat message to a milestone (admin or owner client)
     if (pathStr.startsWith("client-projects/") && path[2] === "messages") {
       const user = await getUserFromRequest(request);
@@ -934,14 +1767,36 @@ export async function POST(request, context) {
           { status: 400, headers: getCorsHeaders() },
         );
       }
+      const milestone = (project.milestones || []).find(
+        (item) => String(item._id) === String(body.milestoneId),
+      );
+      if (!milestone) {
+        return NextResponse.json(
+          { error: "Milestone not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      const allowedMessageTypes = user.isAdmin
+        ? new Set(["message", "question", "system", "change_agreed"])
+        : new Set(["message", "question", "change_request"]);
+      const messageType = body.messageType || "message";
+      if (!allowedMessageTypes.has(messageType)) {
+        return NextResponse.json(
+          { error: "Invalid message type" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
       const message = await ProjectMessage.create({
         _id: uuidv4(),
         projectId: id,
         milestoneId: body.milestoneId,
+        proposalId: milestone.proposalId || null,
+        messageType,
         authorUserId: user._id,
-        authorName: body.authorName || user.email,
+        authorName:
+          user.name || (user.isAdmin ? "DMDevelon" : project.clientName) || user.email,
         authorRole: user.isAdmin ? "admin" : "client",
-        body: body.body || "",
+        body: cleanString(body.body, "Message", 10000),
         attachments: Array.isArray(body.attachments) ? body.attachments : [],
       });
       const msgPreview = (body.body || "").slice(0, 140);
@@ -957,18 +1812,27 @@ export async function POST(request, context) {
           entityType: "project",
           entityId: project._id,
           milestoneId: message.milestoneId,
+          proposalId: message.proposalId || "",
           email: true,
         });
       } else {
+        const notificationType =
+          messageType === "change_request"
+            ? "milestone_change_requested"
+            : "project_message";
         await notifyAdmins({
           actorId: user._id,
-          type: "project_message",
-          title: `Client message on ${project.title}`,
+          type: notificationType,
+          title:
+            messageType === "change_request"
+              ? `Change requested: ${milestone.title}`
+              : `Client message on ${project.title}`,
           body: `${project.clientName}: ${msgPreview}`,
           link: `/admin?tab=client-projects&id=${project._id}&m=${message.milestoneId}`,
           entityType: "project",
           entityId: project._id,
           milestoneId: message.milestoneId,
+          proposalId: message.proposalId || "",
           email: true,
         });
       }
@@ -1070,7 +1934,7 @@ export async function POST(request, context) {
           { status: 400, headers: getCorsHeaders() },
         );
       }
-      const owner = await User.findById(user.userId);
+      const owner = await User.findById(user._id);
       const clientName = owner?.name || body.clientName || user.email;
       const clientEmail = owner?.email || user.email;
       const clientSlug = slugify(clientName);
@@ -1079,7 +1943,7 @@ export async function POST(request, context) {
         ? [
             {
               _id: uuidv4(),
-              authorUserId: user.userId,
+              authorUserId: user._id,
               authorName: clientName,
               authorRole: "client",
               type: "message",
@@ -1145,7 +2009,7 @@ export async function POST(request, context) {
       if (path[2] === "messages") {
         reqDoc.messages.push({
           _id: uuidv4(),
-          authorUserId: user.userId,
+          authorUserId: user._id,
           authorName:
             body.authorName ||
             (user.isAdmin ? "DMDevelon" : reqDoc.clientName || user.email),
@@ -1191,71 +2055,198 @@ export async function POST(request, context) {
       }
 
       if (path[2] === "accept") {
-        if (reqDoc.linkedClientProjectId) {
+        if (!canPerformClientProposalAction(user, reqDoc)) {
           return NextResponse.json(
-            { projectId: reqDoc.linkedClientProjectId, request: reqDoc },
-            { headers: getCorsHeaders() },
+            { error: "Only the request owner can accept the proposal" },
+            { status: 403, headers: getCorsHeaders() },
           );
         }
+        const isReplay =
+          reqDoc.status === "approved" && !!reqDoc.linkedClientProjectId;
+        if (
+          !isReplay &&
+          (reqDoc.status !== "proposal_sent" || !reqDoc.proposal?.sentAt)
+        ) {
+          return NextResponse.json(
+            { error: "Only a sent proposal can be accepted" },
+            { status: 409, headers: getCorsHeaders() },
+          );
+        }
+
         const clientSlug = reqDoc.clientSlug || slugify(reqDoc.clientName);
-        const project = await ClientProject.create({
-          _id: uuidv4(),
-          clientUserId: reqDoc.clientUserId,
-          clientName: reqDoc.clientName,
-          clientEmail: reqDoc.clientEmail,
-          clientSlug,
-          requestId: reqDoc._id,
-          title: reqDoc.proposal?.title || reqDoc.title,
-          description: reqDoc.proposal?.scope || reqDoc.description,
-          requirements: reqDoc.description,
-          status: "in_progress",
-          milestones: [],
-          events: [
+        let project = reqDoc.linkedClientProjectId
+          ? await ClientProject.findById(reqDoc.linkedClientProjectId)
+          : await ClientProject.findOne({ requestId: reqDoc._id });
+        if (reqDoc.linkedClientProjectId && !project) {
+          project = await ClientProject.findOne({ requestId: reqDoc._id });
+        }
+        const projectWasCreated = !project;
+        if (!project) {
+          const projectId = uuidv5(`project-request:${reqDoc._id}`, uuidv5.URL);
+          try {
+            project = await ClientProject.findOneAndUpdate(
+              { requestId: reqDoc._id },
+              {
+                $setOnInsert: {
+                  _id: projectId,
+                  clientUserId: reqDoc.clientUserId,
+                  clientName: reqDoc.clientName,
+                  clientEmail: reqDoc.clientEmail,
+                  clientSlug,
+                  requestId: reqDoc._id,
+                  title: reqDoc.proposal?.title || reqDoc.title,
+                  description: reqDoc.proposal?.scope || reqDoc.description,
+                  requirements: reqDoc.description,
+                  status: "in_progress",
+                  milestones: [],
+                  events: [
+                    {
+                      _id: uuidv5(
+                        `project-request-created:${reqDoc._id}`,
+                        uuidv5.URL,
+                      ),
+                      type: "created",
+                      body: "Project created from accepted proposal",
+                      actorName: reqDoc.clientName || "Client",
+                      createdAt: now,
+                    },
+                  ],
+                },
+              },
+              { new: true, upsert: true, setDefaultsOnInsert: true },
+            );
+          } catch (error) {
+            if (error?.code !== 11000) throw error;
+            project = await ClientProject.findOne({ requestId: reqDoc._id });
+          }
+        }
+        if (!project) {
+          throw apiError("Could not reconcile the accepted project", 409);
+        }
+
+        const embeddedPlan = normalizeMilestonePlan(
+          reqDoc.proposal?.milestonePlan || reqDoc.proposal?.milestones || [],
+          reqDoc.proposal?.milestonePlan || reqDoc.proposal?.milestones || [],
+        );
+        const masterProposalId = uuidv5(
+          `master-proposal:${reqDoc._id}`,
+          uuidv5.URL,
+        );
+        let masterProposal;
+        try {
+          masterProposal = await ProjectProposal.findOneAndUpdate(
+            { requestId: reqDoc._id },
             {
-              _id: uuidv4(),
-              type: "created",
-              body: "Project created from accepted proposal",
-              actorName: reqDoc.clientName || "Client",
-              createdAt: now,
+              $setOnInsert: {
+                _id: masterProposalId,
+                projectId: project._id,
+                requestId: reqDoc._id,
+                clientUserId: reqDoc.clientUserId || null,
+                kind: "master",
+                phaseNumber: 1,
+                phaseLabel: reqDoc.proposal?.phaseLabel || "Master Proposal",
+                title: reqDoc.proposal?.title || reqDoc.title,
+                scope: reqDoc.proposal?.scope || reqDoc.description || "",
+                timeline: reqDoc.proposal?.timeline || "",
+                budget: reqDoc.proposal?.budget || "",
+                status: "accepted",
+                version: Math.max(1, reqDoc.proposal?.version || 1),
+                milestonePlan: embeddedPlan,
+                revisionHistory: reqDoc.proposal?.revisionHistory || [],
+                createdByUserId: reqDoc.proposal?.createdByUserId || null,
+                sentAt: reqDoc.proposal?.sentAt || now,
+                acceptedAt: reqDoc.proposal?.acceptedAt || now,
+                rejectedAt: null,
+              },
             },
-          ],
-        });
+            { new: true, upsert: true, setDefaultsOnInsert: true },
+          );
+        } catch (error) {
+          if (error?.code !== 11000) throw error;
+          masterProposal = await ProjectProposal.findOne({
+            $or: [
+              { requestId: reqDoc._id },
+              { projectId: project._id, kind: "master" },
+            ],
+          });
+        }
+        if (!masterProposal) {
+          throw apiError("Could not reconcile the master proposal", 409);
+        }
+        await reconcileProposalMilestones(
+          project._id,
+          masterProposal,
+          reqDoc.clientName || "Client",
+        );
+
         ensureClientFolders(clientSlug).catch(() => {});
-        reqDoc.status = "approved";
-        if (reqDoc.proposal) reqDoc.proposal.acceptedAt = now;
-        reqDoc.linkedClientProjectId = project._id;
-        reqDoc.messages.push({
-          _id: uuidv4(),
-          authorName: "System",
-          authorRole: role,
-          type: "system",
-          body: "Request approved — project created.",
-          createdAt: now,
-        });
-        reqDoc.lastActivityAt = now;
-        await reqDoc.save();
-        await notifyAdmins({
-          actorId: user._id,
-          type: "request_approved",
-          title: `Proposal accepted: ${reqDoc.title}`,
-          body: `${reqDoc.clientName} accepted the proposal — project created.`,
-          link: `/admin?tab=project-requests&id=${reqDoc._id}`,
-          entityType: "request",
-          entityId: reqDoc._id,
-          email: true,
-        });
+        const requestUpdate = await ProjectRequest.updateOne(
+          { _id: reqDoc._id, status: { $ne: "approved" } },
+          {
+            $set: {
+              status: "approved",
+              linkedClientProjectId: project._id,
+              "proposal.status": "accepted",
+              "proposal.acceptedAt": masterProposal.acceptedAt || now,
+              lastActivityAt: now,
+            },
+            $push: {
+              messages: {
+                _id: uuidv4(),
+                authorName: "System",
+                authorRole: "client",
+                type: "system",
+                body: "Request approved — project created.",
+                createdAt: now,
+              },
+            },
+          },
+        );
+        if (requestUpdate.modifiedCount) {
+          await notifyAdmins({
+            actorId: user._id,
+            type: "project_proposal_accepted",
+            title: `Proposal accepted: ${reqDoc.title}`,
+            body: `${reqDoc.clientName} accepted the proposal — project created.`,
+            link: `/admin?tab=client-projects&id=${project._id}&proposal=${masterProposal._id}`,
+            entityType: "project",
+            entityId: project._id,
+            proposalId: masterProposal._id,
+            email: true,
+          });
+        }
+        const refreshedRequest = await ProjectRequest.findById(reqDoc._id);
         return NextResponse.json(
-          { projectId: project._id, request: reqDoc },
-          { status: 201, headers: getCorsHeaders() },
+          {
+            projectId: project._id,
+            proposalId: masterProposal._id,
+            request: refreshedRequest,
+          },
+          {
+            status: projectWasCreated ? 201 : 200,
+            headers: getCorsHeaders(),
+          },
         );
       }
 
       if (path[2] === "request-changes") {
+        if (!canPerformClientProposalAction(user, reqDoc)) {
+          return NextResponse.json(
+            { error: "Only the request owner can request proposal changes" },
+            { status: 403, headers: getCorsHeaders() },
+          );
+        }
+        if (reqDoc.status !== "proposal_sent" || !reqDoc.proposal?.sentAt) {
+          return NextResponse.json(
+            { error: "Changes can only be requested on a sent proposal" },
+            { status: 409, headers: getCorsHeaders() },
+          );
+        }
         if (body.body) {
           reqDoc.messages.push({
             _id: uuidv4(),
-            authorUserId: user.userId,
-            authorName: body.authorName || reqDoc.clientName || user.email,
+            authorUserId: user._id,
+            authorName: reqDoc.clientName || user.name || user.email,
             authorRole: role,
             type: "message",
             body: body.body,
@@ -1274,6 +2265,7 @@ export async function POST(request, context) {
           createdAt: now,
         });
         reqDoc.status = "discussion";
+        if (reqDoc.proposal) reqDoc.proposal.status = "changes_requested";
         reqDoc.lastActivityAt = now;
         await reqDoc.save();
         await notifyAdmins({
@@ -1304,12 +2296,27 @@ export async function POST(request, context) {
       else if (body.entityId) {
         filter.entityId = body.entityId;
         if (body.milestoneId) filter.milestoneId = body.milestoneId;
-        else if (body.excludeMilestones)
-          filter.$or = [
-            { milestoneId: "" },
-            { milestoneId: { $exists: false } },
-            { milestoneId: null },
-          ];
+        if (body.proposalId) filter.proposalId = body.proposalId;
+        const exclusions = [];
+        if (body.excludeMilestones) {
+          exclusions.push({
+            $or: [
+              { milestoneId: "" },
+              { milestoneId: { $exists: false } },
+              { milestoneId: null },
+            ],
+          });
+        }
+        if (body.excludeProposals) {
+          exclusions.push({
+            $or: [
+              { proposalId: "" },
+              { proposalId: { $exists: false } },
+              { proposalId: null },
+            ],
+          });
+        }
+        if (exclusions.length) filter.$and = exclusions;
       }
       // else: all unread for this user
       await Notification.updateMany(filter, { $set: { read: true } });
@@ -1388,7 +2395,7 @@ export async function POST(request, context) {
       const testimonial = await Testimonial.create({
         _id: uuidv4(),
         ...body,
-        userId: user?.userId || null,
+        userId: user?._id || null,
       });
       await notifyAdmins({
         actorId: user?._id,
@@ -1473,11 +2480,7 @@ export async function POST(request, context) {
       { status: 404, headers: getCorsHeaders() },
     );
   } catch (error) {
-    console.error("POST Error:", error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500, headers: getCorsHeaders() },
-    );
+    return errorResponse(error, "POST");
   }
 }
 
@@ -1489,6 +2492,196 @@ export async function PUT(request, context) {
 
   try {
     const body = await request.json();
+
+    // Audited content edit for one operational milestone. This route keeps the
+    // milestone id (and all matching task ids) stable, so existing chat links
+    // remain valid, and records a bounded before/after snapshot.
+    if (
+      path[0] === "client-projects" &&
+      path[1] &&
+      path[2] === "milestones" &&
+      path[3]
+    ) {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      if (!user.isAdmin) {
+        return NextResponse.json(
+          { error: "Forbidden" },
+          { status: 403, headers: getCorsHeaders() },
+        );
+      }
+      const project = await ClientProject.findById(path[1]);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      const milestone = (project.milestones || []).find(
+        (item) => String(item._id) === String(path[3]),
+      );
+      if (!milestone) {
+        return NextResponse.json(
+          { error: "Milestone not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      const changeSummary = cleanString(
+        body.changeSummary,
+        "changeSummary",
+        2000,
+        { required: true },
+      );
+      const sourceMessageId = cleanString(
+        body.sourceMessageId,
+        "sourceMessageId",
+        100,
+      );
+      if (sourceMessageId) {
+        const sourceMessage = await ProjectMessage.findOne({
+          _id: sourceMessageId,
+          projectId: project._id,
+          milestoneId: milestone._id,
+        });
+        if (!sourceMessage) {
+          return NextResponse.json(
+            { error: "sourceMessageId does not belong to this milestone" },
+            { status: 400, headers: getCorsHeaders() },
+          );
+        }
+      }
+
+      const requested =
+        body.milestone && typeof body.milestone === "object"
+          ? body.milestone
+          : body;
+      const currentPlain = milestone.toObject
+        ? milestone.toObject()
+        : JSON.parse(JSON.stringify(milestone));
+      const changedAt = new Date();
+      const normalized = normalizeMilestonePlan(
+        [
+          {
+            ...currentPlain,
+            ...requested,
+            _id: currentPlain._id,
+            tasks:
+              requested.tasks === undefined
+                ? currentPlain.tasks || []
+                : requested.tasks,
+            order:
+              requested.order === undefined
+                ? currentPlain.order || 0
+                : requested.order,
+          },
+        ],
+        [currentPlain],
+      )[0];
+      const nextStatus = requested.status ?? milestone.status ?? "pending";
+      if (!ITEM_STATUSES.has(nextStatus)) {
+        throw apiError("Invalid milestone status");
+      }
+      const requestedTasks = Array.isArray(requested.tasks)
+        ? requested.tasks
+        : currentPlain.tasks || [];
+      const currentTasksById = new Map(
+        (currentPlain.tasks || []).map((task) => [String(task._id), task]),
+      );
+      normalized.tasks = normalized.tasks.map((task, index) => {
+        const requestedTask = requestedTasks[index] || {};
+        const currentTask = currentTasksById.get(String(task._id));
+        const status = requestedTask.status ?? currentTask?.status ?? "pending";
+        if (!ITEM_STATUSES.has(status)) throw apiError("Invalid task status");
+        return {
+          ...task,
+          sourcePlanTaskId: currentTask?.sourcePlanTaskId || "",
+          status,
+          workStartedAt:
+            currentTask?.workStartedAt ||
+            (![undefined, null, "", "pending"].includes(currentTask?.status) ||
+            status !== "pending"
+              ? changedAt
+              : null),
+        };
+      });
+
+      const before = milestoneAuditSnapshot(milestone);
+      milestone.title = normalized.title;
+      milestone.description = normalized.description;
+      milestone.icon = normalized.icon;
+      milestone.githubBranch = normalized.githubBranch;
+      milestone.order = normalized.order;
+      milestone.status = nextStatus;
+      if (
+        !milestone.workStartedAt &&
+        (![undefined, null, "", "pending"].includes(currentPlain.status) ||
+          nextStatus !== "pending" ||
+          normalized.tasks.some((task) => task.workStartedAt))
+      ) {
+        milestone.workStartedAt = changedAt;
+      }
+      milestone.tasks = normalized.tasks;
+      milestone.revision = (milestone.revision || 0) + 1;
+      const after = milestoneAuditSnapshot(milestone);
+      if (!Array.isArray(milestone.changeHistory)) milestone.changeHistory = [];
+      milestone.changeHistory.push({
+        changedAt,
+        changedByUserId: user._id,
+        changedByName: user.name || "Admin",
+        changeSummary,
+        sourceMessageId: sourceMessageId || null,
+        before,
+        after,
+      });
+      project.events.push({
+        _id: uuidv4(),
+        type: "milestone_change_applied",
+        body: `${milestone.title}: ${changeSummary}`,
+        actorName: user.name || "Admin",
+        createdAt: changedAt,
+      });
+      project.markModified("milestones");
+      await project.save();
+
+      try {
+        await ProjectMessage.create({
+          _id: uuidv4(),
+          projectId: project._id,
+          milestoneId: milestone._id,
+          proposalId: milestone.proposalId || null,
+          authorUserId: user._id,
+          authorName: user.name || "DMDevelon",
+          authorRole: "admin",
+          messageType: "change_agreed",
+          body: changeSummary,
+          attachments: [],
+        });
+      } catch (error) {
+        // The authoritative audit lives on the milestone. A transient chat
+        // write must not make the already-applied edit look unsuccessful.
+        console.error("milestone change system message failed:", error);
+      }
+      const clientId = await resolveClientUserId(project);
+      await notifyUser({
+        userId: clientId,
+        actorId: user._id,
+        type: "milestone_change_applied",
+        title: `Milestone updated: ${milestone.title}`,
+        body: changeSummary,
+        link: `/dashboard/projects/${project._id}?m=${milestone._id}`,
+        entityType: "project",
+        entityId: project._id,
+        milestoneId: milestone._id,
+        proposalId: milestone.proposalId || "",
+        email: true,
+      });
+      return NextResponse.json(project, { headers: getCorsHeaders() });
+    }
 
     // User - update notification preferences (current user)
     if (pathStr === "user/settings") {
@@ -1581,13 +2774,46 @@ export async function PUT(request, context) {
           { status: 404, headers: getCorsHeaders() },
         );
       }
+      const update = {};
+      const stringFields = {
+        clientName: ["Client name", 200],
+        clientEmail: ["Client email", 320],
+        title: ["Project title", 200],
+        description: ["Project description", 100000],
+        requirements: ["Project requirements", 100000],
+        githubRepoUrl: ["GitHub URL", 2000],
+        livePreviewUrl: ["Live preview URL", 2000],
+        coverImageUrl: ["Cover image URL", 2000],
+        category: ["Category", 200],
+        color: ["Color", 100],
+      };
+      for (const [field, [label, max]] of Object.entries(stringFields)) {
+        if (body[field] !== undefined) {
+          update[field] = cleanString(body[field], label, max, {
+            required: field === "title",
+          });
+        }
+      }
+      if (body.clientUserId !== undefined) {
+        update.clientUserId =
+          typeof body.clientUserId === "string" ? body.clientUserId : null;
+      }
+      if (body.status !== undefined) {
+        if (!PROJECT_STATUSES.has(body.status)) throw apiError("Invalid project status");
+        update.status = body.status;
+      }
+      if (body.publishToHomepage !== undefined) {
+        if (typeof body.publishToHomepage !== "boolean") {
+          throw apiError("publishToHomepage must be a boolean");
+        }
+        update.publishToHomepage = body.publishToHomepage;
+      }
       // Publish to public portfolio: create a linked Project once.
       if (
         body.publishToHomepage &&
-        !existing.linkedProjectId &&
-        !body.linkedProjectId
+        !existing.linkedProjectId
       ) {
-        const title = body.title || existing.title;
+        const title = update.title || existing.title;
         const slug = title
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
@@ -1595,23 +2821,30 @@ export async function PUT(request, context) {
         const portfolio = await Project.create({
           _id: uuidv4(),
           title,
-          description: body.description || existing.description || title,
-          image_url: body.coverImageUrl || existing.coverImageUrl || "",
-          live_preview_url: body.livePreviewUrl || existing.livePreviewUrl || "",
-          github_url: body.githubRepoUrl || existing.githubRepoUrl || "",
-          color: body.color || existing.color || "blue",
-          category: body.category || existing.category || "Web App",
+          description: update.description || existing.description || title,
+          image_url: update.coverImageUrl || existing.coverImageUrl || "",
+          live_preview_url:
+            update.livePreviewUrl || existing.livePreviewUrl || "",
+          github_url: update.githubRepoUrl || existing.githubRepoUrl || "",
+          color: update.color || existing.color || "blue",
+          category: update.category || existing.category || "Web App",
           slug,
         });
-        body.linkedProjectId = portfolio._id;
+        update.linkedProjectId = portfolio._id;
       }
       // Reassign / renamed client -> recompute slug and ensure its folders.
-      if (body.clientName && slugify(body.clientName) !== existing.clientSlug) {
-        body.clientSlug = slugify(body.clientName);
-        ensureClientFolders(body.clientSlug).catch(() => {});
+      if (
+        update.clientName &&
+        slugify(update.clientName) !== existing.clientSlug
+      ) {
+        update.clientSlug = slugify(update.clientName);
+        ensureClientFolders(update.clientSlug).catch(() => {});
       }
-      const project = await ClientProject.findByIdAndUpdate(id, body, {
+      // Milestone content intentionally cannot be replaced by this generic
+      // endpoint; use the audited /milestones/:milestoneId route instead.
+      const project = await ClientProject.findByIdAndUpdate(id, update, {
         new: true,
+        runValidators: true,
       });
       return NextResponse.json(project, { headers: getCorsHeaders() });
     }
@@ -1632,15 +2865,56 @@ export async function PUT(request, context) {
           { status: 404, headers: getCorsHeaders() },
         );
       }
+      if (
+        reqDoc.status === "approved" ||
+        reqDoc.status === "closed" ||
+        reqDoc.proposal?.acceptedAt
+      ) {
+        return NextResponse.json(
+          { error: "An accepted or closed proposal is immutable" },
+          { status: 409, headers: getCorsHeaders() },
+        );
+      }
       const now = new Date();
+      const existingProposal = reqDoc.proposal?.toObject
+        ? reqDoc.proposal.toObject()
+        : reqDoc.proposal || {};
+      const fields = normalizeProposalFields(
+        {
+          ...body,
+          title: body.title || existingProposal.title || reqDoc.title,
+          phaseLabel: "Master Proposal",
+        },
+        {
+          ...existingProposal,
+          phaseLabel: existingProposal.phaseLabel || "Master Proposal",
+        },
+      );
+      const revisionHistory = [
+        ...(existingProposal.revisionHistory || []),
+      ];
+      if ((existingProposal.version || 0) > 0) {
+        revisionHistory.push(
+          proposalSnapshot({
+            ...existingProposal,
+            kind: "master",
+            phaseNumber: 1,
+            phaseLabel: "Master Proposal",
+            status: existingProposal.sentAt ? "sent" : existingProposal.status,
+          }),
+        );
+      }
       reqDoc.proposal = {
-        title: body.title || reqDoc.title,
-        scope: body.scope || "",
-        timeline: body.timeline || "",
-        budget: body.budget || "",
-        version: (reqDoc.proposal?.version || 0) + 1,
+        ...fields,
+        kind: "master",
+        phaseNumber: 1,
+        phaseLabel: "Master Proposal",
+        status: "sent",
+        version: (existingProposal.version || 0) + 1,
+        revisionHistory,
+        createdByUserId: existingProposal.createdByUserId || user._id,
         sentAt: now,
-        acceptedAt: reqDoc.proposal?.acceptedAt || null,
+        acceptedAt: null,
       };
       reqDoc.status = "proposal_sent";
       reqDoc.messages.push({
@@ -1837,11 +3111,7 @@ export async function PUT(request, context) {
       { status: 404, headers: getCorsHeaders() },
     );
   } catch (error) {
-    console.error("PUT Error:", error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500, headers: getCorsHeaders() },
-    );
+    return errorResponse(error, "PUT");
   }
 }
 
@@ -1916,6 +3186,7 @@ export async function DELETE(request, context) {
         );
       }
       await ProjectMessage.deleteMany({ projectId: id });
+      await ProjectProposal.deleteMany({ projectId: id });
       return NextResponse.json(
         { message: "Project deleted" },
         { headers: getCorsHeaders() },
@@ -1955,7 +3226,10 @@ export async function DELETE(request, context) {
         );
       }
       // User can delete their own testimonial, admin can delete any
-      if (!user || (testimonial.userId !== user.userId && !user.isAdmin)) {
+      if (
+        !user ||
+        (String(testimonial.userId) !== String(user._id) && !user.isAdmin)
+      ) {
         return NextResponse.json(
           { error: "Unauthorized" },
           { status: 401, headers: getCorsHeaders() },
@@ -2019,7 +3293,7 @@ export async function DELETE(request, context) {
       const user = await getUserFromRequest(request);
       const id = path[1];
       // User can delete their own account, admin can delete anyone
-      if (!user || (user.userId !== id && !user.isAdmin)) {
+      if (!user || (String(user._id) !== String(id) && !user.isAdmin)) {
         return NextResponse.json(
           { error: "Unauthorized" },
           { status: 401, headers: getCorsHeaders() },
@@ -2080,6 +3354,65 @@ export async function PATCH(request, context) {
   try {
     const body = await request.json();
 
+    // PATCH /client-projects/:projectId/proposals/:proposalId (admin draft
+    // editing only). Server-owned lifecycle and ownership fields are ignored.
+    if (
+      path[0] === "client-projects" &&
+      path[1] &&
+      path[2] === "proposals" &&
+      path[3]
+    ) {
+      const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      if (!user.isAdmin) {
+        return NextResponse.json(
+          { error: "Forbidden" },
+          { status: 403, headers: getCorsHeaders() },
+        );
+      }
+      const project = await ClientProject.findById(path[1]);
+      if (!project) {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      const proposal = await ProjectProposal.findOne({
+        _id: path[3],
+        projectId: project._id,
+      });
+      if (!proposal) {
+        return NextResponse.json(
+          { error: "Proposal not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+      if (!["draft", "changes_requested"].includes(proposal.status)) {
+        return NextResponse.json(
+          { error: "Only a draft or requested revision can be edited" },
+          { status: 409, headers: getCorsHeaders() },
+        );
+      }
+      if (proposal.status === "changes_requested") {
+        const alreadyCaptured = (proposal.revisionHistory || []).some(
+          (revision) => Number(revision.version) === Number(proposal.version),
+        );
+        if (!alreadyCaptured) {
+          proposal.revisionHistory.push(proposalSnapshot(proposal));
+        }
+        proposal.status = "draft";
+      }
+      const fields = normalizeProposalFields(body, proposal);
+      Object.assign(proposal, fields);
+      await proposal.save();
+      return NextResponse.json(proposal, { headers: getCorsHeaders() });
+    }
+
     if (path[0] === "client-projects" && path[1]) {
       const user = await getUserFromRequest(request);
       if (!user || !user.isAdmin) {
@@ -2103,6 +3436,9 @@ export async function PATCH(request, context) {
       // PATCH /client-projects/:id/status
       if (path[2] === "status") {
         if (body.status !== undefined) {
+          if (!PROJECT_STATUSES.has(body.status)) {
+            throw apiError("Invalid project status");
+          }
           project.status = body.status;
           project.events.push({
             _id: uuidv4(),
@@ -2111,6 +3447,12 @@ export async function PATCH(request, context) {
             actorName,
             createdAt: new Date(),
           });
+        }
+        if (
+          body.publishToHomepage !== undefined &&
+          typeof body.publishToHomepage !== "boolean"
+        ) {
+          throw apiError("publishToHomepage must be a boolean");
         }
         if (body.publishToHomepage !== undefined)
           project.publishToHomepage = body.publishToHomepage;
@@ -2151,9 +3493,15 @@ export async function PATCH(request, context) {
             );
           }
           const prev = t.status;
-          ["status", "title", "description", "order"].forEach((k) => {
-            if (body[k] !== undefined) t[k] = body[k];
-          });
+          if (body.status === undefined || !ITEM_STATUSES.has(body.status)) {
+            throw apiError("A valid task status is required");
+          }
+          const statusChangedAt = new Date();
+          t.status = body.status;
+          if (prev !== "pending" || body.status !== "pending") {
+            if (!t.workStartedAt) t.workStartedAt = statusChangedAt;
+            if (!m.workStartedAt) m.workStartedAt = statusChangedAt;
+          }
           const justCompleted =
             body.status === "completed" && prev !== "completed";
           if (body.status !== undefined && body.status !== prev) {
@@ -2162,7 +3510,7 @@ export async function PATCH(request, context) {
               type: "task",
               body: `Task '${t.title}' → ${String(body.status).replace("_", " ")}`,
               actorName,
-              createdAt: new Date(),
+              createdAt: statusChangedAt,
             });
           }
           project.markModified("milestones");
@@ -2186,11 +3534,17 @@ export async function PATCH(request, context) {
 
         // Milestone-level update
         const prev = m.status;
-        ["status", "title", "description", "icon", "order", "githubBranch"].forEach(
-          (k) => {
-            if (body[k] !== undefined) m[k] = body[k];
-          },
-        );
+        if (body.status === undefined || !ITEM_STATUSES.has(body.status)) {
+          throw apiError("A valid milestone status is required");
+        }
+        const statusChangedAt = new Date();
+        m.status = body.status;
+        if (
+          (prev !== "pending" || body.status !== "pending") &&
+          !m.workStartedAt
+        ) {
+          m.workStartedAt = statusChangedAt;
+        }
         const justCompleted =
           body.status === "completed" && prev !== "completed";
         if (body.status !== undefined && body.status !== prev) {
@@ -2199,7 +3553,7 @@ export async function PATCH(request, context) {
             type: "milestone",
             body: `Milestone '${m.title}' → ${String(body.status).replace("_", " ")}`,
             actorName,
-            createdAt: new Date(),
+            createdAt: statusChangedAt,
           });
         }
         project.markModified("milestones");
@@ -2239,6 +3593,16 @@ export async function PATCH(request, context) {
         );
       }
       const now = new Date();
+      const allowedStatuses = new Set(["new", "discussion", "closed"]);
+      if (!allowedStatuses.has(body.status)) {
+        return NextResponse.json(
+          {
+            error:
+              "This request status is controlled by the proposal lifecycle",
+          },
+          { status: 409, headers: getCorsHeaders() },
+        );
+      }
       reqDoc.status = body.status;
       reqDoc.messages.push({
         _id: uuidv4(),
@@ -2272,10 +3636,6 @@ export async function PATCH(request, context) {
       { status: 404, headers: getCorsHeaders() },
     );
   } catch (error) {
-    console.error("PATCH Error:", error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500, headers: getCorsHeaders() },
-    );
+    return errorResponse(error, "PATCH");
   }
 }
