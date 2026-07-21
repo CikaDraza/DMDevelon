@@ -19,7 +19,8 @@ import {
   Briefcase,
   MessageSquare,
   Settings,
-  LogOut,  Star,
+  LogOut,
+  Star,
   Plus,
   Edit,
   Trash2,
@@ -371,7 +372,11 @@ function DashboardInner() {
       <header className="bg-[#1a1a1b] border-b border-white/10 px-3 lg:px-6 py-4">
         <div className="container mx-auto flex items-center justify-between px-1 lg:px-3">
           <a href="/" className="flex items-center lg:gap-3">
-            <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
+            <img
+              src="/icons/dmd-logo.png"
+              alt="DMDevelon"
+              className="h-8 w-auto"
+            />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
               <p className="text-xs text-gray-400">Client Dashboard</p>
@@ -681,7 +686,7 @@ function DashboardInner() {
 
             {activeTab === "testimonials" && (
               <div>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col md:flex-row items-start px-4 md:px-0 md:items-center justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold text-white">
                       My Testimonials
@@ -702,7 +707,7 @@ function DashboardInner() {
                       });
                       setIsTestimonialModalOpen(true);
                     }}
-                    className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
+                    className="mt-4 md:mt-0 bg-[#FFB633] text-black hover:bg-[#e5a32e]"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Leave Testimonial
