@@ -380,30 +380,12 @@ function DashboardInner() {
           <div className="flex items-center gap-4">
             <NotificationBell />
             <Link
-              href="/dashboard/settings"
-              className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"
-              aria-label="Settings"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Settings</span>
-            </Link>
-            <Link
               href="/"
               className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"
             >
               <Home className="w-4 h-4" />
               <span className="hidden sm:inline">Home</span>
             </Link>
-            {user.isAdmin && (
-              <Link
-                href="/admin"
-                className="text-gray-400 hover:text-[#FFB633] transition-colors flex items-center gap-2"
-                aria-label="Admin panel"
-              >
-                <Shield className="w-4 h-4" />
-                <span className="hidden sm:inline">Admin</span>
-              </Link>
-            )}
             <Button
               onClick={handleLogout}
               variant="outline"
@@ -492,6 +474,22 @@ function DashboardInner() {
                 <MessageSquare className="w-5 h-5" />
                 <span>Testimonials</span>
               </button>
+              <Link
+                href="/dashboard/settings"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+              >
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </Link>
+              {user.isAdmin && (
+                <Link
+                  href="/admin"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-white/5 hover:text-[#FFB633] transition-colors"
+                >
+                  <Shield className="w-5 h-5" />
+                  <span>Admin Panel</span>
+                </Link>
+              )}
             </nav>
           </div>
 
