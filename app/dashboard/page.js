@@ -502,7 +502,7 @@ function DashboardInner() {
           <div className="lg:col-span-3">
             {activeTab === "services" && (
               <div>
-                <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+                <div className="px-4 md:px-0 flex items-center justify-between mb-6 gap-4 flex-wrap">
                   <div>
                     <h2 className="text-2xl font-bold text-white">
                       My Projects
