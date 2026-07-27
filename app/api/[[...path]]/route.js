@@ -21,8 +21,10 @@ import {
 import {
   hashPassword,
   comparePassword,
-  generateToken,
+  generateAccessToken,
+  generateRefreshToken,
   getUserFromRequest,
+  verifyToken,
 } from "@/lib/auth";
 import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
 import { randomBytes } from "crypto";
@@ -57,6 +59,92 @@ function getCorsHeaders() {
   };
 }
 
+const REFRESH_COOKIE_NAME = "dmdevelon_refresh";
+const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+
+function authUserPayload(user) {
+  return {
+    id: user._id,
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    isAdmin: user.isAdmin,
+    image: user.image,
+    emailVerified: user.emailVerified,
+  };
+}
+
+function authTokenPayload(user) {
+  return {
+    userId: user._id,
+    email: user.email,
+    isAdmin: user.isAdmin,
+    sessionVersion: Number(user.sessionVersion || 0),
+  };
+}
+
+function setRefreshCookie(response, token) {
+  response.cookies.set({
+    name: REFRESH_COOKIE_NAME,
+    value: token,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: REFRESH_COOKIE_MAX_AGE,
+  });
+  return response;
+}
+
+function clearRefreshCookie(response) {
+  response.cookies.set({
+    name: REFRESH_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
+}
+
+function createSessionResponse(user, { status = 200 } = {}) {
+  const response = NextResponse.json(
+    {
+      token: generateAccessToken(authTokenPayload(user)),
+      user: authUserPayload(user),
+    },
+    { status, headers: getCorsHeaders() },
+  );
+  return setRefreshCookie(
+    response,
+    generateRefreshToken(authTokenPayload(user)),
+  );
+}
+
+async function getRefreshSessionUser(request) {
+  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+  const decoded = refreshToken ? verifyToken(refreshToken) : null;
+  if (
+    !decoded ||
+    decoded.tokenType !== "refresh" ||
+    !decoded.userId
+  ) {
+    return null;
+  }
+  const user = await User.findById(decoded.userId).select(
+    "-password -verifyToken -resetToken -resetTokenExpiry",
+  );
+  if (
+    !user ||
+    Number(decoded.sessionVersion) !== Number(user.sessionVersion || 0)
+  ) {
+    return null;
+  }
+  return user;
+}
+
 // Admin gets full access; client only to their own projects (by id or email).
 function canAccessClientProject(user, project) {
   return canAccessClientEntity(user, project);
@@ -78,6 +166,13 @@ const PROJECT_STATUSES = new Set([
   "in_progress",
   "completed",
   "on_hold",
+  "cancelled",
+  "deleted",
+]);
+const TERMINAL_PROJECT_STATUSES = new Set([
+  "completed",
+  "cancelled",
+  "deleted",
 ]);
 
 function apiError(message, status = 400) {
@@ -858,6 +953,41 @@ export async function POST(request, context) {
       return NextResponse.json(result, { headers: getCorsHeaders() });
     }
 
+    // Auth - Refresh access token from the HttpOnly refresh cookie. The
+    // browser never exposes this cookie to JavaScript.
+    if (pathStr === "auth/refresh") {
+      const user = await getRefreshSessionUser(request);
+      if (!user) {
+        const response = NextResponse.json(
+          { error: "Session expired" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+        return clearRefreshCookie(response);
+      }
+      return NextResponse.json(
+        {
+          token: generateAccessToken(authTokenPayload(user)),
+          user: authUserPayload(user),
+        },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // Auth - Logout invalidates the current token family and clears the
+    // HttpOnly refresh cookie, including when the access token has expired.
+    if (pathStr === "auth/logout") {
+      const user = await getRefreshSessionUser(request);
+      if (user) {
+        user.sessionVersion = Number(user.sessionVersion || 0) + 1;
+        await user.save();
+      }
+      const response = NextResponse.json(
+        { message: "Logged out" },
+        { headers: getCorsHeaders() },
+      );
+      return clearRefreshCookie(response);
+    }
+
     // Auth - Register
     if (pathStr === "auth/register") {
       const { name, email, password } = body;
@@ -901,24 +1031,7 @@ export async function POST(request, context) {
         console.error("Failed to send verification email:", error);
       }
 
-      const token = generateToken({
-        userId: user._id,
-        email: user.email,
-        isAdmin: user.isAdmin,
-      });
-      return NextResponse.json(
-        {
-          token,
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-            emailVerified: user.emailVerified,
-          },
-        },
-        { headers: getCorsHeaders() },
-      );
+      return createSessionResponse(user, { status: 201 });
     }
 
     // Auth - Login
@@ -944,25 +1057,7 @@ export async function POST(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
-      const token = generateToken({
-        userId: user._id,
-        email: user.email,
-        isAdmin: user.isAdmin,
-      });
-      return NextResponse.json(
-        {
-          token,
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-            image: user.image,
-            emailVerified: user.emailVerified,
-          },
-        },
-        { headers: getCorsHeaders() },
-      );
+      return createSessionResponse(user);
     }
 
     // Auth - Forgot password (always returns 200, no user enumeration)
@@ -1017,6 +1112,7 @@ export async function POST(request, context) {
       user.password = hashPassword(password);
       user.resetToken = null;
       user.resetTokenExpiry = null;
+      user.sessionVersion = Number(user.sessionVersion || 0) + 1;
       await user.save();
       return NextResponse.json(
         { message: "Password updated. You can now sign in." },
@@ -3166,11 +3262,13 @@ export async function PUT(request, context) {
       }
       // Don't allow changing email while an active project relies on it for
       // ownership matching (keeps client projects from being orphaned).
+      let targetUser = null;
       if (body.email !== undefined) {
         const target = await User.findById(id);
+        targetUser = target;
         if (target && body.email !== target.email) {
           const activeProjects = await ClientProject.countDocuments({
-            status: { $ne: "completed" },
+            status: { $nin: [...TERMINAL_PROJECT_STATUSES] },
             $or: [{ clientUserId: id }, { clientEmail: target.email }],
           });
           if (activeProjects > 0) {
@@ -3181,6 +3279,10 @@ export async function PUT(request, context) {
       // Hash password if being updated
       if (body.password) {
         body.password = hashPassword(body.password);
+        targetUser = targetUser || (await User.findById(id));
+        if (targetUser) {
+          body.sessionVersion = Number(targetUser.sessionVersion || 0) + 1;
+        }
       }
       const updatedUser = await User.findByIdAndUpdate(id, body, {
         new: true,
@@ -3266,17 +3368,31 @@ export async function DELETE(request, context) {
         );
       }
       const id = path[1];
-      const project = await ClientProject.findByIdAndDelete(id);
+      const project = await ClientProject.findById(id);
       if (!project) {
         return NextResponse.json(
           { error: "Project not found" },
           { status: 404, headers: getCorsHeaders() },
         );
       }
-      await ProjectMessage.deleteMany({ projectId: id });
-      await ProjectProposal.deleteMany({ projectId: id });
+      // Preserve the project, its milestones, messages and proposal snapshots
+      // in the client's history until the client deletes their account.
+      if (project.status !== "deleted") {
+        project.status = "deleted";
+        project.deletedAt = new Date();
+        project.deletedByUserId = String(user._id);
+        project.deletedByName = user.name || "Admin";
+        project.events.push({
+          _id: uuidv4(),
+          type: "deleted",
+          body: "Project moved to deleted history",
+          actorName: user.name || "Admin",
+          createdAt: project.deletedAt,
+        });
+        await project.save();
+      }
       return NextResponse.json(
-        { message: "Project deleted" },
+        { message: "Project moved to deleted history", project },
         { headers: getCorsHeaders() },
       );
     }
@@ -3391,7 +3507,7 @@ export async function DELETE(request, context) {
       // doesn't become orphaned. Admin must reassign it first.
       const target = await User.findById(id);
       const activeProjects = await ClientProject.countDocuments({
-        status: { $ne: "completed" },
+        status: { $nin: [...TERMINAL_PROJECT_STATUSES] },
         $or: [
           { clientUserId: id },
           ...(target?.email ? [{ clientEmail: target.email }] : []),

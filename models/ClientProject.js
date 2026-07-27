@@ -104,9 +104,21 @@ const ClientProjectSchema = new mongoose.Schema(
     requirements: { type: String, default: '' },
     status: {
       type: String,
-      enum: ['planning', 'in_progress', 'completed', 'on_hold'],
+      // Keep terminal engagements in the same client-visible history.  A
+      // deleted project is deliberately a soft deletion, not a lost record.
+      enum: [
+        'planning',
+        'in_progress',
+        'completed',
+        'on_hold',
+        'cancelled',
+        'deleted',
+      ],
       default: 'in_progress',
     },
+    deletedAt: { type: Date, default: null },
+    deletedByUserId: { type: String, default: null },
+    deletedByName: { type: String, default: '' },
     // Showcase fields (used when published to homepage)
     githubRepoUrl: { type: String, default: '' },
     livePreviewUrl: { type: String, default: '' },

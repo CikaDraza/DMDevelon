@@ -3,6 +3,103 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
+const SESSION_CHANGED_EVENT = "dmdevelon:session-changed";
+const SESSION_CLEARED_EVENT = "dmdevelon:session-cleared";
+let refreshPromise = null;
+let authInterceptorInstalled = false;
+
+function readStoredSession() {
+  try {
+    const token = localStorage.getItem("token");
+    const rawUser = localStorage.getItem("user");
+    return { token, user: rawUser ? JSON.parse(rawUser) : null };
+  } catch {
+    return { token: null, user: null };
+  }
+}
+
+function announceSessionChange() {
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
+}
+
+function clearStoredSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  announceSessionChange();
+  window.dispatchEvent(new Event(SESSION_CLEARED_EVENT));
+}
+
+function storeSession(token, user) {
+  localStorage.setItem("token", token);
+  localStorage.setItem("user", JSON.stringify(user));
+  announceSessionChange();
+}
+
+// All existing API calls use axios directly. Install one interceptor on that
+// shared client so every protected area (client dashboard and admin alike)
+// transparently receives a renewed access token after a 401.
+function installAuthRefreshInterceptor() {
+  if (authInterceptorInstalled || typeof window === "undefined") return;
+  authInterceptorInstalled = true;
+
+  axios.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const request = error.config;
+      const status = error.response?.status;
+      const url = String(request?.url || "");
+      // auth/me is intentionally *not* skipped: it is the first protected
+      // request on app load and must be able to renew an expired access token.
+      const skipRefresh =
+        request._dmdevelonSkipRefresh ||
+        [
+          "/api/auth/refresh",
+          "/api/auth/login",
+          "/api/auth/register",
+          "/api/auth/logout",
+          "/api/auth/forgot-password",
+          "/api/auth/reset-password",
+          "/api/auth/verify-email",
+        ].some((path) => url.includes(path));
+
+      if (!request || status !== 401 || skipRefresh) {
+        return Promise.reject(error);
+      }
+
+      if (request._dmdevelonSessionRetried) {
+        return Promise.reject(error);
+      }
+      request._dmdevelonSessionRetried = true;
+
+      try {
+        if (!refreshPromise) {
+          refreshPromise = axios
+            .post("/api/auth/refresh", {}, { _dmdevelonSkipRefresh: true })
+            .then((response) => {
+              if (!response.data?.token || !response.data?.user) {
+                throw new Error("Invalid refresh response");
+              }
+              storeSession(response.data.token, response.data.user);
+              return response.data.token;
+            })
+            .finally(() => {
+              refreshPromise = null;
+            });
+        }
+        const token = await refreshPromise;
+        request.headers = {
+          ...(request.headers || {}),
+          Authorization: `Bearer ${token}`,
+        };
+        return axios(request);
+      } catch (refreshError) {
+        clearStoredSession();
+        return Promise.reject(error);
+      }
+    },
+  );
+}
+
 function readAsDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -29,7 +126,7 @@ export function useAuth() {
       });
       const fresh = res.data;
       if (fresh && fresh._id) {
-        localStorage.setItem("user", JSON.stringify(fresh));
+        storeSession(currentToken, fresh);
         setUser(fresh);
         return fresh;
       }
@@ -40,22 +137,26 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
+    installAuthRefreshInterceptor();
+    const syncSession = () => {
+      const stored = readStoredSession();
+      setToken(stored.token || null);
+      setUser(stored.token && stored.user ? stored.user : null);
+    };
+    window.addEventListener(SESSION_CHANGED_EVENT, syncSession);
+    const { token: storedToken } = readStoredSession();
+    syncSession();
     setLoading(false);
-    // Background re-sync with the server (clears a stale verify banner, etc.)
+    // Background re-sync also renews the access token through the interceptor
+    // when the short-lived access token has expired.
     if (storedToken) refreshUser();
+    return () => window.removeEventListener(SESSION_CHANGED_EVENT, syncSession);
   }, [refreshUser]);
 
   const login = useCallback(async (email, password) => {
     const response = await axios.post("/api/auth/login", { email, password });
     const { token: newToken, user: userData } = response.data;
-    localStorage.setItem("token", newToken);
-    localStorage.setItem("user", JSON.stringify(userData));
+    storeSession(newToken, userData);
     setToken(newToken);
     setUser(userData);
     return userData;
@@ -68,16 +169,29 @@ export function useAuth() {
       password,
     });
     const { token: newToken, user: userData } = response.data;
-    localStorage.setItem("token", newToken);
-    localStorage.setItem("user", JSON.stringify(userData));
+    storeSession(newToken, userData);
     setToken(newToken);
     setUser(userData);
     return userData;
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    const currentToken = localStorage.getItem("token");
+    // Deliberately non-blocking: the UI signs out immediately, while the
+    // server invalidates the refresh-token family and clears its cookie.
+    axios
+      .post(
+        "/api/auth/logout",
+        {},
+        {
+          headers: currentToken
+            ? { Authorization: `Bearer ${currentToken}` }
+            : {},
+          _dmdevelonSkipRefresh: true,
+        },
+      )
+      .catch(() => {});
+    clearStoredSession();
     setToken(null);
     setUser(null);
   }, []);

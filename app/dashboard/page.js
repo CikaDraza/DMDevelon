@@ -316,14 +316,21 @@ function DashboardInner() {
   const statusBadgeClass = (status) =>
     status === "completed"
       ? "bg-green-500/20 text-green-400"
+      : status === "cancelled"
+        ? "bg-red-500/20 text-red-300"
+        : status === "deleted"
+          ? "bg-gray-500/20 text-gray-300"
       : status === "in_progress"
         ? "bg-blue-500/20 text-blue-400"
         : status === "on_hold"
           ? "bg-yellow-500/20 text-yellow-400"
           : "bg-purple-500/20 text-purple-300";
 
-  // Client can't delete account while a project is still active (avoids orphans)
-  const hasActiveProject = clientProjects.some((p) => p.status !== "completed");
+  // Terminal projects stay visible as history and must not prevent the client
+  // from deleting their account.
+  const hasActiveProject = clientProjects.some(
+    (p) => !["completed", "cancelled", "deleted"].includes(p.status),
+  );
 
   const REQUEST_STATUS = {
     new: {
@@ -608,11 +615,11 @@ function DashboardInner() {
                       </div>
                     )}
 
-                    {/* Active / completed projects */}
+                    {/* Active projects and retained client history */}
                     {clientProjects.length > 0 && (
                       <div>
                         <h3 className="text-lg font-semibold text-white mb-3">
-                          Projects
+                          Projects &amp; history
                         </h3>
                         <div className="space-y-4">
                           {clientProjects.map((project) => {

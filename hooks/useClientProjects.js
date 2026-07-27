@@ -148,16 +148,28 @@ export function useClientProjects() {
 
 // Single project by id (used on the detail page).
 export function useClientProject(id) {
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, loading: authLoading, token } = useAuth();
   return useQuery({
     queryKey: ['client-projects', id],
-    enabled: !!id,
+    // Do not issue an unauthenticated request while the client auth state is
+    // still hydrating. The project endpoint itself is the sole source of truth
+    // for whether this exact ID exists; the dashboard list is never used to
+    // decide that.
+    enabled: !!id && !authLoading && !!token,
     queryFn: async () => {
       const res = await axios.get(`/api/client-projects/${id}`, {
         headers: getAuthHeaders(),
       });
       return res.data;
     },
+    // A 404 is definitive. Network/server failures are retried before the UI
+    // presents its explicit Refresh action.
+    retry: (failureCount, error) => {
+      const status = error?.response?.status;
+      if (status === 404 || status === 401 || status === 403) return false;
+      return failureCount < 2;
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
   });
 }
 

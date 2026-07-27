@@ -63,6 +63,8 @@ const STATUS_BADGE = {
   in_progress: "bg-blue-500/20 text-blue-400",
   on_hold: "bg-yellow-500/20 text-yellow-400",
   completed: "bg-green-500/20 text-green-400",
+  cancelled: "bg-red-500/20 text-red-300",
+  deleted: "bg-gray-500/20 text-gray-300",
 };
 
 const ITEM_ICON = {
@@ -148,7 +150,7 @@ function ClientProjectDetailInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const { data: project, isLoading, error } = useClientProject(id);
+  const { data: project, isLoading, error, refetch } = useClientProject(id);
   const { updateMilestoneAgreed } = useClientProjects();
   const {
     proposals,
@@ -442,13 +444,47 @@ function ClientProjectDetailInner() {
     );
   }
 
-  if (error || !project) {
+  // Only the authoritative single-project endpoint can say the ID is absent.
+  // Any other failed request is recoverable and must never be presented as a
+  // missing project.
+  const projectMissing = error?.response?.status === 404;
+
+  if (projectMissing) {
     return (
       <div className="min-h-screen bg-[#0f0f10] flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-400">Project not found or access denied.</p>
+        <p className="text-gray-400">Project not found.</p>
         <Link href="/dashboard" className="text-[#FFB633] hover:underline">
           Back to dashboard
         </Link>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#0f0f10] flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-gray-300">We couldn&apos;t load this project right now.</p>
+        <p className="text-sm text-gray-500">
+          The project may still exist. Please refresh and try again.
+        </p>
+        <Button
+          type="button"
+          onClick={() => refetch()}
+          className="bg-[#FFB633] text-black hover:bg-[#e5a32e]"
+        >
+          <RotateCcw className="mr-2 h-4 w-4" />
+          Refresh project
+        </Button>
+      </div>
+    );
+  }
+
+  // This also covers the brief interval before an authenticated query becomes
+  // enabled. Never infer a missing project from an empty client cache.
+  if (!user || !project) {
+    return (
+      <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center">
+        <div className="text-white">Loading…</div>
       </div>
     );
   }

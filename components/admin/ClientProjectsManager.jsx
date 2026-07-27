@@ -64,6 +64,8 @@ const STATUS_BADGE = {
   in_progress: "bg-blue-500/20 text-blue-400",
   on_hold: "bg-yellow-500/20 text-yellow-400",
   completed: "bg-green-500/20 text-green-400",
+  cancelled: "bg-red-500/20 text-red-300",
+  deleted: "bg-gray-500/20 text-gray-300",
 };
 
 const ITEM_STATUS = ["pending", "in_progress", "completed"];
@@ -660,10 +662,10 @@ export default function ClientProjectsManager({
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this client project and its conversations?")) return;
+    if (!confirm("Move this client project to the client's deleted history?")) return;
     try {
       await deleteProject.mutateAsync(id);
-      toast.success("Project deleted");
+      toast.success("Project moved to deleted history");
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to delete");
     }
@@ -1037,6 +1039,7 @@ export default function ClientProjectsManager({
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="on_hold">On Hold</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>

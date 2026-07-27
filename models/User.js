@@ -19,6 +19,8 @@ const UserSchema = new mongoose.Schema(
     verifyToken: { type: String },
     resetToken: { type: String },
     resetTokenExpiry: { type: Date },
+    // Incrementing this invalidates all issued access/refresh token pairs.
+    sessionVersion: { type: Number, default: 0 },
   },
   { timestamps: true, _id: false }
 );
