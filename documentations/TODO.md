@@ -514,8 +514,13 @@ Posle korisnikovog uživo korišćenja: „handoff je konfuzan, ne zna se gde id
 - [x] Admin panel header — `overflow-hidden` + `gap-2 lg:gap-4` + `hidden sm:inline` na `Welcome, {name}` + `shrink-0` na kritičnim elementima — sprečava horizontalni scroll na mobilnom
 - [x] Mobilni composer textarea: `rows={3}` na mobilnom, `rows={1}` na desktopu — `useEffect` sa `matchMedia("(max-width: 767px)")`
 - [x] Mobilni Flag submenu (`DropdownMenuSubContent`): `side="top" align="end"` — meni ide ka gore od Flag dugmeta, donja ivica poravnata
+- [x] Hydration mismatch warning (`cz-shortcut-listen="true"`) — **nije bug u kodu**: ColorZilla browser ekstenzija ubacuje atribut na `<body>` pre nego što React hidrira. `suppressHydrationWarning` na `<html>` i `<body>` u `app/layout.js`
 
 Sintaksno provereno; `npm test` 161/161. **Uživo nije testirano — korisnik testira u dev modu.**
+
+- [x] Proxy download endpoint `GET /api/download` + prošireni tipovi fajlova (PDF/DOC/DOCX/TXT) + download slika na uređaj putem proxy-ja — **potvrdio korisnik**: slike rade kroz proxy, PDF/DOC/DOCX/TXT koriste Cloudinary Admin API signed URL fallback (`cloudinary.utils.private_download_url`) jer "Restricted media types" blokira `image/upload` za ne-slikovne formate. Upload endpoint proširen da prihvata DOC/DOCX/TXT i koristi `uploadRawToCloudinary` (`resource_type: "raw"`) za sve ne-slikovne fajlove — novi fajlovi dobijaju `/raw/upload` putanju koja nije blokirana
+- [x] Mobilni tri tačkice (`⋮`) pored poruka — `md:opacity-0 md:group-hover:opacity-100` umesto `opacity-0 group-hover:opacity-100`, tako da su na mobilnom uvek vidljive a na desktopu se i dalje pojavljuju na hover
+- [-] Chat workspace visina — zamenjen `h-[calc(100vh-220px)]` u `ProjectChat.jsx` sa `h-full`; roditeljski kontejneri (`app/admin/page.js`, `app/dashboard/page.js`) sada koriste `h-dvh flex flex-col` + `shrink-0` na headeru + `flex-1 min-h-0` na `<main>`/content oblasti tako da chat prirodno ispuni sav raspoloživ prostor. Dashboard koristi uslovne klase (`activeTab === "chat" ? flex-1 min-h-0 : container mx-auto`) da ne polomi izgled ostalih tabova. Čeka korisnikovu potvrdu posle testiranja
 
 ---
 

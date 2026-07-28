@@ -38,6 +38,10 @@ const FLAG_OPTIONS = [
 
 const MAX_TEXTAREA_HEIGHT = 200;
 
+// File extensions the composer also accepts when the browser does not report
+// a MIME type (common on mobile, or for .doc/.docx on some OS configs).
+const ALLOWED_FILE_EXTENSIONS = [".pdf", ".doc", ".docx", ".txt"];
+
 /**
  * `flag`/`search` are passed through only so this component's own
  * useChatMessages(channelId, {flag, q}) call resolves to the SAME query key
@@ -121,15 +125,42 @@ export function MessageComposer({
     setUploading(true);
     try {
       for (const file of files) {
+        const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
         const allowed =
-          file.type.startsWith("image/") || file.type === "application/pdf";
+          file.type.startsWith("image/") ||
+          file.type === "application/pdf" ||
+          file.type ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+          file.type === "application/msword" ||
+          file.type === "text/plain" ||
+          ALLOWED_FILE_EXTENSIONS.includes(ext);
         if (!allowed) {
-          toast.error("Only images and PDF files are allowed");
+          toast.error("Only images, PDF, DOC/DOCX, and TXT files are allowed");
           continue;
         }
         if (file.size > 10 * 1024 * 1024) {
           toast.error(`${file.name} is larger than 10MB`);
           continue;
+        }
+        // Derive attachment `type` from MIME when available; fall back to
+        // extension when the browser doesn't report MIME (mobile, some .doc).
+        let uploadType;
+        if (file.type.startsWith("image/")) {
+          uploadType = "image";
+        } else if (file.type === "application/pdf" || ext === ".pdf") {
+          uploadType = "pdf";
+        } else if (
+          file.type ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+          file.type === "application/msword" ||
+          ext === ".doc" ||
+          ext === ".docx"
+        ) {
+          uploadType = "doc";
+        } else if (ext === ".txt") {
+          uploadType = "txt";
+        } else {
+          uploadType = "pdf"; // safe fallback
         }
         const dataUri = await readAsDataURL(file);
         const result = await uploadAttachment.mutateAsync({
@@ -137,7 +168,7 @@ export function MessageComposer({
           name: file.name,
           projectId,
         });
-        setPending((prev) => [...prev, result]);
+        setPending((prev) => [...prev, { ...result, type: uploadType }]);
       }
     } catch (err) {
       toast.error(err.response?.data?.error || "Upload failed");
@@ -225,7 +256,7 @@ export function MessageComposer({
         <input
           ref={fileRef}
           type="file"
-          accept="image/*,application/pdf"
+          accept="image/*,.pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
           multiple
           onChange={handleFiles}
           className="hidden"

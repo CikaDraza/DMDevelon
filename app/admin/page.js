@@ -2492,7 +2492,7 @@ function AdminPageInner() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f10]">
+    <div className="h-dvh flex flex-col bg-[#0f0f10]">
       <PushManager />
       <AdminSidebar
         activeTab={activeTab}
@@ -2504,9 +2504,9 @@ function AdminPageInner() {
       />
 
       {/* Main Content */}
-      <div className="lg:ml-64">
+      <div className="lg:ml-64 h-dvh flex flex-col">
         {/* Top Bar */}
-        <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4 overflow-hidden">
+        <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4 overflow-hidden shrink-0">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setIsMobileOpen(true)}
@@ -2533,8 +2533,9 @@ function AdminPageInner() {
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="p-6">{renderContent()}</main>
+        {/* Page Content — flex-1 fills the remaining viewport below the header
+             so the chat panel can stretch all the way down with h-full. */}
+        <main className="flex-1 min-h-0 p-4 lg:p-6">{renderContent()}</main>
       </div>
     </div>
   );

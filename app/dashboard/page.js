@@ -327,11 +327,11 @@ function DashboardInner() {
         ? "bg-red-500/20 text-red-300"
         : status === "deleted"
           ? "bg-gray-500/20 text-gray-300"
-      : status === "in_progress"
-        ? "bg-blue-500/20 text-blue-400"
-        : status === "on_hold"
-          ? "bg-yellow-500/20 text-yellow-400"
-          : "bg-purple-500/20 text-purple-300";
+          : status === "in_progress"
+            ? "bg-blue-500/20 text-blue-400"
+            : status === "on_hold"
+              ? "bg-yellow-500/20 text-yellow-400"
+              : "bg-purple-500/20 text-purple-300";
 
   // Terminal projects stay visible as history and must not prevent the client
   // from deleting their account.
@@ -384,11 +384,11 @@ function DashboardInner() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f10]">
+    <div className="h-dvh flex flex-col bg-[#0f0f10]">
       <PushManager />
       <PWAInstallBanner />
       {/* Header */}
-      <header className="bg-[#1a1a1b] border-b border-white/10 px-3 lg:px-6 py-4">
+      <header className="bg-[#1a1a1b] border-b border-white/10 px-3 lg:px-6 py-4 shrink-0">
         <div className="container mx-auto flex items-center justify-between px-1 lg:px-3">
           <a href="/" className="flex items-center lg:gap-3">
             <img
@@ -446,8 +446,20 @@ function DashboardInner() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div
+        className={
+          activeTab === "chat"
+            ? "flex-1 min-h-0 flex flex-col px-4 py-4"
+            : "container mx-auto px-4 py-8"
+        }
+      >
+        <div
+          className={
+            activeTab === "chat"
+              ? "flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-8"
+              : "grid grid-cols-1 lg:grid-cols-4 gap-8"
+          }
+        >
           {/* Sidebar */}
           <div className="lg:col-span-1">
             {/* User Info Card */}
@@ -532,7 +544,13 @@ function DashboardInner() {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3">
+          <div
+            className={
+              activeTab === "chat"
+                ? "lg:col-span-3 flex flex-col min-h-0"
+                : "lg:col-span-3"
+            }
+          >
             {activeTab === "services" && (
               <div>
                 <div className="px-4 md:px-0 flex items-center justify-between mb-6 gap-4 flex-wrap">

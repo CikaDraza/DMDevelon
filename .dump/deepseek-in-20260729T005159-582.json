@@ -1,0 +1,7 @@
+{
+  "model": "deepseek-v4-pro",
+  "receivedAt": "2026-07-28T22:51:59.582Z",
+  "sseData": [
+    "data: {\"id\":\"20b14f09-a771-40e7-a71e-ad12eeb64e1e\",\"object\":\"chat.completion.chunk\",\"created\":1785279083,\"model\":\"deepseek-v4-pro\",\"system_fingerprint\":\"fp_9954b31ca7_prod0820_fp8_kvcache_20260402\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":null,\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":null}],\"usage\":null}"
+  ]
+}

@@ -46,22 +46,49 @@ export function MilestoneChat({
     setUploading(true);
     try {
       for (const file of files) {
+        const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
         const allowed =
-          file.type.startsWith("image/") || file.type === "application/pdf";
+          file.type.startsWith("image/") ||
+          file.type === "application/pdf" ||
+          file.type ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+          file.type === "application/msword" ||
+          file.type === "text/plain" ||
+          [".pdf", ".doc", ".docx", ".txt"].includes(ext);
         if (!allowed) {
-          toast.error("Only images and PDF files are allowed");
+          toast.error("Only images, PDF, DOC/DOCX, and TXT files are allowed");
           continue;
         }
         if (file.size > 10 * 1024 * 1024) {
           toast.error(`${file.name} is larger than 10MB`);
           continue;
         }
+        // Derive attachment `type` from MIME when available; fall back to
+        // extension when the browser doesn't report MIME.
+        let uploadType;
+        if (file.type.startsWith("image/")) {
+          uploadType = "image";
+        } else if (file.type === "application/pdf" || ext === ".pdf") {
+          uploadType = "pdf";
+        } else if (
+          file.type ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+          file.type === "application/msword" ||
+          ext === ".doc" ||
+          ext === ".docx"
+        ) {
+          uploadType = "doc";
+        } else if (ext === ".txt") {
+          uploadType = "txt";
+        } else {
+          uploadType = "pdf";
+        }
         const dataUri = await readAsDataURL(file);
         const result = await uploadAttachment.mutateAsync({
           file: dataUri,
           name: file.name,
         });
-        setPending((prev) => [...prev, result]);
+        setPending((prev) => [...prev, { ...result, type: uploadType }]);
       }
     } catch (err) {
       toast.error(err.response?.data?.error || "Upload failed");
@@ -129,7 +156,8 @@ export function MilestoneChat({
                   )}
                 >
                   <p className="text-[10px] opacity-70 mb-0.5">
-                    {m.authorName || (m.authorRole === "admin" ? "Admin" : "Client")}
+                    {m.authorName ||
+                      (m.authorRole === "admin" ? "Admin" : "Client")}
                   </p>
                   {type === "question" && (
                     <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -263,7 +291,7 @@ export function MilestoneChat({
         <input
           ref={fileRef}
           type="file"
-          accept="image/*,application/pdf"
+          accept="image/*,.pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
           multiple
           onChange={handleFiles}
           className="hidden"
@@ -295,7 +323,9 @@ export function MilestoneChat({
         />
         <button
           type="submit"
-          disabled={sendMessage.isPending || (!text.trim() && pending.length === 0)}
+          disabled={
+            sendMessage.isPending || (!text.trim() && pending.length === 0)
+          }
           className="p-2 bg-[#FFB633] text-black rounded-full hover:bg-[#e5a32e] disabled:opacity-50 transition-colors"
         >
           <Send className="w-5 h-5" />

@@ -48,11 +48,11 @@ export async function generateMetadata({ params }) {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <GeoStructuredData />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <QueryProvider>
           {children}
           <Toaster

@@ -91,13 +91,35 @@ function resolveAppUrl(request) {
     return APP_URL;
   }
 }
-import {
+import cloudinary, {
   uploadToCloudinary,
+  uploadRawToCloudinary,
   ensureClientFolders,
   ensureAdminFolders,
   clientFolder,
   adminFolder,
 } from "@/lib/cloudinary";
+
+// Extract public_id from a res.cloudinary.com delivery URL so the download
+// proxy can fall back to the Admin API when direct fetch is blocked (e.g.
+// "Restricted media types" rejects a PDF delivered through image/upload).
+function parseCloudinaryUrl(url) {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.endsWith(".cloudinary.com")) return null;
+    const parts = u.pathname.split("/upload/");
+    if (parts.length < 2) return null;
+    // Strip optional version prefix (v1234567890/) and file extension
+    let publicIdWithExt = parts[1].replace(/^v\d+\//, "");
+    const lastDot = publicIdWithExt.lastIndexOf(".");
+    const ext = lastDot >= 0 ? publicIdWithExt.slice(lastDot + 1) : "";
+    const publicId =
+      lastDot >= 0 ? publicIdWithExt.slice(0, lastDot) : publicIdWithExt;
+    return { publicId, ext };
+  } catch {
+    return null;
+  }
+}
 import { slugify } from "@/lib/slugify";
 import {
   canAccessClientEntity,
@@ -252,11 +274,7 @@ function createSessionResponse(user, { status = 200 } = {}) {
 async function getRefreshSessionUser(request) {
   const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
   const decoded = refreshToken ? verifyToken(refreshToken) : null;
-  if (
-    !decoded ||
-    decoded.tokenType !== "refresh" ||
-    !decoded.userId
-  ) {
+  if (!decoded || decoded.tokenType !== "refresh" || !decoded.userId) {
     return null;
   }
   const user = await User.findById(decoded.userId).select(
@@ -390,7 +408,10 @@ async function getOrCreateDmChannel(project, userIdA, userIdB) {
     });
   } catch (error) {
     if (error?.code === 11000) {
-      const raced = await ChatChannel.findOne({ projectId: project._id, dmKey });
+      const raced = await ChatChannel.findOne({
+        projectId: project._id,
+        dmKey,
+      });
       if (raced) return raced;
     }
     throw error;
@@ -593,11 +614,7 @@ async function acceptInvitationForUser(invitation, project, user) {
   }
 }
 
-const CLIENT_PROPOSAL_STATUSES = [
-  "sent",
-  "changes_requested",
-  "accepted",
-];
+const CLIENT_PROPOSAL_STATUSES = ["sent", "changes_requested", "accepted"];
 const ITEM_STATUSES = new Set(["pending", "in_progress", "completed"]);
 const PROJECT_STATUSES = new Set([
   "planning",
@@ -668,9 +685,11 @@ function milestoneAuditSnapshot(milestone) {
 }
 
 function normalizeMilestonePlan(value, existingPlan = []) {
-  if (value === undefined) return JSON.parse(JSON.stringify(existingPlan || []));
+  if (value === undefined)
+    return JSON.parse(JSON.stringify(existingPlan || []));
   if (!Array.isArray(value)) throw apiError("milestonePlan must be an array");
-  if (value.length > 60) throw apiError("milestonePlan has too many milestones");
+  if (value.length > 60)
+    throw apiError("milestonePlan has too many milestones");
 
   const explicitOrders = value
     .filter((item) => Number.isInteger(item?.order))
@@ -703,7 +722,9 @@ function normalizeMilestonePlan(value, existingPlan = []) {
       );
     }
     if (new Set(taskOrders).size !== taskOrders.length) {
-      throw apiError(`Task order values must be unique in milestone ${index + 1}`);
+      throw apiError(
+        `Task order values must be unique in milestone ${index + 1}`,
+      );
     }
     const existingTasks = new Map(
       (existing?.tasks || []).map((task) => [String(task._id), task]),
@@ -719,11 +740,7 @@ function normalizeMilestonePlan(value, existingPlan = []) {
         10000,
       ),
       icon: cleanString(raw.icon || "Circle", "Milestone icon", 80),
-      githubBranch: cleanString(
-        raw.githubBranch,
-        "Milestone git branch",
-        250,
-      ),
+      githubBranch: cleanString(raw.githubBranch, "Milestone git branch", 250),
       order: Number.isInteger(raw.order) ? raw.order : index,
       tasks: tasks.map((task, taskIndex) => {
         if (!task || typeof task !== "object") {
@@ -736,12 +753,9 @@ function normalizeMilestonePlan(value, existingPlan = []) {
           : null;
         return {
           _id: existingTask?._id || uuidv4(),
-          title: cleanString(
-            task.title,
-            `Task ${taskIndex + 1} title`,
-            200,
-            { required: true },
-          ),
+          title: cleanString(task.title, `Task ${taskIndex + 1} title`, 200, {
+            required: true,
+          }),
           description: cleanString(
             task.description,
             `Task ${taskIndex + 1} description`,
@@ -757,12 +771,9 @@ function normalizeMilestonePlan(value, existingPlan = []) {
 function normalizeProposalFields(body, existing = null) {
   const sourcePlan = body.milestonePlan ?? body.milestones;
   return {
-    title: cleanString(
-      body.title ?? existing?.title,
-      "Proposal title",
-      200,
-      { required: true },
-    ),
+    title: cleanString(body.title ?? existing?.title, "Proposal title", 200, {
+      required: true,
+    }),
     scope: cleanString(body.scope ?? existing?.scope, "Proposal scope", 100000),
     timeline: cleanString(
       body.timeline ?? existing?.timeline,
@@ -1275,9 +1286,10 @@ export async function GET(request, context) {
       // 15s while the chat UI is open, so it doubles as "the caller is
       // active right now" — no separate heartbeat endpoint/poll needed.
       // Fire-and-forget: a failed touch should never break the channel list.
-      User.updateOne({ _id: user._id }, { $set: { lastActiveAt: new Date() } }).catch(
-        (e) => console.error("presence heartbeat failed:", e),
-      );
+      User.updateOne(
+        { _id: user._id },
+        { $set: { lastActiveAt: new Date() } },
+      ).catch((e) => console.error("presence heartbeat failed:", e));
       let projectQuery;
       if (user.isAdmin) {
         projectQuery = {};
@@ -1409,7 +1421,8 @@ export async function GET(request, context) {
       if (read?.clearedAt) createdAtFilter.$gt = read.clearedAt;
       if (before) {
         const beforeDate = new Date(before);
-        if (!Number.isNaN(beforeDate.getTime())) createdAtFilter.$lt = beforeDate;
+        if (!Number.isNaN(beforeDate.getTime()))
+          createdAtFilter.$lt = beforeDate;
       }
       if (Object.keys(createdAtFilter).length > 0) {
         query.createdAt = createdAtFilter;
@@ -1512,7 +1525,8 @@ export async function GET(request, context) {
       // client-projects) — a collaborator has no relationship to it at all,
       // so this is 404, not 403: existence is not disclosed to someone with
       // no claim to it, same policy as an unrelated client-projects id.
-      if (!canAccessRequest(user, req)) return notFoundResponse("Request not found");
+      if (!canAccessRequest(user, req))
+        return notFoundResponse("Request not found");
       return NextResponse.json(req, { headers: getCorsHeaders() });
     }
 
@@ -1655,6 +1669,83 @@ export async function GET(request, context) {
         { items, unreadCount },
         { headers: getCorsHeaders() },
       );
+    }
+
+    // Proxy download — fetches from Cloudinary server-to-server (no CORS)
+    // and streams back with Content-Disposition: attachment so the browser
+    // saves the file instead of navigating. No auth: Cloudinary URLs are
+    // already public, and the SSRF guard below (only res.cloudinary.com) is
+    // what keeps this from being usable as a general proxy.
+    if (pathStr === "download") {
+      const { searchParams: dlParams } = new URL(request.url);
+      const url = dlParams.get("url");
+      const name = dlParams.get("name") || "download";
+
+      if (!url) {
+        return NextResponse.json(
+          { error: "Missing url parameter" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+
+      // Only proxy Cloudinary URLs — reject anything else to prevent SSRF
+      if (!url.startsWith("https://res.cloudinary.com/")) {
+        return NextResponse.json(
+          { error: "Invalid source" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+
+      // Stream a proxied response to the client.
+      const streamResponse = async (res) => {
+        const contentType =
+          res.headers.get("content-type") || "application/octet-stream";
+        const body = await res.arrayBuffer();
+        return new NextResponse(body, {
+          status: 200,
+          headers: {
+            ...getCorsHeaders(),
+            "Content-Type": contentType,
+            "Content-Disposition": `attachment; filename="${encodeURIComponent(name)}"`,
+            "Cache-Control": "public, max-age=31536000, immutable",
+          },
+        });
+      };
+
+      try {
+        // 1) Try a plain fetch — works for images and raw-uploaded files.
+        let upstream = await fetch(url);
+        if (upstream.ok) return await streamResponse(upstream);
+
+        // 2) Fall back to a signed Admin API download URL for files stuck
+        //    under image/upload that Cloudinary's "Restricted media types"
+        //    refuses to serve as a raw delivery (notably PDFs).
+        const parsed = parseCloudinaryUrl(url);
+        if (parsed && parsed.ext) {
+          const signedUrl = cloudinary.utils.private_download_url(
+            parsed.publicId,
+            parsed.ext,
+            {
+              resource_type: "image",
+              type: "upload",
+              attachment: true,
+            },
+          );
+          upstream = await fetch(signedUrl);
+          if (upstream.ok) return await streamResponse(upstream);
+        }
+
+        // Neither worked
+        return NextResponse.json(
+          { error: "Upstream fetch failed" },
+          { status: 502, headers: getCorsHeaders() },
+        );
+      } catch {
+        return NextResponse.json(
+          { error: "Download failed" },
+          { status: 502, headers: getCorsHeaders() },
+        );
+      }
     }
 
     // Statistics (admin only)
@@ -1872,7 +1963,9 @@ export async function POST(request, context) {
         );
       }
       const hashedPassword = hashPassword(password);
-      const verifyToken = invitation ? undefined : randomBytes(32).toString("hex");
+      const verifyToken = invitation
+        ? undefined
+        : randomBytes(32).toString("hex");
       const user = await User.create({
         _id: uuidv4(),
         name,
@@ -2110,7 +2203,8 @@ export async function POST(request, context) {
         required: true,
       });
       const status = body.status || "in_progress";
-      if (!PROJECT_STATUSES.has(status)) throw apiError("Invalid project status");
+      if (!PROJECT_STATUSES.has(status))
+        throw apiError("Invalid project status");
       const normalizedPlan = normalizeMilestonePlan(body.milestones || [], []);
       const milestones = normalizedPlan.map((milestone, index) => {
         const source = body.milestones?.[index] || {};
@@ -2121,7 +2215,8 @@ export async function POST(request, context) {
         const startedAt = new Date();
         const normalizedTasks = milestone.tasks.map((task, taskIndex) => {
           const taskStatus = source.tasks?.[taskIndex]?.status || "pending";
-          if (!ITEM_STATUSES.has(taskStatus)) throw apiError("Invalid task status");
+          if (!ITEM_STATUSES.has(taskStatus))
+            throw apiError("Invalid task status");
           return {
             ...task,
             status: taskStatus,
@@ -2151,11 +2246,23 @@ export async function POST(request, context) {
         clientEmail: cleanString(body.clientEmail, "Client email", 320),
         clientSlug,
         title,
-        description: cleanString(body.description, "Project description", 100000),
-        requirements: cleanString(body.requirements, "Project requirements", 100000),
+        description: cleanString(
+          body.description,
+          "Project description",
+          100000,
+        ),
+        requirements: cleanString(
+          body.requirements,
+          "Project requirements",
+          100000,
+        ),
         status,
         githubRepoUrl: cleanString(body.githubRepoUrl, "GitHub URL", 2000),
-        livePreviewUrl: cleanString(body.livePreviewUrl, "Live preview URL", 2000),
+        livePreviewUrl: cleanString(
+          body.livePreviewUrl,
+          "Live preview URL",
+          2000,
+        ),
         coverImageUrl: cleanString(body.coverImageUrl, "Cover image URL", 2000),
         category: cleanString(body.category, "Category", 200),
         color: cleanString(body.color || "blue", "Color", 100),
@@ -2402,8 +2509,7 @@ export async function POST(request, context) {
         if (forceArchive && body.forceConfirmation !== "DELETE STARTED WORK") {
           return NextResponse.json(
             {
-              error:
-                "Force deletion requires its own confirmation phrase",
+              error: "Force deletion requires its own confirmation phrase",
             },
             { status: 400, headers: getCorsHeaders() },
           );
@@ -2443,7 +2549,11 @@ export async function POST(request, context) {
             let recipientUserId = hasStoredRecipient
               ? txProposal.archiveRecipientUserId || null
               : txProject.clientUserId || null;
-            if (!hasStoredRecipient && !recipientUserId && txProject.clientEmail) {
+            if (
+              !hasStoredRecipient &&
+              !recipientUserId &&
+              txProject.clientEmail
+            ) {
               const recipient = await User.findOne({
                 email: txProject.clientEmail,
               })
@@ -2549,8 +2659,7 @@ export async function POST(request, context) {
                     _id: eventId,
                     type: "project_proposal_archived",
                     body: `${archived.phaseLabel} removed from active work — ${archivedReason.slice(0, 180)}`,
-                    actorName:
-                      archived.archivedByName || user.name || "Admin",
+                    actorName: archived.archivedByName || user.name || "Admin",
                     createdAt: archived.archivedAt || now,
                   },
                 },
@@ -2719,7 +2828,9 @@ export async function POST(request, context) {
           actorId: user._id,
           type: "project_proposal_changes_requested",
           title: `Changes requested: ${proposal.phaseLabel}`,
-          body: reason || `${project.clientName || "The client"} requested changes.`,
+          body:
+            reason ||
+            `${project.clientName || "The client"} requested changes.`,
           link: `/admin?tab=client-projects&id=${project._id}&proposal=${proposal._id}`,
           entityType: "project",
           entityId: project._id,
@@ -3124,9 +3235,7 @@ export async function POST(request, context) {
         // admin who also accepted an invitation to this project is in BOTH
         // lists and was otherwise getting two notifications for one message.
         if (access.role !== "admin") {
-          const alreadyNotified = new Set(
-            roster.map((r) => String(r.userId)),
-          );
+          const alreadyNotified = new Set(roster.map((r) => String(r.userId)));
           const admins = await User.find({ isAdmin: true }).select("_id");
           await Promise.all(
             admins
@@ -3224,7 +3333,11 @@ export async function POST(request, context) {
         throw apiError("That person is not part of this project", 400);
       }
 
-      const channel = await getOrCreateDmChannel(project, user._id, targetUserId);
+      const channel = await getOrCreateDmChannel(
+        project,
+        user._id,
+        targetUserId,
+      );
       return NextResponse.json(
         serializeChannelSummary(channel, { accessObj: access }),
         { headers: getCorsHeaders() },
@@ -3526,7 +3639,9 @@ export async function POST(request, context) {
                   {
                     title: item.title,
                     description: item.body || "",
-                    tasks: [{ title: item.title, description: item.body || "" }],
+                    tasks: [
+                      { title: item.title, description: item.body || "" },
+                    ],
                   },
                 ],
         },
@@ -3836,7 +3951,8 @@ export async function POST(request, context) {
       const user = await requireAuthenticatedUser(request);
       const reqDoc = await ProjectRequest.findById(path[1]);
       if (!reqDoc) return notFoundResponse("Request not found");
-      if (!canAccessRequest(user, reqDoc)) return notFoundResponse("Request not found");
+      if (!canAccessRequest(user, reqDoc))
+        return notFoundResponse("Request not found");
       const now = new Date();
       const role = user.isAdmin ? "admin" : "client";
 
@@ -3853,7 +3969,8 @@ export async function POST(request, context) {
           attachments: Array.isArray(body.attachments) ? body.attachments : [],
           createdAt: now,
         });
-        if (user.isAdmin && reqDoc.status === "new") reqDoc.status = "discussion";
+        if (user.isAdmin && reqDoc.status === "new")
+          reqDoc.status = "discussion";
         reqDoc.lastActivityAt = now;
         await reqDoc.save();
         const preview = (body.body || "").slice(0, 140);
@@ -4157,10 +4274,13 @@ export async function POST(request, context) {
       }
       // else: all unread for this user
       await Notification.updateMany(filter, { $set: { read: true } });
-      return NextResponse.json({ success: true }, { headers: getCorsHeaders() });
+      return NextResponse.json(
+        { success: true },
+        { headers: getCorsHeaders() },
+      );
     }
 
-    // File upload (images + PDF) to Cloudinary (auth required)
+    // File upload (images, PDF, DOC/DOCX, TXT) to Cloudinary (auth required)
     if (pathStr === "upload") {
       const user = await requireAuthenticatedUser(request);
       const { file, name, projectId, requestId, kind } = body;
@@ -4170,15 +4290,34 @@ export async function POST(request, context) {
           { status: 400, headers: getCorsHeaders() },
         );
       }
-      const isPdf =
-        file.startsWith("data:application/pdf") ||
-        (name && name.toLowerCase().endsWith(".pdf"));
-      if (!file.startsWith("data:image/") && !isPdf) {
+      // Determine attachment type for the response and decide whether this
+      // needs resource_type: "raw" (anything non-image goes to /raw/upload so
+      // Cloudinary's "Restricted media types" doesn't block it later).
+      const ext = name ? name.slice(name.lastIndexOf(".")).toLowerCase() : "";
+      const isImage = file.startsWith("data:image/");
+      const isPdf = file.startsWith("data:application/pdf") || ext === ".pdf";
+      const isDoc =
+        file.startsWith("data:application/msword") ||
+        file.startsWith(
+          "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ) ||
+        ext === ".doc" ||
+        ext === ".docx";
+      const isTxt =
+        file.startsWith("data:text/plain") || ext === ".txt" || ext === ".text";
+      if (!isImage && !isPdf && !isDoc && !isTxt) {
         return NextResponse.json(
-          { error: "Only images and PDF files are allowed" },
+          { error: "Only images, PDF, DOC/DOCX, and TXT files are allowed" },
           { status: 400, headers: getCorsHeaders() },
         );
       }
+      const attachmentType = isImage
+        ? "image"
+        : isPdf
+          ? "pdf"
+          : isDoc
+            ? "doc"
+            : "txt";
       // Resolve destination folder: admin -> portfolio/admin/<kind>,
       // client -> portfolio/clients/<slug>/<kind>. The project/request is
       // loaded first and permission is checked against THAT document — the
@@ -4217,9 +4356,10 @@ export async function POST(request, context) {
           ? adminFolder(kind)
           : clientFolder(slugify(user.name || user.email), kind);
       }
-      const url = await uploadToCloudinary(file, { folder });
+      const uploadFn = isImage ? uploadToCloudinary : uploadRawToCloudinary;
+      const url = await uploadFn(file, { folder });
       return NextResponse.json(
-        { url, type: isPdf ? "pdf" : "image", name: name || "" },
+        { url, type: attachmentType, name: name || "" },
         { status: 201, headers: getCorsHeaders() },
       );
     }
@@ -4571,7 +4711,8 @@ export async function PUT(request, context) {
         }
         const normalizedTasks = milestone.tasks.map((task, taskIndex) => {
           const taskStatus = source.tasks?.[taskIndex]?.status || "pending";
-          if (!ITEM_STATUSES.has(taskStatus)) throw apiError("Invalid task status");
+          if (!ITEM_STATUSES.has(taskStatus))
+            throw apiError("Invalid task status");
           return {
             ...task,
             status: taskStatus,
@@ -4722,7 +4863,8 @@ export async function PUT(request, context) {
           typeof body.clientUserId === "string" ? body.clientUserId : null;
       }
       if (body.status !== undefined) {
-        if (!PROJECT_STATUSES.has(body.status)) throw apiError("Invalid project status");
+        if (!PROJECT_STATUSES.has(body.status))
+          throw apiError("Invalid project status");
         update.status = body.status;
       }
       if (body.publishToHomepage !== undefined) {
@@ -4732,10 +4874,7 @@ export async function PUT(request, context) {
         update.publishToHomepage = body.publishToHomepage;
       }
       // Publish to public portfolio: create a linked Project once.
-      if (
-        body.publishToHomepage &&
-        !existing.linkedProjectId
-      ) {
+      if (body.publishToHomepage && !existing.linkedProjectId) {
         const title = update.title || existing.title;
         const slug = title
           .toLowerCase()
@@ -4813,9 +4952,7 @@ export async function PUT(request, context) {
           phaseLabel: existingProposal.phaseLabel || "Master Proposal",
         },
       );
-      const revisionHistory = [
-        ...(existingProposal.revisionHistory || []),
-      ];
+      const revisionHistory = [...(existingProposal.revisionHistory || [])];
       if ((existingProposal.version || 0) > 0) {
         revisionHistory.push(
           proposalSnapshot({
@@ -5532,7 +5669,9 @@ export async function DELETE(request, context) {
             eventType: "member.removed",
             metadata: { reason: "account_deleted" },
           })),
-        ).catch((e) => console.error("audit insert failed (account deletion):", e));
+        ).catch((e) =>
+          console.error("audit insert failed (account deletion):", e),
+        );
       }
       return NextResponse.json(
         { message: "User deleted" },

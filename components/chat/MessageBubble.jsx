@@ -113,13 +113,17 @@ export function MessageBubble({
   return (
     <div
       data-message-id={message._id}
-      className={cn("flex group scroll-mt-4", isMine ? "justify-end" : "justify-start")}
+      className={cn(
+        "flex group scroll-mt-4",
+        isMine ? "justify-end" : "justify-start",
+      )}
     >
       <div
         className={cn(
           "max-w-[75%] rounded-2xl px-4 py-2 relative transition-shadow",
           isMine ? "bg-[#FFB633] text-black" : "bg-white/10 text-gray-100",
-          highlighted && "ring-2 ring-[#FFB633] ring-offset-2 ring-offset-[#0f0f10]",
+          highlighted &&
+            "ring-2 ring-[#FFB633] ring-offset-2 ring-offset-[#0f0f10]",
         )}
       >
         <div className="flex items-center gap-1.5 mb-0.5">
@@ -207,7 +211,8 @@ export function MessageBubble({
                 className="flex items-center gap-1 text-[10px] italic opacity-80"
               >
                 <ArrowRightCircle className="h-2.5 w-2.5 shrink-0" />
-                Converted to {c.ref || CONVERT_TARGET_LABEL[c.target] || c.target}
+                Converted to{" "}
+                {c.ref || CONVERT_TARGET_LABEL[c.target] || c.target}
               </p>
             ))}
           </div>
@@ -255,7 +260,7 @@ export function MessageBubble({
         {!message.deleted && (
           <div
             className={cn(
-              "absolute top-1 opacity-0 group-hover:opacity-100 transition-opacity",
+              "absolute top-1 transition-opacity md:opacity-0 md:group-hover:opacity-100",
               isMine ? "-left-8" : "-right-8",
             )}
           >
@@ -276,7 +281,10 @@ export function MessageBubble({
                 {canPin && (
                   <DropdownMenuItem
                     onClick={() =>
-                      onTogglePin?.({ messageId: message._id, pinned: !message.pinned })
+                      onTogglePin?.({
+                        messageId: message._id,
+                        pinned: !message.pinned,
+                      })
                     }
                     className="gap-2 cursor-pointer"
                   >

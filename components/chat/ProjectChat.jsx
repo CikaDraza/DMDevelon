@@ -19,7 +19,10 @@ import { Loader2, MessageSquare } from "lucide-react";
  * (drives bubble alignment/moderation client-side; the server is the actual
  * authority on every permission).
  */
-export function ProjectChat({ viewerRole = "client", initialChannelId = null }) {
+export function ProjectChat({
+  viewerRole = "client",
+  initialChannelId = null,
+}) {
   const { user } = useAuth();
   const { channels, isLoading, startDirectMessage } = useChatChannels();
   const [activeChannelId, setActiveChannelId] = useState(null);
@@ -63,7 +66,10 @@ export function ProjectChat({ viewerRole = "client", initialChannelId = null }) 
 
   const handleStartDirectMessage = async ({ projectId, userId }) => {
     try {
-      const channel = await startDirectMessage.mutateAsync({ projectId, userId });
+      const channel = await startDirectMessage.mutateAsync({
+        projectId,
+        userId,
+      });
       setActiveChannelId(channel._id);
       setMobileView("chat");
     } catch {
@@ -90,7 +96,7 @@ export function ProjectChat({ viewerRole = "client", initialChannelId = null }) 
   }
 
   return (
-    <div className="flex h-[calc(100vh-220px)] min-h-[500px] bg-[#1a1a1b] border border-white/10 rounded-xl overflow-hidden">
+    <div className="flex h-full min-h-[500px] bg-[#1a1a1b] border border-white/10 rounded-xl overflow-hidden">
       <ChannelSidebar
         channels={channels}
         activeChannelId={activeChannelId}
