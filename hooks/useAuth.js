@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { readAsDataURL } from "@/lib/utils";
 
 const SESSION_CHANGED_EVENT = "dmdevelon:session-changed";
 const SESSION_CLEARED_EVENT = "dmdevelon:session-cleared";
@@ -100,15 +101,6 @@ function installAuthRefreshInterceptor() {
   );
 }
 
-function readAsDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -162,11 +154,16 @@ export function useAuth() {
     return userData;
   }, []);
 
-  const register = useCallback(async (name, email, password) => {
+  // `extra` carries fields beyond the base signup form — currently just
+  // `inviteToken`, when registration is completing a project invitation
+  // (the server ignores `email` in that case and locks it to the invite's
+  // own address instead).
+  const register = useCallback(async (name, email, password, extra = {}) => {
     const response = await axios.post("/api/auth/register", {
       name,
       email,
       password,
+      ...extra,
     });
     const { token: newToken, user: userData } = response.data;
     storeSession(newToken, userData);

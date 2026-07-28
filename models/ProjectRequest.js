@@ -77,6 +77,12 @@ const ProjectRequestSchema = new mongoose.Schema(
     messages: { type: [RequestMessageSchema], default: [] },
     proposal: { type: ProposalSchema, default: () => ({}) },
     linkedClientProjectId: { type: String, default: null },
+    // Set only when this request was raised via chat's "Convert to…" inside an
+    // EXISTING project — distinct from linkedClientProjectId, which instead
+    // records the project a request BECAME once approved. A converted request
+    // already has a project (the one it came from); it does not need one.
+    sourceProjectId: { type: String, default: null },
+    sourceMessageId: { type: String, default: null },
     lastActivityAt: { type: Date, default: Date.now },
   },
   { timestamps: true, _id: false }

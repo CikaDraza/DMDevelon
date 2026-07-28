@@ -21,6 +21,11 @@ const UserSchema = new mongoose.Schema(
     resetTokenExpiry: { type: Date },
     // Incrementing this invalidates all issued access/refresh token pairs.
     sessionVersion: { type: Number, default: 0 },
+    // Touched by GET /chat/channels' 15s poll while the chat UI is open —
+    // "online" is derived from this being recent, not a separate socket
+    // connection. Good enough for a presence dot; not a general app-wide
+    // "last seen" feature.
+    lastActiveAt: { type: Date, default: null },
   },
   { timestamps: true, _id: false }
 );

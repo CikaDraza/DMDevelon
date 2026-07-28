@@ -26,11 +26,15 @@ function timeAgo(d) {
 
 // Ordered categories per audience; maps a notification's entityType to a label.
 const CATEGORY_ORDER = {
-  admin: ["Messages", "Testimonials", "Requests", "Projects"],
-  client: ["My Projects", "Testimonials"],
+  admin: ["Messages", "Testimonials", "Requests", "Projects", "Chat"],
+  client: ["My Projects", "Testimonials", "Chat"],
 };
 
 function categoryOf(n, variant) {
+  // Checked first: chat notifications also carry entityType: "project" (to
+  // reuse the existing project-link/email plumbing), so without this early
+  // check they'd be misclassified as "Projects"/"My Projects" below.
+  if (n.channelId) return "Chat";
   if (variant === "admin") {
     if (n.entityType === "contact") return "Messages";
     if (n.entityType === "testimonial") return "Testimonials";

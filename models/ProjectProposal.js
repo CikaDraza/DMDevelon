@@ -85,6 +85,12 @@ const ProjectProposalSchema = new mongoose.Schema(
       required: true,
     },
     version: { type: Number, default: 1, min: 1 },
+    // Provenance when this proposal was handed off from a chat item, so the
+    // admin's "Pending work" list can show what it came out of. The ref
+    // ("D-001") is denormalized because the item may later be deleted while
+    // the proposal — and any phase accepted from it — must remain readable.
+    sourceItemId: { type: String, default: null },
+    sourceItemRef: { type: String, default: "" },
     milestonePlan: { type: [ProposalMilestonePlanSchema], default: [] },
     revisionHistory: { type: [ProposalRevisionSchema], default: [] },
     createdByUserId: { type: String, default: null },

@@ -184,6 +184,10 @@ test("accepted follow-up phase can be archived while all live work is untouched"
     alreadyArchived: false,
     milestoneIds: ["milestone-1"],
     milestoneCount: 1,
+    // Nothing in this phase had started, so the operator override was not
+    // needed and the result says so.
+    forcedOverStartedWork: false,
+    startedMilestoneCount: 0,
   });
 });
 
@@ -529,4 +533,93 @@ test("master revision and phase acceptance append once to one project", () => {
   assert.equal(replay.toInsert.length, 0);
   project.milestones[0].title = "Operational title changed";
   assert.equal(sentV1.milestonePlan[0].title, "Foundation");
+});
+
+// --- Force archive (operator override of the started-work guard) -------------
+
+const startedPhase = () => ({
+  proposal: {
+    _id: "phase-2",
+    kind: "phase",
+    phaseNumber: 2,
+    status: "accepted",
+  },
+  milestones: [
+    {
+      _id: "milestone-1",
+      proposalId: "phase-2",
+      status: "in_progress",
+      workStartedAt: new Date("2026-01-01"),
+      tasks: [{ _id: "task-1", status: "completed" }],
+    },
+  ],
+});
+
+test("force archives a phase whose work has already started", () => {
+  const { proposal, milestones } = startedPhase();
+  // Without the override it is refused — the default policy is unchanged.
+  assert.throws(
+    () => preparePhaseArchive(proposal, milestones),
+    (error) => error.code === "PHASE_WORK_ALREADY_STARTED",
+  );
+
+  const forced = preparePhaseArchive(proposal, milestones, { force: true });
+  assert.equal(forced.proposalId, "phase-2");
+  assert.deepEqual(forced.milestoneIds, ["milestone-1"]);
+  // Flagged so the caller can word the audit trail as "work was discarded".
+  assert.equal(forced.forcedOverStartedWork, true);
+  assert.equal(forced.startedMilestoneCount, 1);
+});
+
+test("force does NOT make the master proposal deletable", () => {
+  assert.throws(
+    () =>
+      preparePhaseArchive(
+        { _id: "master", kind: "master", phaseNumber: 1, status: "accepted" },
+        [],
+        { force: true },
+      ),
+    (error) => error.code === "MASTER_PROPOSAL_IMMUTABLE",
+  );
+  // Nor a phase numbered 1, which is the same scope by another name.
+  assert.throws(
+    () =>
+      preparePhaseArchive(
+        { _id: "p1", kind: "phase", phaseNumber: 1, status: "accepted" },
+        [],
+        { force: true },
+      ),
+    (error) => error.code === "MASTER_PROPOSAL_IMMUTABLE",
+  );
+});
+
+test("force does NOT make an un-accepted proposal archivable", () => {
+  for (const status of ["draft", "sent", "changes_requested", "rejected"]) {
+    assert.throws(
+      () =>
+        preparePhaseArchive(
+          { _id: "phase-3", kind: "phase", phaseNumber: 3, status },
+          [],
+          { force: true },
+        ),
+      (error) => error.code === "PHASE_NOT_ACCEPTED",
+      `status ${status} must stay non-archivable even with force`,
+    );
+  }
+});
+
+test("force on an untouched phase behaves exactly like a normal archive", () => {
+  const proposal = {
+    _id: "phase-4",
+    kind: "phase",
+    phaseNumber: 4,
+    status: "accepted",
+  };
+  const milestones = [
+    { _id: "m-1", proposalId: "phase-4", status: "pending", tasks: [] },
+  ];
+  const plain = preparePhaseArchive(proposal, milestones);
+  const forced = preparePhaseArchive(proposal, milestones, { force: true });
+  assert.deepEqual(forced, plain);
+  assert.equal(forced.forcedOverStartedWork, false);
 });

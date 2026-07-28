@@ -90,11 +90,25 @@ module.exports = {
     				to: {
     					height: '0'
     				}
+    			},
+    			// Draws attention to a card that is waiting on someone, without
+    			// touching its opacity — Tailwind's built-in `animate-pulse`
+    			// fades the WHOLE element, so the text it is trying to make you
+    			// read blinks along with the border. This animates only the
+    			// outer glow, so the content stays fully legible.
+    			'attention-glow': {
+    				'0%, 100%': {
+    					boxShadow: '0 0 0 0 rgba(255, 182, 51, 0.45)'
+    				},
+    				'50%': {
+    					boxShadow: '0 0 0 6px rgba(255, 182, 51, 0)'
+    				}
     			}
     		},
     		animation: {
     			'accordion-down': 'accordion-down 0.2s ease-out',
-    			'accordion-up': 'accordion-up 0.2s ease-out'
+    			'accordion-up': 'accordion-up 0.2s ease-out',
+    			'attention-glow': 'attention-glow 2s ease-in-out infinite'
     		}
     	}
     },

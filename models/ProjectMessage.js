@@ -29,7 +29,13 @@ const ProjectMessageSchema = new mongoose.Schema(
     },
     authorUserId: { type: String, default: null },
     authorName: { type: String, default: '' },
-    authorRole: { type: String, enum: ['admin', 'client'], required: true },
+    // 'member' covers invited collaborators, who may read and comment on a
+    // milestone but never drive the change_request/change_agreed flow.
+    authorRole: {
+      type: String,
+      enum: ['admin', 'client', 'member'],
+      required: true,
+    },
     body: { type: String, default: '' },
     attachments: { type: [AttachmentSchema], default: [] },
   },

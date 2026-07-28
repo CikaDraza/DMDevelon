@@ -1,18 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { cn } from "@/lib/utils";
+import { cn, readAsDataURL } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { Send, Paperclip, FileText, X, Loader2 } from "lucide-react";
-
-function readAsDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 function timeLabel(d) {
   if (!d) return "";

@@ -119,6 +119,13 @@ const ClientProjectSchema = new mongoose.Schema(
     deletedAt: { type: Date, default: null },
     deletedByUserId: { type: String, default: null },
     deletedByName: { type: String, default: '' },
+    // Set when the client who owned this project hard-deletes their account.
+    // The engagement itself is retained as history for the operator and for the
+    // collaborators who were part of it, but it becomes closed and read-only:
+    // there is no longer an owner who could agree to anything. Stored as a flag
+    // rather than derived from a missing User so that access checks — including
+    // the project list — never need an extra lookup per project.
+    ownerAccountDeletedAt: { type: Date, default: null },
     // Showcase fields (used when published to homepage)
     githubRepoUrl: { type: String, default: '' },
     livePreviewUrl: { type: String, default: '' },

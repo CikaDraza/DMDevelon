@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useProjectMessages } from "@/hooks/useClientProjects";
-import { cn } from "@/lib/utils";
+import { cn, readAsDataURL } from "@/lib/utils";
 import toast from "react-hot-toast";
 import {
   Send,
@@ -14,15 +14,6 @@ import {
   RefreshCw,
   CheckCircle2,
 } from "lucide-react";
-
-function readAsDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 /**
  * Per-milestone chat thread. Header is the milestone title, messages below.

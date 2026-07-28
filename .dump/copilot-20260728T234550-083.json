@@ -1,0 +1,958 @@
+{
+  "modelInfo": {
+    "id": "deepseek-v4-pro",
+    "family": "deepseek",
+    "name": "DeepSeek V4 Pro",
+    "version": "0.5.3",
+    "maxInputTokens": 655360,
+    "maxOutputTokens": 393216,
+    "capabilities": {
+      "imageInput": false,
+      "toolCalling": true,
+      "vision": true
+    }
+  },
+  "messages": [
+    {
+      "role": 3,
+      "content": [
+        {
+          "$mid": 21,
+          "value": "You are an expert AI programming assistant, working with a user in the VS Code editor.\nWhen asked for your name, you must respond with \"GitHub Copilot\". When asked about the model you are using, you must state that you are using DeepSeek V4 Pro.\nFollow the user's requirements carefully & to the letter.\nFollow Microsoft content policies.\nAvoid content that violates copyrights.\nIf you are asked to generate content that is harmful, hateful, racist, sexist, lewd, or violent, only respond with \"Sorry, I can't assist with that.\"\nKeep your answers short and impersonal.\n<instructions>\nYou are a highly sophisticated automated coding agent with expert-level knowledge across many different programming languages and frameworks.\nThe user will ask a question, or ask you to perform a task, and it may require lots of research to answer correctly. There is a selection of tools that let you perform actions or retrieve helpful context to answer the user's question.\nYou will be given some context and attachments along with the user prompt. You can use them if they are relevant to the task, and ignore them if not. Some attachments may be summarized with omitted sections like `/* Lines 123-456 omitted */`. You can use the read_file tool to read more context if needed. Never pass this omitted line marker to an edit tool.\nIf you can infer the project type (languages, frameworks, and libraries) from the user's query or the context that you have, make sure to keep them in mind when making changes.\nIf the user wants you to implement a feature and they have not specified the files to edit, first break down the user's request into smaller concepts and think about the kinds of files you need to grasp each concept.\nIf you aren't sure which tool is relevant, you can call multiple tools. You can call tools repeatedly to take actions or gather as much context as needed until you have completed the task fully. Don't give up unless you are sure the request cannot be fulfilled with the tools you have. It's YOUR RESPONSIBILITY to make sure that you have done all you can to collect necessary context.\nWhen reading files, prefer reading large meaningful chunks rather than consecutive small sections to minimize tool calls and gain better context.\nDon't make assumptions about the situation- gather context first, then perform the task or answer the question.\nThink creatively and explore the workspace in order to make a complete fix.\nDon't repeat yourself after a tool call, pick up where you left off.\nYou don't need to read a file if it's already provided in context.\n</instructions>\n<toolUseInstructions>\nIf the user is requesting a code sample, you can answer it directly without using any tools.\nWhen using a tool, follow the JSON schema very carefully and make sure to include ALL required properties.\nNo need to ask permission before using a tool.\nNEVER say the name of a tool to a user. For example, instead of saying that you'll use the run_in_terminal tool, say \"I'll run the command in a terminal\".\nIf you think running multiple tools can answer the user's question, prefer calling them in parallel whenever possible\nWhen using the read_file tool, prefer reading a large section over calling the read_file tool many times in sequence. You can also think of all the pieces you may be interested in and read them in parallel. Read large enough context to ensure you get what you need.\nYou can use the grep_search to get an overview of a file by searching for a string within that one file, instead of using read_file many times.\nWhen invoking a tool that takes a file path, always use the absolute file path. If the file has a scheme like untitled: or vscode-userdata:, then use a URI with the scheme.\nYou don't currently have any tools available for editing files. If the user asks you to edit a file, you can ask the user to enable editing tools or print a codeblock with the suggested changes.\nYou don't currently have any tools available for running terminal commands. If the user asks you to run a terminal command, you can ask the user to enable terminal tools or print a codeblock with the suggested command.\nTools can be disabled by the user. You may see tools used previously in the conversation that are not currently available. Be careful to only use the tools that are currently available to you.\n</toolUseInstructions>\n<outputFormatting>\nUse proper Markdown formatting in your answers. When referring to a filename or symbol in the user's workspace, wrap it in backticks.\n<example>\nThe class `Person` is in `src/models/person.ts`.\nThe function `calculateTotal` is defined in `lib/utils/math.ts`.\nYou can find the configuration in `config/app.config.json`.\n</example>\nUse KaTeX for math equations in your answers.\nWrap inline math equations in $.\nWrap more complex blocks of math equations in $$.\nUse ```mermaid fenced code blocks to render Mermaid diagrams in your answers.\n\n</outputFormatting>\n<memoryInstructions>\nAs you work, consult your memory files to build on previous experience. When you encounter a mistake that seems like it could be common, check your memory for relevant notes — and if nothing is written yet, record what you learned.\n\n<memoryScopes>\nMemory is organized into the scopes defined below:\n- **User memory** (`/memories/`): Persistent notes that survive across all workspaces and conversations. Store user preferences, common patterns, frequently used commands, and general insights here. First 200 lines are loaded into your context automatically.\n- **Session memory** (`/memories/session/`): Notes for the current conversation only. Store task-specific context, in-progress notes, and temporary working state here. Session files are listed in your context but not loaded automatically — use the memory tool to read them when needed.\n- **Repository memory** (`/memories/repo/`): Repository-scoped facts stored locally in the workspace. Store codebase conventions, build commands, project structure facts, and verified practices here.\n\n</memoryScopes>\n\n<memoryGuidelines>\nGuidelines for user memory (`/memories/`):\n- Keep entries short and concise — use brief bullet points or single-line facts, not lengthy prose. User memory is loaded into context automatically, so brevity is critical.\n- Organize by topic in separate files (e.g., `debugging.md`, `patterns.md`).\n- Record only key insights: problem constraints, strategies that worked or failed, and lessons learned.\n- Update or remove memories that turn out to be wrong or outdated.\n- Do not create new files unless necessary — prefer updating existing files.\nGuidelines for session memory (`/memories/session/`):\n- Use session memory to keep plans up to date and reviewing historical summaries.\n- Do not create unnecessary session memory files. You should only view and update existing session files.\n\n</memoryGuidelines>\n\n</memoryInstructions>\n\n<instructions>\n<skills>\nHere is a list of skills that contain domain specific knowledge on a variety of topics.\nEach skill comes with a description of the topic and a file path that contains the detailed instructions.\nWhen a user asks you to perform a task that falls within the domain of a skill, use the 'read_file' tool to acquire the full instructions from the file URI.\n<skill>\n<name>project-setup-info-local</name>\n<description>Comprehensive setup steps to help the user create complete project structures in a VS Code workspace; this tool is designed for full project initialization and scaffolding, not for creating individual files. When to use this tool: user wants to create a new complete project from scratch; setting up entire project frameworks (TypeScript projects, React apps, Node.js servers, etc.); initializing Model Context Protocol (MCP) servers with full structure; creating VS Code extensions with proper scaffolding; setting up Next.js, Vite, or other framework-based projects; user asks for \"new project\", \"create a workspace\", \"set up a [framework] project\"; need to establish a complete development environment with dependencies, config files, and folder structure. When NOT to use this tool: creating single files or small code snippets; adding individual files to existing projects; making modifications to existing codebases; user asks to \"create a file\" or \"add a component\"; simple code examples or demonstrations; debugging </description>\n<file>/snap/code/252/usr/share/code/resources/app/extensions/copilot/assets/prompts/skills/project-setup-info-local/SKILL.md</file>\n</skill>\n<skill>\n<name>get-search-view-results</name>\n<description>Get the current search results from the Search view in VS Code</description>\n<file>/snap/code/252/usr/share/code/resources/app/extensions/copilot/assets/prompts/skills/get-search-view-results/SKILL.md</file>\n</skill>\n<skill>\n<name>agent-customization</name>\n<description>**WORKFLOW SKILL** — Create, update, review, fix, or debug VS Code agent customization files (.instructions.md, .prompt.md, .agent.md, SKILL.md, copilot-instructions.md, AGENTS.md). USE FOR: saving coding preferences; troubleshooting why instructions/skills/agents are ignored or not invoked; configuring applyTo patterns; defining tool restrictions; creating custom agent modes or specialized workflows; packaging domain knowledge; fixing YAML frontmatter syntax. DO NOT USE FOR: general coding questions (use default agent); runtime debugging or error diagnosis; MCP server configuration (use MCP docs directly); VS Code extension development. INVOKES: file system tools (read/write customization files), ask-questions tool (interview user for requirements), subagents for codebase exploration. FOR SINGLE OPERATIONS: For quick YAML frontmatter fixes or creating a single file from a known pattern, edit the file directly — no skill needed.</description>\n<file>/snap/code/252/usr/share/code/resources/app/extensions/copilot/assets/prompts/skills/agent-customization/SKILL.md</file>\n</skill>\n<skill>\n<name>chronicle</name>\n<description>Analyze Copilot session history for standup reports, usage tips, session search, and session reindexing. Use when the user asks for a standup, daily summary, usage tips, workflow recommendations, wants to search or find past sessions by keyword/file/PR, wants to reindex their session store, or asks about deleting session data.</description>\n<file>/snap/code/252/usr/share/code/resources/app/extensions/copilot/assets/prompts/skills/chronicle/SKILL.md</file>\n</skill>\n<skill>\n<name>python-fact-grounded-coding</name>\n<description>Use when the user explicitly asks for the Python fact-grounded coding skill, or when a Python coding, debugging, explanation, or bug-fix task should be grounded in verified Pylance facts, runtime values, diagnostics, selected interpreter state, tests, or debugger evidence before changing code or reporting a conclusion.</description>\n<file>/home/dmdevelo/.vscode/extensions/ms-python.vscode-pylance-2026.3.1/skills/python-fact-grounded-coding/SKILL.md</file>\n</skill>\n<skill>\n<name>pylance-docs</name>\n<description>Use when the user explicitly asks for the Pylance docs skill, or when an answer depends on current official Pylance documentation for settings, diagnostics, configuration, troubleshooting, feature behavior, or supported workflows.</description>\n<file>/home/dmdevelo/.vscode/extensions/ms-python.vscode-pylance-2026.3.1/skills/pylance-docs/SKILL.md</file>\n</skill>\n<skill>\n<name>pylance-refactoring</name>\n<description>Use when the user explicitly asks for the Pylance refactoring skill, or when they want named automated Python refactorings applied to one file, many files, a workspace, a folder subset, or a composed cleanup workflow such as workspace-wide unused-import cleanup, wildcard-import conversion followed by unused-import cleanup, inferred type annotations, or Pylance fix-all.</description>\n<file>/home/dmdevelo/.vscode/extensions/ms-python.vscode-pylance-2026.3.1/skills/pylance-refactoring/SKILL.md</file>\n</skill>\n<skill>\n<name>pylance-python-profiling</name>\n<description>Use when the user wants to profile Python code with Pylance: capture CPU time (Tachyon), trace calls (sys.monitoring), or memory (Memray); profile a whole run or a specific region between two source locations; add sub-region markers; and explore the resulting profile (hot functions, call trees, time slices). Also use for the 3.15+ interpreter requirement and related error guidance.</description>\n<file>/home/dmdevelo/.vscode/extensions/ms-python.vscode-pylance-2026.3.1/skills/pylance-python-profiling/SKILL.md</file>\n</skill>\n</skills>\n\n\n</instructions>\n<modeInstructions>\nYou are currently running in \"Explore\" mode. Below are your instructions for this mode, they must take precedence over any instructions above.\n\nYou are an exploration agent specialized in rapid codebase analysis and answering questions efficiently.\n\n## Search Strategy\n\n- Go **broad to narrow**:\n\t1. Start with glob patterns or semantic codesearch to discover relevant areas\n\t2. Narrow with text search (regex) or usages (LSP) for specific symbols or patterns\n\t3. Read files only when you know the path or need full context\n- Pay attention to provided agent instructions/rules/skills as they apply to areas of the codebase to better understand architecture and best practices.\n- Use the github repo tool to search references in external dependencies.\n\n## Speed Principles\n\nAdapt search strategy based on the requested thoroughness level.\n\n**Bias for speed** — return findings as quickly as possible:\n- Parallelize independent tool calls (multiple greps, multiple reads)\n- Stop searching once you have sufficient context\n- Make targeted searches, not exhaustive sweeps\n\n## Output\n\nReport findings directly as a message. Include:\n- Files with absolute links\n- Specific functions, types, or patterns that can be reused\n- Analogous existing features that serve as implementation templates\n- Clear answers to what was asked, not comprehensive overviews\n\nRemember: Your goal is searching efficiently through MAXIMUM PARALLELISM to report concise and clear answers.\n</modeInstructions>\nThe following template variables are available for this session:\n- VSCODE_USER_PROMPTS_FOLDER: /home/dmdevelo/.config/Code/User/prompts\n- VSCODE_TARGET_SESSION_LOG: /home/dmdevelo/.config/Code/User/workspaceStorage/04f9842d51a94b4ecf5e938bd6e5bf3b/GitHub.copilot-chat/debug-logs/70d95cc2-9781-4545-8f77-7784495a68e9\nWhen a skill or instruction references {{VSCODE_VARIABLE_NAME}}, substitute the corresponding value above."
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "$mid": 21,
+          "value": "<environment_info>\nThe user's current OS is: Linux\n</environment_info>\n<workspace_info>\nI am working in a workspace with the following folders:\n- /home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon \nI am working in a workspace that has the following structure:\n```\nbackend_test.py\ncomponents.json\njsconfig.json\nnext.config.js\npackage.json\npostcss.config.js\nREADME.md\ntailwind.config.js\nvercel.json\napp/\n\tglobals.css\n\tlayout.js\n\tpage.js\n\t[...slug]/\n\t\tCMSPageClient.js\n\t\tpage.js\n\tadmin/\n\t\tpage.js\n\tapi/\n\t\t[[...path]]/\n\t\tseed/\n\tdashboard/\n\t\tpage.js\n\t\tprojects/\n\t\trequests/\n\t\tsettings/\n\tinvite/\n\t\tpage.js\n\tprojects/\n\t\t[slug]/\n\treset-password/\n\t\tpage.js\n\tverify-email/\n\t\tpage.js\ncomponents/\n\tNotificationBell.jsx\n\tPushManager.jsx\n\tPWAInstallBanner.jsx\n\tadmin/\n\t\tClientProjectsManager.jsx\n\t\tDeletePhaseDialog.jsx\n\t\tDeleteProposalForeverDialog.jsx\n\t\t...\n\tchat/\n\t\t...\n\tdashboard/\n\tgeo/\n\tloaders/\n\tpages/\n\tui/\ndocumentations/\n\tCODEX_PROMPT_DMDEVELON_MULTI_PROPOSAL_PHASES.md\n\tPROJECT_CHAT_PLAN.md\n\tTODO.md\nhooks/\n\tuse-mobile.jsx\n\tuse-toast.js\n\tuseAuth.js\n\tuseCardHighlight.js\n\tuseClientProjects.js\n\tuseCompanyProfile.js\n\tuseNotifications.js\n\tuseProjectChat.js\n\tuseProjectItems.js\n\tuseProjectMembers.js\n\tuseProjectProposals.js\n\tuseProjectRequests.js\n\tuseProjects.js\n\tusePush.js\n\tuseServices.js\n\tuseTestimonials.js\nlib/\n\tauth.js\n\tchat-domain.mjs\n\tchat-serializers.mjs\n\tcloudinary.js\n\temail-templates.js\n\temail.js\n\tmongodb.js\n\tnotification-policy.mjs\n\tnotify.js\n\tproject-access.js\n\tproject-proposal-domain.mjs\n\tproject-serializers.mjs\n\tpush.js\n\tresend.js\n\troute-match.mjs\n\tseo.js\n\tslugify.js\n\tutils.js\nmemory/\nmodels/\n\tChatChannel.js\n\tChatMessage.js\n\tChatRead.js\n\tClientProject.js\n\tCMSPage.js\n\tCompanyProfile.js\n\tContactMessage.js\n\tNotification.js\n\tProject.js\n\tProjectAuditLog.js\n\tProjectInvitation.js\n\tProjectItem.js\n\tProjectMember.js\n\tProjectMessage.js\n\tProjectProposal.js\n\tProjectRequest.js\n\tPushSubscription.js\n\tService.js\n\tTestimonial.js\n\tUser.js\nproviders/\n\tQueryProvider.js\npublic/\n\tmanifest.json\n\tsw.js\n\ticons/\n\timages/\nscripts/\n\tmigrate-project-proposals.mjs\ntest_reports/\n\tpytest/\ntests/\n\t__init__.py\n\tchat-domain.test.mjs\n\tchat-serializers.test.mjs\n\tnotification-policy.test.mjs\n\tproject-proposal-domain.test.mjs\n\tproject-serializers.test.mjs\n\troute-match.test.mjs\n```\nThis is the state of the context at this point in the conversation. The view of the workspace structure may be truncated. You can use tools to collect more context if needed.\n</workspace_info>\n<userMemory>\nNo user preferences or notes saved yet. Use the memory tool to store persistent notes under /memories/.\n</userMemory>\n<sessionMemory>\nSession memory (/memories/session/) is empty. No session notes have been created yet.\n</sessionMemory>\n<repoMemory>\nRepository memory (/memories/repo/) is empty. No workspace-scoped notes have been created yet.\n</repoMemory>\n"
+        },
+        {
+          "$mid": 24,
+          "mimeType": "cache_control",
+          "data": "ZXBoZW1lcmFs"
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "$mid": 21,
+          "value": "<context>\nThe current date is 2026-07-28.\n</context>\n<editorContext>\nThe user's current file is /home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/documentations/TODO.md. The current selection is from line 167 to line 167.\n</editorContext>\n<reminderInstructions>\n\n</reminderInstructions>\n<userRequest>\nI need to find and read the following files in /home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon:\n\n1. The admin panel page at `app/admin/page.js` — read the full file, focusing on the header/AuthGuard/AdminPageInner area that renders the chat tab\n2. The `MessageComposer.jsx` component at `components/chat/MessageComposer.jsx` — read the full file\n3. The `ProjectChat.jsx` component at `components/chat/ProjectChat.jsx` — read the full file\n4. The `ChatHeader.jsx` at `components/chat/ChatHeader.jsx` — read the full file\n\nReturn the FULL content of all four files. Do not summarize or omit any lines.\n</userRequest>\n"
+        },
+        {
+          "$mid": 24,
+          "mimeType": "cache_control",
+          "data": "ZXBoZW1lcmFs"
+        }
+      ]
+    },
+    {
+      "role": 2,
+      "content": [
+        {
+          "$mid": 22,
+          "value": "The user wants me to read four specific files in full. Let me read all four in parallel.",
+          "id": ""
+        },
+        {
+          "$mid": 21,
+          "value": ""
+        },
+        {
+          "callId": "call_00_ZlvlTPjulTAVTZKpTf9b5733",
+          "name": "read_file",
+          "input": {
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/app/admin/page.js",
+            "startLine": 1
+          }
+        },
+        {
+          "callId": "call_01_v8fSWnDgsjE8xQARtC5X1099",
+          "name": "read_file",
+          "input": {
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/components/chat/MessageComposer.jsx",
+            "startLine": 1
+          }
+        },
+        {
+          "callId": "call_02_KaCL86ofEinIzUUsJq8L2661",
+          "name": "read_file",
+          "input": {
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/components/chat/ProjectChat.jsx",
+            "startLine": 1
+          }
+        },
+        {
+          "callId": "call_03_ILP8AMWVlvfQp9ZbQ0zd4563",
+          "name": "read_file",
+          "input": {
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/components/chat/ChatHeader.jsx",
+            "startLine": 1
+          }
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_00_ZlvlTPjulTAVTZKpTf9b5733",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "ERROR: Your input to the tool was invalid (must have required property 'endLine')\nPlease check your input and try again."
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_01_v8fSWnDgsjE8xQARtC5X1099",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "ERROR: Your input to the tool was invalid (must have required property 'endLine')\nPlease check your input and try again."
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_02_KaCL86ofEinIzUUsJq8L2661",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "ERROR: Your input to the tool was invalid (must have required property 'endLine')\nPlease check your input and try again."
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_03_ILP8AMWVlvfQp9ZbQ0zd4563",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "ERROR: Your input to the tool was invalid (must have required property 'endLine')\nPlease check your input and try again."
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 2,
+      "content": [
+        {
+          "$mid": 22,
+          "value": "I need to provide endLine. Let me first check the file sizes or use a large endLine. Let me search for the files to find their line counts, or just use a large endLine.",
+          "id": ""
+        },
+        {
+          "$mid": 21,
+          "value": "I need to provide `endLine`. Let me first check line counts for each file, then read them all."
+        },
+        {
+          "callId": "call_00_M3B48W3HUkPI42a1R1MU9878",
+          "name": "grep_search",
+          "input": {
+            "query": "$",
+            "includePattern": "app/admin/page.js",
+            "isRegexp": true
+          }
+        },
+        {
+          "callId": "call_01_7yurre86TGTvuvvyxvqL7356",
+          "name": "grep_search",
+          "input": {
+            "query": "$",
+            "includePattern": "components/chat/MessageComposer.jsx",
+            "isRegexp": true
+          }
+        },
+        {
+          "callId": "call_02_bnEc8WvaZZPoGxIrHOCF0517",
+          "name": "grep_search",
+          "input": {
+            "query": "$",
+            "includePattern": "components/chat/ProjectChat.jsx",
+            "isRegexp": true
+          }
+        },
+        {
+          "callId": "call_03_Q1f7yoF2KhrfxiW5ervM4150",
+          "name": "grep_search",
+          "input": {
+            "query": "$",
+            "includePattern": "components/chat/ChatHeader.jsx",
+            "isRegexp": true
+          }
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_00_M3B48W3HUkPI42a1R1MU9878",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "Found 101 matches in 1 file for \"$\" (showing 20 matches in 1 file)\n\napp/admin/page.js\n1:\"use client\";\n2:\n3:import { useState, useEffect, Suspense } from \"react\";\n4:import { useRouter, useSearchParams } from \"next/navigation\";\n5:import { motion } from \"framer-motion\";\n6:import { useAuth } from \"@/hooks/useAuth\";\n7:import { useServices } from \"@/hooks/useServices\";\n8:import { useProjects } from \"@/hooks/useProjects\";\n9:import { useTestimonials } from \"@/hooks/useTestimonials\";\n10:import { useCardHighlight } from \"@/hooks/useCardHighlight\";\n11:import toast from \"react-hot-toast\";\n12:import axios from \"axios\";\n13:import {\n14:  Bot,\n15:  BrainCircuit,\n16:  Cog,\n17:  Code,\n18:  LayoutDashboard,\n19:  CodeXml,\n20:  Users,\n... (81 more matches in this file)"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_01_7yurre86TGTvuvvyxvqL7356",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "Found 101 matches in 1 file for \"$\" (showing 20 matches in 1 file)\n\ncomponents/chat/MessageComposer.jsx\n1:\"use client\";\n2:\n3:import { useRef, useState } from \"react\";\n4:import toast from \"react-hot-toast\";\n5:import { useChatMessages } from \"@/hooks/useProjectChat\";\n6:import { useProjectMembers } from \"@/hooks/useProjectMembers\";\n7:import { cn, readAsDataURL } from \"@/lib/utils\";\n8:import {\n9:  ChevronDown,\n10:  FileText,\n11:  Flag,\n12:  Loader2,\n13:  MoreVertical,\n14:  Paperclip,\n15:  Send,\n16:  X,\n17:} from \"lucide-react\";\n18:import {\n19:  DropdownMenu,\n20:  DropdownMenuContent,\n... (81 more matches in this file)"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_02_bnEc8WvaZZPoGxIrHOCF0517",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "Found 101 matches in 1 file for \"$\" (showing 20 matches in 1 file)\n\ncomponents/chat/ProjectChat.jsx\n1:\"use client\";\n2:\n3:import { useEffect, useState } from \"react\";\n4:import { cn } from \"@/lib/utils\";\n5:import { useAuth } from \"@/hooks/useAuth\";\n6:import { useChatChannels } from \"@/hooks/useProjectChat\";\n7:import { ChannelSidebar } from \"./ChannelSidebar\";\n8:import { ChatHeader } from \"./ChatHeader\";\n9:import { PinnedBar } from \"./PinnedBar\";\n10:import { MessageList } from \"./MessageList\";\n11:import { MessageComposer } from \"./MessageComposer\";\n12:import { TeamPanel } from \"./TeamPanel\";\n13:import { ProjectItemsPanel } from \"./ProjectItemsPanel\";\n14:import { Loader2, MessageSquare } from \"lucide-react\";\n15:\n16:/**\n17: * Shell for the whole Communication Hub — shared between the client\n18: * dashboard and the admin dashboard, distinguished only by `viewerRole`\n19: * (drives bubble alignment/moderation client-side; the server is the actual\n20: * authority on every permission).\n... (81 more matches in this file)"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_03_Q1f7yoF2KhrfxiW5ervM4150",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "Found 101 matches in 1 file for \"$\" (showing 20 matches in 1 file)\n\ncomponents/chat/ChatHeader.jsx\n1:\"use client\";\n2:\n3:import { useEffect, useState } from \"react\";\n4:import { Input } from \"@/components/ui/input\";\n5:import {\n6:  Select,\n7:  SelectContent,\n8:  SelectItem,\n9:  SelectTrigger,\n10:  SelectValue,\n11:} from \"@/components/ui/select\";\n12:import { ChevronLeft, Hash, ListTodo, MessageCircle, Search } from \"lucide-react\";\n13:\n14:// \"attachment:image\"/\"attachment:document\" are a distinct filter dimension\n15:// from the message flag (idea/problem/…), but share this one dropdown by\n16:// request — useChatMessages translates the prefixed value into the server's\n17:// separate `attachmentType` query param instead of `flag`.\n18:const FILTER_OPTIONS = [\n19:  { value: \"all\", label: \"All\" },\n20:  { value: \"pinned\", label: \"Pinned\" },\n... (81 more matches in this file)"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 2,
+      "content": [
+        {
+          "$mid": 22,
+          "value": "Each file has at least 101 lines. Let me read them all now with proper endLine values. I'll use large endLine values to ensure I get the full files.",
+          "id": ""
+        },
+        {
+          "$mid": 21,
+          "value": "Each file shows at least 101 matches. Let me read all four now with generous endLine values:"
+        },
+        {
+          "callId": "call_00_ZRyQquOKKiPfpDWUx5eR4528",
+          "name": "read_file",
+          "input": {
+            "endLine": 200,
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/app/admin/page.js",
+            "startLine": 1
+          }
+        },
+        {
+          "callId": "call_01_hareEcOFA4annYMDgG4Z6108",
+          "name": "read_file",
+          "input": {
+            "endLine": 200,
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/components/chat/MessageComposer.jsx",
+            "startLine": 1
+          }
+        },
+        {
+          "callId": "call_02_YgghVJC6m5xVtRtW0guE0808",
+          "name": "read_file",
+          "input": {
+            "endLine": 300,
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/components/chat/ProjectChat.jsx",
+            "startLine": 1
+          }
+        },
+        {
+          "callId": "call_03_BfsgyRC3qH93yDUZg8ez1817",
+          "name": "read_file",
+          "input": {
+            "endLine": 200,
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/components/chat/ChatHeader.jsx",
+            "startLine": 1
+          }
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_00_ZRyQquOKKiPfpDWUx5eR4528",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "\"use client\";\n\nimport { useState, useEffect, Suspense } from \"react\";\nimport { useRouter, useSearchParams } from \"next/navigation\";\nimport { motion } from \"framer-motion\";\nimport { useAuth } from \"@/hooks/useAuth\";\nimport { useServices } from \"@/hooks/useServices\";\nimport { useProjects } from \"@/hooks/useProjects\";\nimport { useTestimonials } from \"@/hooks/useTestimonials\";\nimport { useCardHighlight } from \"@/hooks/useCardHighlight\";\nimport toast from \"react-hot-toast\";\nimport axios from \"axios\";\nimport {\n  Bot,\n  BrainCircuit,\n  Cog,\n  Code,\n  LayoutDashboard,\n  CodeXml,\n  Users,\n  Palette,\n  TrendingUp,\n  Globe,\n  Smartphone,\n  Briefcase,\n  FolderKanban,\n  MessageSquare,\n  MessagesSquare,\n  Settings,\n  FileText,\n  LogOut,\n  Menu,\n  X,\n  Plus,\n  Shield,\n  Edit,\n  Trash2,\n  Cloud,\n  Sparkles,\n  Eye,\n  Reply,\n  ChevronRight,\n  Star,\n  Zap,\n  Database,\n  Layers,\n  Building,\n  Mail,  Monitor,\n  ShoppingCart,\n  Home,\n  NotebookPen,\n  Store,\n  MapPinHouse,\n  Handshake,\n  AlertTriangle,\n  RefreshCw,\n  Inbox,\n  FilePlus2,\n  KeyRound,\n} from \"lucide-react\";\nimport { Button } from \"@/components/ui/button\";\nimport { Input } from \"@/components/ui/input\";\nimport { Label } from \"@/components/ui/label\";\nimport {\n  Dialog,\n  DialogContent,\n  DialogHeader,\n  DialogTitle,\n  DialogDescription,\n} from \"@/components/ui/dialog\";\nimport {\n  Select,\n  SelectContent,\n  SelectItem,\n  SelectTrigger,\n  SelectValue,\n} from \"@/components/ui/select\";\nimport {\n  BarChart,\n  Bar,\n  XAxis,\n  YAxis,\n  CartesianGrid,\n  Tooltip,\n  ResponsiveContainer,\n  PieChart,\n  Pie,\n  Cell,\n} from \"recharts\";\nimport Loader from \"@/components/loaders/Loader\";\nimport Link from \"next/link\";\nimport { useCompanyProfile } from \"@/hooks/useCompanyProfile\";\nimport { useChatChannels } from \"@/hooks/useProjectChat\";\nimport ClientProjectsManager from \"@/components/admin/ClientProjectsManager\";\nimport ProjectRequestsManager from \"@/components/admin/ProjectRequestsManager\";\nimport NotificationBell from \"@/components/NotificationBell\";\nimport PushManager from \"@/components/PushManager\";\nimport { ProjectChat } from \"@/components/chat/ProjectChat\";\n\n// Icon mapping\nconst iconMap = {\n  Bot,\n  BrainCircuit,\n  Cog,\n  Code,\n  CodeXml,\n  Palette,\n  Smartphone,\n  Globe,\n  TrendingUp,\n  Cloud,\n  Sparkles,\n  Zap,\n  Shield,\n  Layers,\n  Monitor,\n  Database,\n  Settings,\n  Mail,\n  ShoppingCart,\n  NotebookPen,\n  Store,\n  MapPinHouse,\n  Handshake,\n  HandshakeIcon: Cog,\n};\n\nconst iconOptions = [\n  \"Bot\",\n  \"BrainCircuit\",\n  \"Cog\",\n  \"Code\",\n  \"CodeXml\",\n  \"Palette\",\n  \"Smartphone\",\n  \"Globe\",\n  \"TrendingUp\",\n  \"Cloud\",\n  \"Sparkles\",\n  \"Zap\",\n  \"Shield\",\n  \"Layers\",\n  \"Monitor\",\n  \"Database\",\n  \"Settings\",\n  \"Mail\",\n  \"ShoppingCart\",\n  \"NotebookPen\",\n  \"Store\",\n  \"MapPinHouse\",\n  \"Handshake\",\n];\nconst colorOptions = [\n  \"blue\",\n  \"green\",\n  \"purple\",\n  \"orange\",\n  \"pink\",\n  \"cyan\",\n  \"yellow\",\n  \"red\",\n  \"indigo\",\n  \"teal\",\n  \"sky\",\n  \"violet\",\n  \"emerald\",\n  \"black\",\n];\n\nconst colorMap = {\n  blue: \"#3B82F6\",\n  green: \"#10B981\",\n  purple: \"#8B5CF6\",\n  orange: \"#F97316\",\n  pink: \"#EC4899\",\n  cyan: \"#06B6D4\",\n  yellow: \"#EAB308\",\n  red: \"#EF4444\",\n  indigo: \"#6366F1\",\n  teal: \"#14B8A6\",\n  sky: \"oklch(58.8% 0.158 241.966)\",\n  violet: \"oklch(54.1% 0.281 293.009)\",\n  emerald: \"oklch(43.2% 0.095 166.913)\",\n  black: \"oklch(13% 0.028 261.692)\",\n};\n\n// Sidebar Component\nfunction AdminSidebar({\n  activeTab,\n  setActiveTab,\n  onLogout,\n  isMobileOpen,\n  setIsMobileOpen,\n  totalUnreadChat = 0,\n}) {\n  const menuItems = [\n    { id: \"dashboard\", label: \"Dashboard\", icon: LayoutDashboard },\n    { id: \"services\", label: \"Services\", icon: Briefcase },\n    { id: \"projects\", label: \"Projects\", icon: FolderKanban },\n    { id: \"client-projects\", label: \"Client Projects\", icon: Handshake },"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_01_hareEcOFA4annYMDgG4Z6108",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "\"use client\";\n\nimport { useRef, useState } from \"react\";\nimport toast from \"react-hot-toast\";\nimport { useChatMessages } from \"@/hooks/useProjectChat\";\nimport { useProjectMembers } from \"@/hooks/useProjectMembers\";\nimport { cn, readAsDataURL } from \"@/lib/utils\";\nimport {\n  ChevronDown,\n  FileText,\n  Flag,\n  Loader2,\n  MoreVertical,\n  Paperclip,\n  Send,\n  X,\n} from \"lucide-react\";\nimport {\n  DropdownMenu,\n  DropdownMenuContent,\n  DropdownMenuItem,\n  DropdownMenuPortal,\n  DropdownMenuSub,\n  DropdownMenuSubContent,\n  DropdownMenuSubTrigger,\n  DropdownMenuTrigger,\n} from \"@/components/ui/dropdown-menu\";\n\nconst FLAG_OPTIONS = [\n  { value: \"none\", label: \"No flag\" },\n  { value: \"request\", label: \"Request\" },\n  { value: \"task\", label: \"Task\" },\n  { value: \"idea\", label: \"Idea\" },\n  { value: \"problem\", label: \"Problem\" },\n  { value: \"incident\", label: \"Incident\" },\n  { value: \"decision\", label: \"Decision\" },\n];\n\nconst MAX_TEXTAREA_HEIGHT = 200;\n\n/**\n * `flag`/`search` are passed through only so this component's own\n * useChatMessages(channelId, {flag, q}) call resolves to the SAME query key\n * MessageList is reading — React Query then shares one cache entry/poll\n * instead of this composer quietly running a second, differently-filtered\n * background query for mutations it doesn't otherwise need the data for.\n */\nexport function MessageComposer({\n  channelId,\n  projectId,\n  flag,\n  search,\n  replyTo,\n  onCancelReply,\n}) {\n  const { sendMessage, uploadAttachment } = useChatMessages(channelId, {\n    flag,\n    q: search,\n  });\n  const { members } = useProjectMembers(projectId);\n\n  const [text, setText] = useState(\"\");\n  const [pending, setPending] = useState([]);\n  const [uploading, setUploading] = useState(false);\n  const [messageFlag, setMessageFlag] = useState(\"none\");\n  const [mentionQuery, setMentionQuery] = useState(null);\n  const textareaRef = useRef(null);\n  const fileRef = useRef(null);\n\n  const autoGrow = (el) => {\n    if (!el) return;\n    el.style.height = \"auto\";\n    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;\n  };\n\n  const handleChange = (e) => {\n    const value = e.target.value;\n    setText(value);\n    autoGrow(e.target);\n\n    const cursor = e.target.selectionStart;\n    const upToCursor = value.slice(0, cursor);\n    const match = upToCursor.match(/@([^\\s@]*)$/);\n    setMentionQuery(match ? match[1] : null);\n  };\n\n  const insertMention = (name) => {\n    const el = textareaRef.current;\n    if (!el) return;\n    const cursor = el.selectionStart;\n    const upToCursor = text.slice(0, cursor);\n    const replaced = upToCursor.replace(/@([^\\s@]*)$/, `@${name} `);\n    const next = replaced + text.slice(cursor);\n    setText(next);\n    setMentionQuery(null);\n    requestAnimationFrame(() => el.focus());\n  };\n\n  const mentionCandidates =\n    mentionQuery === null\n      ? []\n      : members\n          .filter((m) =>\n            m.name.toLowerCase().includes(mentionQuery.toLowerCase()),\n          )\n          .slice(0, 5);\n\n  const handleFiles = async (e) => {\n    const files = Array.from(e.target.files || []);\n    if (files.length === 0) return;\n    setUploading(true);\n    try {\n      for (const file of files) {\n        const allowed =\n          file.type.startsWith(\"image/\") || file.type === \"application/pdf\";\n        if (!allowed) {\n          toast.error(\"Only images and PDF files are allowed\");\n          continue;\n        }\n        if (file.size > 10 * 1024 * 1024) {\n          toast.error(`${file.name} is larger than 10MB`);\n          continue;\n        }\n        const dataUri = await readAsDataURL(file);\n        const result = await uploadAttachment.mutateAsync({\n          file: dataUri,\n          name: file.name,\n          projectId,\n        });\n        setPending((prev) => [...prev, result]);\n      }\n    } catch (err) {\n      toast.error(err.response?.data?.error || \"Upload failed\");\n    } finally {\n      setUploading(false);\n      if (fileRef.current) fileRef.current.value = \"\";\n    }\n  };\n\n  const handleSend = async () => {\n    if (!text.trim() && pending.length === 0) return;\n    try {\n      await sendMessage.mutateAsync({\n        body: text.trim(),\n        attachments: pending,\n        flag: messageFlag,\n        replyToMessageId: replyTo?._id || undefined,\n      });\n      setText(\"\");\n      setPending([]);\n      setMessageFlag(\"none\");\n      onCancelReply?.();\n      if (textareaRef.current) textareaRef.current.style.height = \"auto\";\n    } catch (err) {\n      toast.error(err.response?.data?.error || \"Failed to send\");\n    }\n  };\n\n  // Enter alone is left completely alone — the textarea's own default\n  // behavior (a newline) is exactly what's wanted. Only Ctrl/Cmd+Enter sends.\n  const handleKeyDown = (e) => {\n    if (e.key === \"Enter\" && (e.ctrlKey || e.metaKey)) {\n      e.preventDefault();\n      handleSend();\n    }\n  };\n\n  return (\n    <div className=\"border-t border-white/10 shrink-0\">\n      {replyTo && (\n        <div className=\"flex items-center justify-between gap-2 px-4 pt-2 text-xs text-gray-400\">\n          <span className=\"truncate\">\n            Replying to <strong className=\"text-gray-300\">{replyTo.authorName}</strong>:{\" \"}\n            {replyTo.body}\n          </span>\n          <button\n            type=\"button\"\n            onClick={onCancelReply}\n            className=\"text-gray-500 hover:text-white shrink-0\"\n          >\n            <X className=\"w-3.5 h-3.5\" />\n          </button>\n        </div>\n      )}\n\n      {pending.length > 0 && (\n        <div className=\"px-4 pt-2 flex flex-wrap gap-2\">\n          {pending.map((a, idx) => (\n            <span\n              key={idx}\n              className=\"flex items-center gap-1 text-xs bg-white/10 text-gray-200 rounded px-2 py-1\"\n            >\n              {a.type === \"pdf\" ? (\n                <FileText className=\"w-3 h-3\" />\n              ) : (\n                <Paperclip className=\"w-3 h-3\" />\n              )}\n              {a.name || a.type}\n              <button\n                type=\"button\""
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_02_YgghVJC6m5xVtRtW0guE0808",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "\"use client\";\n\nimport { useEffect, useState } from \"react\";\nimport { cn } from \"@/lib/utils\";\nimport { useAuth } from \"@/hooks/useAuth\";\nimport { useChatChannels } from \"@/hooks/useProjectChat\";\nimport { ChannelSidebar } from \"./ChannelSidebar\";\nimport { ChatHeader } from \"./ChatHeader\";\nimport { PinnedBar } from \"./PinnedBar\";\nimport { MessageList } from \"./MessageList\";\nimport { MessageComposer } from \"./MessageComposer\";\nimport { TeamPanel } from \"./TeamPanel\";\nimport { ProjectItemsPanel } from \"./ProjectItemsPanel\";\nimport { Loader2, MessageSquare } from \"lucide-react\";\n\n/**\n * Shell for the whole Communication Hub — shared between the client\n * dashboard and the admin dashboard, distinguished only by `viewerRole`\n * (drives bubble alignment/moderation client-side; the server is the actual\n * authority on every permission).\n */\nexport function ProjectChat({ viewerRole = \"client\", initialChannelId = null }) {\n  const { user } = useAuth();\n  const { channels, isLoading, startDirectMessage } = useChatChannels();\n  const [activeChannelId, setActiveChannelId] = useState(null);\n  const [flagFilter, setFlagFilter] = useState(\"all\");\n  const [search, setSearch] = useState(\"\");\n  const [replyTo, setReplyTo] = useState(null);\n  const [teamPanelProjectId, setTeamPanelProjectId] = useState(null);\n  const [itemsPanelOpen, setItemsPanelOpen] = useState(false);\n  // Carries a jump from the pinned bar down into the thread. The nonce makes\n  // clicking the same pinned message twice in a row work.\n  const [jumpRequest, setJumpRequest] = useState(null);\n  // Below md: only one pane shows at a time (sidebar or conversation), full\n  // width. At md and up both panes show side by side regardless of this —\n  // see the \"md:flex\"/\"md:w-64\" overrides on each pane below.\n  const [mobileView, setMobileView] = useState(\"list\");\n\n  // Default to the deep-linked channel (a notification's ?channel=) if it's\n  // one this viewer actually has, else the first channel in the list. Only\n  // runs while nothing is selected yet, so it never overrides a channel the\n  // user has since clicked — the poll refreshing `channels` every 15s must\n  // not keep snapping selection back to the deep link.\n  useEffect(() => {\n    if (activeChannelId || channels.length === 0) return;\n    const deepLinked =\n      initialChannelId && channels.some((c) => c._id === initialChannelId);\n    setActiveChannelId(deepLinked ? initialChannelId : channels[0]._id);\n  }, [channels, activeChannelId, initialChannelId]);\n\n  // Switching conversations abandons any in-progress reply — replying across\n  // channels makes no sense (the quoted message wouldn't even be there).\n  useEffect(() => {\n    setReplyTo(null);\n  }, [activeChannelId]);\n\n  const activeChannel = channels.find((c) => c._id === activeChannelId) || null;\n\n  const handleSelectChannel = (id) => {\n    setActiveChannelId(id);\n    setMobileView(\"chat\");\n  };\n\n  const handleStartDirectMessage = async ({ projectId, userId }) => {\n    try {\n      const channel = await startDirectMessage.mutateAsync({ projectId, userId });\n      setActiveChannelId(channel._id);\n      setMobileView(\"chat\");\n    } catch {\n      // useChatChannels' mutation surfaces its own error state; nothing\n      // further to do here than not switch channels.\n    }\n  };\n\n  if (isLoading) {\n    return (\n      <div className=\"flex items-center justify-center h-[500px] text-gray-400 gap-2\">\n        <Loader2 className=\"w-5 h-5 animate-spin\" /> Loading chat…\n      </div>\n    );\n  }\n\n  if (channels.length === 0) {\n    return (\n      <div className=\"flex flex-col items-center justify-center h-[500px] text-center text-gray-400 gap-2\">\n        <MessageSquare className=\"w-10 h-10 text-gray-600\" />\n        <p>No project chat yet.</p>\n      </div>\n    );\n  }\n\n  return (\n    <div className=\"flex h-[calc(100vh-220px)] min-h-[500px] bg-[#1a1a1b] border border-white/10 rounded-xl overflow-hidden\">\n      <ChannelSidebar\n        channels={channels}\n        activeChannelId={activeChannelId}\n        onSelectChannel={handleSelectChannel}\n        onStartDirectMessage={handleStartDirectMessage}\n        onOpenTeamPanel={setTeamPanelProjectId}\n        currentUserId={user?._id}\n        mobileHidden={mobileView === \"chat\"}\n      />\n      <div\n        className={cn(\n          \"flex-1 flex-col min-w-0\",\n          mobileView === \"list\" ? \"hidden md:flex\" : \"flex\",\n        )}\n      >\n        {activeChannel ? (\n          <>\n            <ChatHeader\n              channel={activeChannel}\n              flag={flagFilter}\n              onFlagChange={setFlagFilter}\n              search={search}\n              onSearchChange={setSearch}\n              onOpenItems={() => setItemsPanelOpen(true)}\n              onBack={() => setMobileView(\"list\")}\n            />\n            <PinnedBar\n              channelId={activeChannel._id}\n              flag={flagFilter}\n              search={search}\n              canConvertToItem={activeChannel.canConvertToItem}\n              canConvertToFormal={activeChannel.canConvertToFormal}\n              onJumpToMessage={(messageId) =>\n                setJumpRequest({ messageId, nonce: Date.now() })\n              }\n            />\n            <MessageList\n              channelId={activeChannel._id}\n              flag={flagFilter}\n              search={search}\n              viewerRole={viewerRole}\n              canPin={activeChannel.canPin}\n              canConvertToItem={activeChannel.canConvertToItem}\n              canConvertToFormal={activeChannel.canConvertToFormal}\n              currentUserId={user?._id}\n              onReply={setReplyTo}\n              jumpRequest={jumpRequest}\n            />\n            <MessageComposer\n              channelId={activeChannel._id}\n              projectId={activeChannel.projectId}\n              flag={flagFilter}\n              search={search}\n              replyTo={replyTo}\n              onCancelReply={() => setReplyTo(null)}\n            />\n          </>\n        ) : (\n          <div className=\"flex-1 flex items-center justify-center text-gray-500\">\n            Select a conversation\n          </div>\n        )}\n      </div>\n      {teamPanelProjectId && (\n        <TeamPanel\n          projectId={teamPanelProjectId}\n          open={!!teamPanelProjectId}\n          onOpenChange={(open) => !open && setTeamPanelProjectId(null)}\n        />\n      )}\n      {activeChannel && (\n        <ProjectItemsPanel\n          projectId={activeChannel.projectId}\n          open={itemsPanelOpen}\n          onOpenChange={setItemsPanelOpen}\n          canApprove={activeChannel.canApproveItems}\n          canPromote={activeChannel.canConvertToFormal}\n        />\n      )}\n    </div>\n  );\n}\n\nexport default ProjectChat;\n"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_03_BfsgyRC3qH93yDUZg8ez1817",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "\"use client\";\n\nimport { useEffect, useState } from \"react\";\nimport { Input } from \"@/components/ui/input\";\nimport {\n  Select,\n  SelectContent,\n  SelectItem,\n  SelectTrigger,\n  SelectValue,\n} from \"@/components/ui/select\";\nimport { ChevronLeft, Hash, ListTodo, MessageCircle, Search } from \"lucide-react\";\n\n// \"attachment:image\"/\"attachment:document\" are a distinct filter dimension\n// from the message flag (idea/problem/…), but share this one dropdown by\n// request — useChatMessages translates the prefixed value into the server's\n// separate `attachmentType` query param instead of `flag`.\nconst FILTER_OPTIONS = [\n  { value: \"all\", label: \"All\" },\n  { value: \"pinned\", label: \"Pinned\" },\n  { value: \"request\", label: \"Request\" },\n  { value: \"task\", label: \"Task\" },\n  { value: \"idea\", label: \"Idea\" },\n  { value: \"problem\", label: \"Problem\" },\n  { value: \"incident\", label: \"Incident\" },\n  { value: \"decision\", label: \"Decision\" },\n  { value: \"attachment:image\", label: \"Images\" },\n  { value: \"attachment:document\", label: \"Documents\" },\n];\n\n// Debounce delay (ms) before a keystroke actually changes the `q` used by\n// useChatMessages' query key (I8) — every keystroke otherwise fires its own\n// request and its own cache entry, one per partial search string typed.\nconst SEARCH_DEBOUNCE_MS = 400;\n\nexport function ChatHeader({\n  channel,\n  flag,\n  onFlagChange,\n  search,\n  onSearchChange,\n  onOpenItems,\n  onBack,\n}) {\n  const Icon = channel?.kind === \"dm\" ? MessageCircle : Hash;\n\n  // Local state so typing feels instant; the debounced value is what\n  // actually reaches the parent (and from there, the message query key).\n  const [draft, setDraft] = useState(search);\n\n  useEffect(() => {\n    setDraft(search);\n  }, [search]);\n\n  useEffect(() => {\n    if (draft === search) return;\n    const t = setTimeout(() => onSearchChange(draft), SEARCH_DEBOUNCE_MS);\n    return () => clearTimeout(t);\n    // eslint-disable-next-line react-hooks/exhaustive-deps\n  }, [draft]);\n\n  return (\n    // Two stacked rows on a phone — title across the full width, controls\n    // across the full width beneath it — collapsing to a single row from md\n    // up. Cramming all of it onto one narrow line left the channel name\n    // truncated to a few characters and the search box unusably small.\n    <div className=\"px-3 md:px-4 py-2.5 border-b border-white/10 shrink-0 flex flex-col gap-2 md:flex-row md:items-center md:gap-3\">\n      <div className=\"flex items-center gap-2 min-w-0 md:flex-1\">\n        {onBack && (\n          <button\n            type=\"button\"\n            onClick={onBack}\n            className=\"md:hidden p-1 -ml-1 rounded-lg text-gray-400 hover:text-white shrink-0\"\n            title=\"Back to channels\"\n          >\n            <ChevronLeft className=\"w-5 h-5\" />\n          </button>\n        )}\n        <Icon className=\"w-4 h-4 text-gray-500 shrink-0\" />\n        <h3 className=\"text-white font-semibold truncate\">\n          {channel?.name || \"Direct message\"}\n        </h3>\n      </div>\n\n      <div className=\"flex items-center gap-2 w-full md:w-auto\">\n        <Select value={flag} onValueChange={onFlagChange}>\n          <SelectTrigger className=\"w-[116px] md:w-[130px] h-8 shrink-0 bg-white/5 border-white/10 text-white text-xs\">\n            <SelectValue placeholder=\"Filter\" />\n          </SelectTrigger>\n          <SelectContent>\n            {FILTER_OPTIONS.map((opt) => (\n              <SelectItem key={opt.value} value={opt.value}>\n                {opt.label}\n              </SelectItem>\n            ))}\n          </SelectContent>\n        </Select>\n\n        {/* Takes whatever width is left on mobile; fixed on desktop. */}\n        <div className=\"relative flex-1 min-w-0 md:flex-none md:w-40\">\n          <Search className=\"absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500\" />\n          <Input\n            value={draft}\n            onChange={(e) => setDraft(e.target.value)}\n            placeholder=\"Search…\"\n            className=\"pl-7 h-8 w-full bg-white/5 border-white/10 text-white text-xs\"\n          />\n        </div>\n\n        {onOpenItems && (\n          <button\n            type=\"button\"\n            onClick={onOpenItems}\n            title=\"Decisions & items\"\n            className=\"h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-gray-400 hover:text-[#FFB633] hover:bg-white/5\"\n          >\n            <ListTodo className=\"w-4 h-4\" />\n          </button>\n        )}\n      </div>\n    </div>\n  );\n}\n\nexport default ChatHeader;\n"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 2,
+      "content": [
+        {
+          "$mid": 22,
+          "value": "Three files were read fully, but the admin/page.js was truncated at 200 lines (we can see it goes beyond that). Let me read the remaining lines. Also, the MessageComposer.jsx might be truncated too — let me check. Looking at the output, it ends with `<button type=\"button\"` which is incomplete, so it was truncated at 200 lines. Let me re-read the remaining portions.",
+          "id": ""
+        },
+        {
+          "$mid": 21,
+          "value": "The `admin/page.js` and `MessageComposer.jsx` were truncated. Let me read the remaining lines:"
+        },
+        {
+          "callId": "call_00_WjxjxvAg9OtcqQ73rjsy0221",
+          "name": "read_file",
+          "input": {
+            "endLine": 400,
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/app/admin/page.js",
+            "startLine": 200
+          }
+        },
+        {
+          "callId": "call_01_oIyelzmjDxXT1oM7GxOS2344",
+          "name": "read_file",
+          "input": {
+            "endLine": 400,
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/components/chat/MessageComposer.jsx",
+            "startLine": 200
+          }
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_00_WjxjxvAg9OtcqQ73rjsy0221",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "    { id: \"client-projects\", label: \"Client Projects\", icon: Handshake },\n    { id: \"chat\", label: \"Chat\", icon: MessagesSquare },\n    { id: \"project-requests\", label: \"Project Requests\", icon: Inbox },\n    { id: \"testimonials\", label: \"Testimonials\", icon: MessageSquare },\n    { id: \"users\", label: \"Users\", icon: Users },\n    { id: \"messages\", label: \"Messages\", icon: Mail },\n    { id: \"company\", label: \"Company Profile\", icon: Building },\n    { id: \"cms\", label: \"CMS Pages\", icon: FileText },\n  ];\n\n  return (\n    <>\n      {/* Mobile overlay */}\n      {isMobileOpen && (\n        <div\n          className=\"lg:hidden fixed inset-0 bg-black/50 z-40\"\n          onClick={() => setIsMobileOpen(false)}\n        />\n      )}\n\n      <aside\n        className={`fixed left-0 top-0 h-full bg-[#1a1a1b] border-r border-white/10 z-50 transition-transform duration-300 w-64\n          ${isMobileOpen ? \"translate-x-0\" : \"-translate-x-full lg:translate-x-0\"}`}\n      >\n        {/* Logo */}\n        <div className=\"p-6 border-b border-white/10\">\n          <a href=\"/\" className=\"flex items-center gap-3\">\n            <img src=\"/icons/dmd-logo.png\" alt=\"DMDevelon\" className=\"h-8 w-auto\" />\n            <div>\n              <h1 className=\"font-bold text-white\">DMDevelon</h1>\n              <p className=\"text-xs text-gray-400\">Admin Panel</p>\n            </div>\n          </a>\n        </div>\n\n        {/* Navigation */}\n        <nav className=\"p-4 space-y-2\">\n          {menuItems.map((item) => (\n            <button\n              key={item.id}\n              onClick={() => {\n                setActiveTab(item.id);\n                setIsMobileOpen(false);\n              }}\n              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors\n                ${activeTab === item.id ? \"bg-[#FFB633] text-black\" : \"text-gray-400 hover:bg-white/5 hover:text-white\"}`}\n            >\n              <item.icon className=\"w-5 h-5\" />\n              <span className=\"font-medium flex-1 text-left\">{item.label}</span>\n              {item.id === \"chat\" &&\n                activeTab !== \"chat\" &&\n                totalUnreadChat > 0 && (\n                  <span className=\"w-2 h-2 rounded-full bg-[#FFB633] shrink-0\" />\n                )}\n            </button>\n          ))}\n        </nav>\n\n        {/* Logout */}\n        <div className=\"absolute bottom-0 left-0 right-0 p-4 border-t border-white/10\">\n          <button\n            onClick={onLogout}\n            className=\"w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-red-600 hover:bg-gray-500/10 transition-colors\"\n          >\n            <LogOut className=\"w-5 h-5\" />\n            <span className=\"font-medium\">Logout</span>\n          </button>\n        </div>\n      </aside>\n    </>\n  );\n}\n\n// Dashboard Stats Component\nfunction DashboardStats({ stats, isLoading, error, onRetry, onRelogin }) {\n  if (isLoading) {\n    return <div className=\"text-gray-400\">Loading statistics...</div>;\n  }\n\n  if (error) {\n    return (\n      <div className=\"space-y-4\">\n        <h2 className=\"text-2xl font-bold text-white\">Dashboard Overview</h2>\n        <div className=\"bg-red-500/10 border border-red-500/30 rounded-xl p-6\">\n          <div className=\"flex items-center gap-3 text-red-400\">\n            <AlertTriangle className=\"w-6 h-6\" />\n            <p className=\"font-semibold\">Error: something went wrong</p>\n          </div>\n          <p className=\"text-gray-400 text-sm mt-2\">{error.message}</p>\n          <div className=\"flex flex-wrap gap-3 mt-4\">\n            <Button\n              onClick={onRetry}\n              className=\"bg-[#FFB633] text-black hover:bg-[#e5a32e]\"\n            >\n              <RefreshCw className=\"w-4 h-4 mr-2\" />\n              Retry\n            </Button>\n            {error.status === 401 && onRelogin && (\n              <Button\n                onClick={onRelogin}\n                variant=\"outline\"\n                className=\"border-white/20 text-gray-300 hover:text-white\"\n              >\n                Log in again\n              </Button>\n            )}\n          </div>\n        </div>\n      </div>\n    );\n  }\n\n  const chartData = [\n    { name: \"Users\", value: stats.users || 0, color: \"#3B82F6\" },\n    { name: \"Projects\", value: stats.projects || 0, color: \"#10B981\" },\n    { name: \"Services\", value: stats.services || 0, color: \"#8B5CF6\" },\n    { name: \"Testimonials\", value: stats.testimonials || 0, color: \"#F97316\" },\n    { name: \"Messages\", value: stats.messages || 0, color: \"#EC4899\" },\n  ];\n\n  const statCards = [\n    {\n      label: \"Total Users\",\n      value: stats.users || 0,\n      icon: Users,\n      color: \"bg-blue-500\",\n    },\n    {\n      label: \"Projects\",\n      value: stats.projects || 0,\n      icon: FolderKanban,\n      color: \"bg-green-500\",\n    },\n    {\n      label: \"Services\",\n      value: stats.services || 0,\n      icon: Briefcase,\n      color: \"bg-purple-500\",\n    },\n    {\n      label: \"Testimonials\",\n      value: stats.testimonials || 0,\n      icon: MessageSquare,\n      color: \"bg-orange-500\",\n    },\n    {\n      label: \"Messages\",\n      value: stats.messages || 0,\n      icon: Mail,\n      color: \"bg-pink-500\",\n    },\n  ];\n\n  return (\n    <div className=\"space-y-8\">\n      <div>\n        <h2 className=\"text-2xl font-bold text-white mb-6\">\n          Dashboard Overview\n        </h2>\n        <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4\">\n          {statCards.map((stat) => (\n            <motion.div\n              key={stat.label}\n              whileHover={{ scale: 1.02 }}\n              className=\"bg-[#1a1a1b] rounded-xl p-6 border border-white/10\"\n            >\n              <div className=\"flex items-center justify-between\">\n                <div>\n                  <p className=\"text-gray-400 text-sm\">{stat.label}</p>\n                  <p className=\"text-3xl font-bold text-white mt-2\">\n                    {stat.value}\n                  </p>\n                </div>\n                <div className={`${stat.color} p-3 rounded-lg`}>\n                  <stat.icon className=\"w-6 h-6 text-white\" />\n                </div>\n              </div>\n            </motion.div>\n          ))}\n        </div>\n      </div>\n\n      <div className=\"grid grid-cols-1 lg:grid-cols-2 gap-6\">\n        <div className=\"bg-[#1a1a1b] rounded-xl p-6 border border-white/10\">\n          <h3 className=\"text-lg font-semibold text-white mb-4\">\n            Statistics Overview\n          </h3>\n          <ResponsiveContainer width=\"100%\" height={300}>\n            <BarChart data={chartData}>\n              <CartesianGrid strokeDasharray=\"3 3\" stroke=\"#333\" />\n              <XAxis dataKey=\"name\" stroke=\"#888\" />\n              <YAxis stroke=\"#888\" />\n              <Bar dataKey=\"value\" fill=\"#FFB633\" radius={[4, 4, 0, 0]} />\n              <Tooltip\n                contentStyle={{\n                  backgroundColor: \"#1a1a1b\",\n                  border: \"1px solid #333\",\n                }}\n                labelStyle={{ color: \"#fff\" }}\n              />\n            </BarChart>"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_01_oIyelzmjDxXT1oM7GxOS2344",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "                type=\"button\"\n                onClick={() =>\n                  setPending((prev) => prev.filter((_, i) => i !== idx))\n                }\n                className=\"hover:text-red-400\"\n              >\n                <X className=\"w-3 h-3\" />\n              </button>\n            </span>\n          ))}\n        </div>\n      )}\n\n      <div className=\"flex items-center gap-2 px-3 md:px-4 py-3\">\n        <input\n          ref={fileRef}\n          type=\"file\"\n          accept=\"image/*,application/pdf\"\n          multiple\n          onChange={handleFiles}\n          className=\"hidden\"\n        />\n\n        {/* Mobile: one ⋮ button folding Attach and Flag away, so the text\n            field gets the width instead of two controls that are used far\n            less often than typing. Desktop keeps them as direct buttons. */}\n        <DropdownMenu>\n          <DropdownMenuTrigger\n            className={cn(\n              \"md:hidden shrink-0 p-2 rounded-lg transition-colors\",\n              messageFlag !== \"none\"\n                ? \"text-[#FFB633]\"\n                : \"text-gray-400 hover:text-white\",\n            )}\n            title=\"Attach or flag\"\n          >\n            {uploading ? (\n              <Loader2 className=\"w-5 h-5 animate-spin\" />\n            ) : (\n              <MoreVertical className=\"w-5 h-5\" />\n            )}\n          </DropdownMenuTrigger>\n          <DropdownMenuContent\n            side=\"top\"\n            align=\"start\"\n            className=\"bg-[#1a1a1b] border-white/10 text-gray-200\"\n          >\n            <DropdownMenuItem\n              onClick={() => fileRef.current?.click()}\n              disabled={uploading}\n              className=\"gap-2 cursor-pointer\"\n            >\n              <Paperclip className=\"w-3.5 h-3.5\" /> Attach image or PDF\n            </DropdownMenuItem>\n            <DropdownMenuSub>\n              <DropdownMenuSubTrigger className=\"gap-2 cursor-pointer\">\n                <Flag className=\"w-3.5 h-3.5\" />\n                Flag\n                <span className=\"ml-auto pl-2 text-[10px] text-gray-500\">\n                  {FLAG_OPTIONS.find((o) => o.value === messageFlag)?.label}\n                </span>\n              </DropdownMenuSubTrigger>\n              <DropdownMenuPortal>\n                <DropdownMenuSubContent className=\"bg-[#1a1a1b] border-white/10 text-gray-200\">\n                  {FLAG_OPTIONS.map((opt) => (\n                    <DropdownMenuItem\n                      key={opt.value}\n                      onClick={() => setMessageFlag(opt.value)}\n                      className=\"cursor-pointer\"\n                    >\n                      {opt.label}\n                    </DropdownMenuItem>\n                  ))}\n                </DropdownMenuSubContent>\n              </DropdownMenuPortal>\n            </DropdownMenuSub>\n          </DropdownMenuContent>\n        </DropdownMenu>\n\n        <button\n          type=\"button\"\n          onClick={() => fileRef.current?.click()}\n          disabled={uploading}\n          className=\"hidden md:block p-2 text-gray-400 hover:text-[#FFB633] transition-colors shrink-0\"\n          title=\"Attach image or PDF\"\n        >\n          {uploading ? (\n            <Loader2 className=\"w-5 h-5 animate-spin\" />\n          ) : (\n            <Paperclip className=\"w-5 h-5\" />\n          )}\n        </button>\n\n        <DropdownMenu>\n          <DropdownMenuTrigger\n            className={cn(\n              \"hidden md:flex shrink-0 items-center gap-1 px-2.5 py-2 text-xs rounded-lg border transition-colors\",\n              messageFlag !== \"none\"\n                ? \"border-[#FFB633] text-[#FFB633]\"\n                : \"border-white/10 text-gray-400 hover:text-white\",\n            )}\n          >\n            {FLAG_OPTIONS.find((o) => o.value === messageFlag)?.label}\n            <ChevronDown className=\"w-3 h-3\" />\n          </DropdownMenuTrigger>\n          <DropdownMenuContent className=\"bg-[#1a1a1b] border-white/10 text-gray-200\">\n            {FLAG_OPTIONS.map((opt) => (\n              <DropdownMenuItem\n                key={opt.value}\n                onClick={() => setMessageFlag(opt.value)}\n                className=\"cursor-pointer\"\n              >\n                {opt.label}\n              </DropdownMenuItem>\n            ))}\n          </DropdownMenuContent>\n        </DropdownMenu>\n\n        <div className=\"relative flex-1\">\n          <textarea\n            ref={textareaRef}\n            value={text}\n            onChange={handleChange}\n            onKeyDown={handleKeyDown}\n            placeholder=\"Type a message… (Enter for new line, Ctrl+Enter to send)\"\n            rows={1}\n            className=\"w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#FFB633]/50 resize-none overflow-y-auto\"\n            style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}\n          />\n          {mentionCandidates.length > 0 && (\n            <div className=\"absolute bottom-full mb-1 left-0 w-56 bg-[#1a1a1b] border border-white/10 rounded-lg shadow-lg overflow-hidden z-10\">\n              {mentionCandidates.map((m) => (\n                <button\n                  key={m.userId}\n                  type=\"button\"\n                  onClick={() => insertMention(m.name)}\n                  className=\"w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-white/10\"\n                >\n                  {m.name}\n                </button>\n              ))}\n            </div>\n          )}\n        </div>\n\n        <button\n          type=\"button\"\n          onClick={handleSend}\n          disabled={sendMessage.isPending || (!text.trim() && pending.length === 0)}\n          className=\"p-2 bg-[#FFB633] text-black rounded-full hover:bg-[#e5a32e] disabled:opacity-50 transition-colors shrink-0\"\n        >\n          <Send className=\"w-5 h-5\" />\n        </button>\n      </div>\n    </div>\n  );\n}\n\nexport default MessageComposer;\n"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 2,
+      "content": [
+        {
+          "$mid": 22,
+          "value": "Good, the MessageComposer.jsx is now complete. But admin/page.js was truncated again at 400. Let me read more.",
+          "id": ""
+        },
+        {
+          "$mid": 21,
+          "value": "Good, `MessageComposer.jsx` is now complete. Let me continue reading `app/admin/page.js` beyond line 400:"
+        },
+        {
+          "callId": "call_00_ltpvYTz4R8Jt8Zs8Xkcw0327",
+          "name": "read_file",
+          "input": {
+            "endLine": 600,
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/app/admin/page.js",
+            "startLine": 400
+          }
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_00_ltpvYTz4R8Jt8Zs8Xkcw0327",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "            </BarChart>\n          </ResponsiveContainer>\n        </div>\n\n        <div className=\"bg-[#1a1a1b] rounded-xl p-6 border border-white/10\">\n          <h3 className=\"text-lg font-semibold text-white mb-4\">\n            Distribution\n          </h3>\n          <ResponsiveContainer width=\"100%\" height={300}>\n            <PieChart>\n              <Pie\n                data={chartData.filter((d) => d.value > 0)}\n                cx=\"50%\"\n                cy=\"50%\"\n                innerRadius={60}\n                outerRadius={100}\n                paddingAngle={5}\n                dataKey=\"value\"\n              >\n                {chartData.map((entry, index) => (\n                  <Cell key={`cell-${index}`} fill={entry.color} />\n                ))}\n              </Pie>\n              <Tooltip\n                contentStyle={{\n                  backgroundColor: \"#FFB633\",\n                  border: \"1px solid #333\",\n                }}\n              />\n            </PieChart>\n          </ResponsiveContainer>\n          <div className=\"flex flex-wrap justify-center gap-4 mt-4\">\n            {chartData.map((item) => (\n              <div key={item.name} className=\"flex items-center gap-2\">\n                <div\n                  className=\"w-3 h-3 rounded-full\"\n                  style={{ backgroundColor: item.color }}\n                />\n                <span className=\"text-gray-400 text-sm\">{item.name}</span>\n              </div>\n            ))}\n          </div>\n        </div>\n      </div>\n    </div>\n  );\n}\n\n// Services Management Component\nfunction ServicesManagement() {\n  const { services, isLoading, createService, updateService, deleteService } =\n    useServices();\n  const { getAuthHeaders } = useAuth();\n  const [isModalOpen, setIsModalOpen] = useState(false);\n  const [editingService, setEditingService] = useState(null);\n  const [formData, setFormData] = useState({\n    title: \"\",\n    description: \"\",\n    icon: \"Code\",\n    color: \"blue\",\n    category: \"\",\n    displayOrder: 0,\n    gridSpan: 1,\n  });\n\n  const handleSubmit = async (e) => {\n    e.preventDefault();\n    try {\n      if (editingService) {\n        await updateService.mutateAsync({\n          id: editingService._id,\n          data: formData,\n        });\n        toast.success(\"Service updated successfully!\");\n      } else {\n        await createService.mutateAsync(formData);\n        toast.success(\"Service created successfully!\");\n      }\n      setIsModalOpen(false);\n      setEditingService(null);\n      resetForm();\n    } catch (error) {\n      toast.error(error.response?.data?.error || \"Failed to save service\");\n    }\n  };\n\n  const handleEdit = (service) => {\n    setEditingService(service);\n    setFormData({\n      title: service.title,\n      description: service.description,\n      icon: service.icon === \"HandshakeIcon\" ? \"Cog\" : service.icon || \"Code\",\n      color: service.color || \"blue\",\n      category: service.category,\n      displayOrder: service.displayOrder || 0,\n      gridSpan: service.gridSpan || 1,\n    });\n    setIsModalOpen(true);\n  };\n\n  const handleDelete = async (id) => {\n    if (confirm(\"Are you sure you want to delete this service?\")) {\n      try {\n        await deleteService.mutateAsync(id);\n        toast.success(\"Service deleted successfully!\");\n      } catch (error) {\n        toast.error(error.response?.data?.error || \"Failed to delete service\");\n      }\n    }\n  };\n\n  const resetForm = () => {\n    setFormData({\n      title: \"\",\n      description: \"\",\n      icon: \"Code\",\n      color: \"blue\",\n      category: \"\",\n      displayOrder: 0,\n      gridSpan: 1,\n    });\n  };\n\n  return (\n    <div>\n      <div className=\"flex items-center justify-between mb-6\">\n        <h2 className=\"text-2xl font-bold text-white\">Services Management</h2>\n        <Button\n          onClick={() => {\n            setEditingService(null);\n            resetForm();\n            setIsModalOpen(true);\n          }}\n          className=\"bg-[#FFB633] text-black hover:bg-[#e5a32e]\"\n        >\n          <Plus className=\"w-4 h-4 mr-2\" />\n          Add Service\n        </Button>\n      </div>\n\n      {isLoading ? (\n        <div className=\"text-gray-400\">Loading services...</div>\n      ) : services.length === 0 ? (\n        <div className=\"text-center py-12 bg-[#1a1a1b] rounded-xl border border-white/10\">\n          <Briefcase className=\"w-12 h-12 text-gray-600 mx-auto mb-4\" />\n          <p className=\"text-gray-400\">\n            No services yet. Create your first service!\n          </p>\n        </div>\n      ) : (\n        <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4\">\n          {services.map((service) => {\n            const IconComponent = iconMap[service.icon] || Code;\n            return (\n              <motion.div\n                key={service._id}\n                whileHover={{ scale: 1.02 }}\n                className=\"bg-[#1a1a1b] rounded-xl p-6 border border-white/10\"\n              >\n                <div className=\"flex items-start justify-between mb-4\">\n                  <div\n                    className=\"p-3 rounded-lg\"\n                    style={{\n                      backgroundColor: colorMap[service.color] || \"#3B82F6\",\n                    }}\n                  >\n                    <IconComponent className=\"w-6 h-6 text-white\" />\n                  </div>\n                  <div className=\"flex gap-2\">\n                    <button\n                      onClick={() => handleEdit(service)}\n                      className=\"p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors\"\n                    >\n                      <Edit className=\"w-4 h-4\" />\n                    </button>\n                    <button\n                      onClick={() => handleDelete(service._id)}\n                      className=\"p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors\"\n                    >\n                      <Trash2 className=\"w-4 h-4\" />\n                    </button>\n                  </div>\n                </div>\n                <h3 className=\"text-lg font-semibold text-white mb-2\">\n                  {service.title}\n                </h3>\n                <p className=\"text-gray-400 text-sm mb-4 line-clamp-2\">\n                  {service.description}\n                </p>\n                <div className=\"flex flex-wrap gap-2\">\n                  <span className=\"px-2 py-1 bg-white/10 rounded text-xs text-gray-300\">\n                    {service.category}\n                  </span>\n                  <span className=\"px-2 py-1 bg-white/10 rounded text-xs text-gray-300\">\n                    Grid: {service.gridSpan || 1}\n                  </span>\n                </div>\n              </motion.div>\n            );\n          })}\n        </div>"
+            },
+            {
+              "$mid": 24,
+              "mimeType": "cache_control",
+              "data": "ZXBoZW1lcmFs"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    },
+    {
+      "role": 2,
+      "content": [
+        {
+          "$mid": 22,
+          "value": "Still truncated. Let me continue reading.",
+          "id": ""
+        },
+        {
+          "$mid": 21,
+          "value": "Still truncated. Let me continue reading."
+        },
+        {
+          "callId": "call_00_HI6Qt1EdiOqIknaK0EUo0046",
+          "name": "read_file",
+          "input": {
+            "endLine": 800,
+            "filePath": "/home/dmdevelo/Desktop/dmdevelon_projects/DMDevelon/app/admin/page.js",
+            "startLine": 600
+          }
+        }
+      ]
+    },
+    {
+      "role": 1,
+      "content": [
+        {
+          "callId": "call_00_HI6Qt1EdiOqIknaK0EUo0046",
+          "content": [
+            {
+              "$mid": 21,
+              "value": "        </div>\n      )}\n\n      {/* Add/Edit Modal */}\n      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>\n        <DialogContent className=\"bg-[#1a1a1b] border-white/10 text-white max-w-lg\">\n          <DialogHeader>\n            <DialogTitle>\n              {editingService ? \"Edit Service\" : \"Add New Service\"}\n            </DialogTitle>\n          </DialogHeader>\n          <form onSubmit={handleSubmit} className=\"space-y-4 mt-4\">\n            <div>\n              <Label className=\"text-white\">Title</Label>\n              <Input\n                value={formData.title}\n                onChange={(e) =>\n                  setFormData({ ...formData, title: e.target.value })\n                }\n                placeholder=\"Service title\"\n                required\n                className=\"bg-white/5 border-white/10 text-white mt-1\"\n              />\n            </div>\n            <div>\n              <Label className=\"text-white\">Description</Label>\n              <textarea\n                value={formData.description}\n                onChange={(e) =>\n                  setFormData({ ...formData, description: e.target.value })\n                }\n                placeholder=\"Service description\"\n                required\n                rows={3}\n                className=\"w-full bg-white/5 border border-white/10 text-white rounded-md px-3 py-2 mt-1\"\n              />\n            </div>\n            <div className=\"grid grid-cols-2 gap-4\">\n              <div>\n                <Label className=\"text-white\">Icon</Label>\n                <Select\n                  value={formData.icon}\n                  onValueChange={(v) => setFormData({ ...formData, icon: v })}\n                >\n                  <SelectTrigger className=\"bg-white/5 border-white/10 text-white mt-1\">\n                    <SelectValue />\n                  </SelectTrigger>\n                  <SelectContent className=\"bg-[#2a2a2b] border-white/10\">\n                    {iconOptions.map((icon) => {\n                      const IconOption = iconMap[icon] || Code;\n                      const label =\n                        icon === \"Bot\"\n                          ? \"Robot (AI Tasks)\"\n                          : icon === \"BrainCircuit\"\n                            ? \"AI / Brain Circuit\"\n                            : icon === \"Cog\"\n                              ? \"Engine\"\n                              : icon;\n                      return (\n                        <SelectItem\n                          key={icon}\n                          value={icon}\n                          className=\"text-white hover:bg-white/10\"\n                        >\n                          <span className=\"flex items-center gap-2\">\n                            <IconOption className=\"h-4 w-4\" /> {label}\n                          </span>\n                        </SelectItem>\n                      );\n                    })}\n                  </SelectContent>\n                </Select>\n              </div>\n              <div>\n                <Label className=\"text-white\">Color</Label>\n                <Select\n                  value={formData.color}\n                  onValueChange={(v) => setFormData({ ...formData, color: v })}\n                >\n                  <SelectTrigger className=\"bg-white/5 border-white/10 text-white mt-1\">\n                    <SelectValue />\n                  </SelectTrigger>\n                  <SelectContent className=\"bg-[#2a2a2b] border-white/10\">\n                    {colorOptions.map((color) => (\n                      <SelectItem\n                        key={color}\n                        value={color}\n                        className=\"text-white hover:bg-white/10\"\n                      >\n                        <div className=\"flex items-center gap-2\">\n                          <div\n                            className=\"w-4 h-4 rounded\"\n                            style={{ backgroundColor: colorMap[color] }}\n                          />\n                          {color}\n                        </div>\n                      </SelectItem>\n                    ))}\n                  </SelectContent>\n                </Select>\n              </div>\n            </div>\n            <div>\n              <Label className=\"text-white\">Category</Label>\n              <Input\n                value={formData.category}\n                onChange={(e) =>\n                  setFormData({ ...formData, category: e.target.value })\n                }\n                placeholder=\"e.g., Web Development\"\n                required\n                className=\"bg-white/5 border-white/10 text-white mt-1\"\n              />\n            </div>\n            <div className=\"grid grid-cols-2 gap-4\">\n              <div>\n                <Label className=\"text-white\">Display Order</Label>\n                <Input\n                  type=\"number\"\n                  value={formData.displayOrder}\n                  onChange={(e) =>\n                    setFormData({\n                      ...formData,\n                      displayOrder: parseInt(e.target.value) || 0,\n                    })\n                  }\n                  className=\"bg-white/5 border-white/10 text-white mt-1\"\n                />\n              </div>\n              <div>\n                <Label className=\"text-white\">Grid Span (1-7)</Label>\n                <Input\n                  type=\"number\"\n                  min={1}\n                  max={7}\n                  value={formData.gridSpan}\n                  onChange={(e) =>\n                    setFormData({\n                      ...formData,\n                      gridSpan: Math.min(\n                        7,\n                        Math.max(1, parseInt(e.target.value) || 1),\n                      ),\n                    })\n                  }\n                  className=\"bg-white/5 border-white/10 text-white mt-1\"\n                />\n              </div>\n            </div>\n            <Button\n              type=\"submit\"\n              className=\"w-full bg-[#FFB633] text-black hover:bg-[#e5a32e]\"\n            >\n              {editingService ? \"Update Service\" : \"Create Service\"}\n            </Button>\n          </form>\n        </DialogContent>\n      </Dialog>\n    </div>\n  );\n}\n\n// Projects Management Component\nfunction ProjectsManagement() {\n  const { projects, isLoading, createProject, updateProject, deleteProject } =\n    useProjects();\n  const { getAuthHeaders } = useAuth();\n  const [isModalOpen, setIsModalOpen] = useState(false);\n  const [editingProject, setEditingProject] = useState(null);\n  const [formData, setFormData] = useState({\n    title: \"\",\n    description: \"\",\n    image_url: \"\",\n    logo_url: \"\",\n    live_preview_url: \"\",\n    github_url: \"\",\n    color: \"blue\",\n    category: \"\",\n  });\n\n  const handleSubmit = async (e) => {\n    e.preventDefault();\n    try {\n      if (editingProject) {\n        await updateProject.mutateAsync({\n          id: editingProject._id,\n          data: formData,\n        });\n        toast.success(\"Project updated successfully!\");\n      } else {\n        await createProject.mutateAsync(formData);\n        toast.success(\"Project created successfully!\");\n      }\n      setIsModalOpen(false);\n      setEditingProject(null);\n      resetForm();\n    } catch (error) {\n      toast.error(error.response?.data?.error || \"Failed to save project\");\n    }\n  };\n"
+            },
+            {
+              "$mid": 24,
+              "mimeType": "cache_control",
+              "data": "ZXBoZW1lcmFs"
+            }
+          ],
+          "isError": false
+        }
+      ]
+    }
+  ],
+  "options": {
+    "tools": [
+      {
+        "name": "fetch_webpage",
+        "description": "Fetches the main content from a web page. This tool is useful for summarizing or analyzing the content of a webpage. You should use this tool when you think the user is looking for information from a specific webpage.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "urls": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "An array of URLs to fetch content from."
+            },
+            "query": {
+              "type": "string",
+              "description": "The query to search for in the web page's content. This should be a clear and concise description of the content you want to find."
+            }
+          },
+          "required": [
+            "urls",
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "file_search",
+        "description": "Search for files in the workspace by glob pattern. This only returns the paths of matching files. Use this tool when you know the exact filename pattern of the files you're searching for. Glob patterns match from the root of the workspace folder. Examples:\n- **/*.{js,ts} to match all js/ts files in the workspace.\n- src/** to match all files under the top-level src folder.\n- **/foo/**/*.js to match all js files under any foo folder in the workspace.\n\nIn a multi-root workspace, you can scope the search to a specific workspace folder by using the absolute path to the folder as the query, e.g. /path/to/folder/**/*.ts.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search for files with names or paths matching this glob pattern. Can also be an absolute path to a workspace folder to scope the search in a multi-root workspace."
+            },
+            "maxResults": {
+              "type": "number",
+              "description": "The maximum number of results to return. Do not use this unless necessary, it can slow things down. By default, only some matches are returned. If you use this and don't see what you're looking for, you can try again with a more specific query or a larger maxResults."
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "grep_search",
+        "description": "Do a fast text search in the workspace. Use this tool when you want to search with an exact string or regex. If you are not sure what words will appear in the workspace, prefer using regex patterns with alternation (|) or character classes to search for multiple potential words at once instead of making separate searches. For example, use 'function|method|procedure' to look for all of those words at once. Use includePattern to search within files matching a specific pattern, or in a specific file, using a relative path. Use 'includeIgnoredFiles' to include files normally ignored by .gitignore, other ignore files, and `files.exclude` and `search.exclude` settings. Warning: using this may cause the search to be slower, only set it when you want to search in ignored folders like node_modules or build outputs. Use this tool when you want to see an overview of a particular file, instead of using read_file many times to look for code within a file.\n\nIn a multi-root workspace, you can scope the search to a specific workspace folder by using the absolute path to the folder as the includePattern, e.g. /path/to/folder.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "The pattern to search for in files in the workspace. Use regex with alternation (e.g., 'word1|word2|word3') or character classes to find multiple potential words in a single search. Be sure to set the isRegexp property properly to declare whether it's a regex or plain text pattern. Is case-insensitive."
+            },
+            "isRegexp": {
+              "type": "boolean",
+              "description": "Whether the pattern is a regex."
+            },
+            "includePattern": {
+              "type": "string",
+              "description": "Search files matching this glob pattern. Will be applied to the relative path of files within the workspace. To search recursively inside a folder, use a proper glob pattern like \"src/folder/**\". Do not use | in includePattern. Can also be an absolute path to a workspace folder to scope the search in a multi-root workspace."
+            },
+            "maxResults": {
+              "type": "number",
+              "description": "The maximum number of results to return. Do not use this unless necessary, it can slow things down. By default, only some matches are returned. If you use this and don't see what you're looking for, you can try again with a more specific query or a larger maxResults."
+            },
+            "includeIgnoredFiles": {
+              "type": "boolean",
+              "description": "Whether to include files that would normally be ignored according to .gitignore, other ignore files and `files.exclude` and `search.exclude` settings. Warning: using this may cause the search to be slower. Only set it when you want to search in ignored folders like node_modules or build outputs."
+            }
+          },
+          "required": [
+            "query",
+            "isRegexp"
+          ]
+        }
+      },
+      {
+        "name": "get_errors",
+        "description": "Get any compile or lint errors in a specific file or across all files. If the user mentions errors or problems in a file, they may be referring to these. Use the tool to see the same errors that the user is seeing. If the user asks you to analyze all errors, or does not specify a file, use this tool to gather errors for all files. Also use this tool after editing a file to validate the change.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePaths": {
+              "description": "The absolute paths to the files or folders to check for errors. Omit 'filePaths' when retrieving all errors.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "copilot_getNotebookSummary",
+        "description": "This is a tool returns the list of the Notebook cells along with the id, cell types, line ranges, language, execution information and output mime types for each cell. This is useful to get Cell Ids when executing a notebook or determine what cells have been executed and what order, or what cells have outputs. If required to read contents of a cell use this to determine the line range of a cells, and then use read_file tool to read a specific line range. Requery this tool if the contents of the notebook change.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "An absolute path to the notebook file with the cell to run, or the URI of a untitled, not yet named, file, such as `untitled:Untitled-1.ipynb"
+            }
+          },
+          "required": [
+            "filePath"
+          ]
+        }
+      },
+      {
+        "name": "github_repo",
+        "description": "Searches a GitHub repository for relevant source code snippets. Only use this tool if the user is very clearly asking for code snippets from a specific GitHub repository. Do not use this tool for Github repos that the user has open in their workspace.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo": {
+              "type": "string",
+              "description": "The name of the Github repository to search for code in. Should must be formatted as '<owner>/<repo>'."
+            },
+            "query": {
+              "type": "string",
+              "description": "The query to search for repo. Should contain all relevant context."
+            }
+          },
+          "required": [
+            "repo",
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "github_text_search",
+        "description": "Lexically searches a GitHub repository or organization for files containing specific keywords or code patterns. Use this when looking for exact strings, function names, or identifiers in a GitHub repo or org. Unlike the semantic search tool, this uses keyword matching rather than meaning-based search.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scope": {
+              "type": "string",
+              "description": "The GitHub scope to search. Use 'owner/repo' to search a single repository, or an org name (no slash) to search across an entire organization."
+            },
+            "query": {
+              "type": "string",
+              "description": "The keyword search query. Supports GitHub code search syntax such as 'language:typescript', 'extension:ts', 'path:src/', etc."
+            },
+            "maxResults": {
+              "type": "number",
+              "description": "Optional. The maximum number of search results to return. Defaults to 100."
+            }
+          },
+          "required": [
+            "scope",
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "list_dir",
+        "description": "List the contents of a directory. Result will have the name of the child. If the name ends in /, it's a folder, otherwise a file",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "The absolute path to the directory to list."
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      },
+      {
+        "name": "memory",
+        "description": "Manage a persistent memory system with three scopes for storing notes and information across conversations.\n\nMemory is organized under /memories/ with three tiers:\n- `/memories/` — User memory: persistent notes that survive across all workspaces and conversations. Store preferences, patterns, and general insights here.\n- `/memories/session/` — Session memory: notes scoped to the current conversation. Store task-specific context and in-progress notes here. Cleared after the conversation ends.\n- `/memories/repo/` — Repository memory: repository-scoped notes stored locally in the workspace. Store codebase conventions, build commands, project structure facts, and verified practices here.\n\nIMPORTANT: Before creating new memory files, first view the /memories/ directory to understand what already exists. This helps avoid duplicates and maintain organized notes.\n\nCommands:\n- `view`: View contents of a file or list directory contents. Can be used on files or directories (e.g., \"/memories/\" to see all top-level items).\n- `create`: Create a new file at the specified path with the given content. Fails if the file already exists.\n- `str_replace`: Replace an exact string in a file with a new string. The old_str must appear exactly once in the file.\n- `insert`: Insert text at a specific line number in a file. Line 0 inserts at the beginning.\n- `delete`: Delete a file or directory (and all its contents).\n- `rename`: Rename or move a file or directory from path to new_path. Cannot rename across scopes.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "enum": [
+                "view",
+                "create",
+                "str_replace",
+                "insert",
+                "delete",
+                "rename"
+              ],
+              "description": "The operation to perform on the memory file system."
+            },
+            "path": {
+              "type": "string",
+              "description": "The absolute path to the file or directory inside /memories/, e.g. \"/memories/notes.md\". Used by all commands except `rename`."
+            },
+            "file_text": {
+              "type": "string",
+              "description": "Required for `create`. The content of the file to create."
+            },
+            "old_str": {
+              "type": "string",
+              "description": "Required for `str_replace`. The exact string in the file to replace. Must appear exactly once."
+            },
+            "new_str": {
+              "type": "string",
+              "description": "Required for `str_replace`. The new string to replace old_str with."
+            },
+            "insert_line": {
+              "type": "number",
+              "description": "Required for `insert`. The 0-based line number to insert text at. 0 inserts before the first line."
+            },
+            "insert_text": {
+              "type": "string",
+              "description": "Required for `insert`. The text to insert at the specified line."
+            },
+            "view_range": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "Optional for `view`. A two-element array [start_line, end_line] (1-indexed) to view a specific range of lines."
+            },
+            "old_path": {
+              "type": "string",
+              "description": "Required for `rename`. The current path of the file or directory to rename."
+            },
+            "new_path": {
+              "type": "string",
+              "description": "Required for `rename`. The new path for the file or directory."
+            }
+          },
+          "required": [
+            "command"
+          ]
+        }
+      },
+      {
+        "name": "read_file",
+        "description": "Read the contents of a file.\n\nYou must specify the line range you're interested in. Line numbers are 1-indexed. If the file contents returned are insufficient for your task, you may call this tool again to retrieve more content. Prefer reading larger ranges over doing many small reads. Binary files use startLine/endLine as byte offsets.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "description": "The absolute path of the file to read.",
+              "type": "string"
+            },
+            "startLine": {
+              "type": "number",
+              "description": "The line number to start reading from, 1-based."
+            },
+            "endLine": {
+              "type": "number",
+              "description": "The inclusive line number to end reading at, 1-based."
+            }
+          },
+          "required": [
+            "filePath",
+            "startLine",
+            "endLine"
+          ]
+        }
+      },
+      {
+        "name": "read_notebook_cell_output",
+        "description": "This tool will retrieve the output for a notebook cell from its most recent execution or restored from disk. The cell may have output even when it has not been run in the current kernel session. This tool has a higher token limit for output length than the runNotebookCell tool.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "An absolute path to the notebook file with the cell to run, or the URI of a untitled, not yet named, file, such as `untitled:Untitled-1.ipynb"
+            },
+            "cellId": {
+              "type": "string",
+              "description": "The ID of the cell for which output should be retrieved."
+            }
+          },
+          "required": [
+            "filePath",
+            "cellId"
+          ]
+        }
+      },
+      {
+        "name": "session_store_sql",
+        "description": "Query the local session store containing history from past coding sessions. Uses SQLite syntax (NOT DuckDB or Postgres). SQL queries are read-only — only SELECT and WITH are allowed. Use `datetime('now', '-1 day')` for date math (NOT `now() - INTERVAL '1 day'`), FTS5 `MATCH` for text search.\n\nTables: `sessions`, `turns`, `session_files`, `session_refs`, `checkpoints`, `search_index`. For column details and query patterns, use the **chronicle** skill.\n\nActions: 'query' (execute SQL — supports JOINs, FTS5 MATCH, aggregations), 'reindex' (rebuild index from debug logs).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "query",
+                "reindex"
+              ],
+              "description": "The action to perform. 'query' (default) executes a SQL query. 'reindex' rebuilds the local session index and syncs to cloud if enabled."
+            },
+            "query": {
+              "type": "string",
+              "description": "A single read-only SQL query to execute. Required when action is 'query'. Supports SELECT, WITH, JOINs, aggregations, and FTS5 MATCH. Only one statement per call — do not combine multiple queries with semicolons."
+            },
+            "force": {
+              "type": "boolean",
+              "description": "When true with action 'reindex', re-processes all sessions including already-indexed ones. Default false (skips already-indexed sessions)."
+            },
+            "description": {
+              "type": "string",
+              "description": "A 2-5 word summary of what this call does (e.g. 'Recent sessions overview', 'Generate standup', 'Reindex sessions')."
+            },
+            "subcommand": {
+              "type": "string",
+              "enum": [
+                "standup",
+                "tips",
+                "cost-tips",
+                "search",
+                "improve",
+                "reindex"
+              ],
+              "description": "The chronicle subcommand that triggered this call (e.g. 'tips' for /chronicle tips). Used for telemetry attribution only — pass this whenever the call originates from a /chronicle slash command."
+            }
+          },
+          "required": [
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "view_image",
+        "description": "View the contents of an image file. Use this instead of read_file for supported image files such as png, jpg, jpeg, gif, and webp. The tool returns the image directly to multimodal models and does not take line ranges or offsets.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "description": "The absolute path of the image file to view.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "filePath"
+          ]
+        }
+      },
+      {
+        "name": "vscode_listCodeUsages",
+        "description": "Find all usages (references, definitions, and implementations) of a code symbol across the workspace. This tool locates where a symbol is referenced, defined, or implemented.\n\nInput:\n- \"symbol\": The exact name of the symbol to search for (function, class, method, variable, type, etc.).\n- \"uri\": A full URI (e.g. \"file:///path/to/file.ts\") of a file where the symbol appears. Provide either \"uri\" or \"filePath\".\n- \"filePath\": A workspace-relative file path (e.g. \"src/utils/helpers.ts\") of a file where the symbol appears. Provide either \"uri\" or \"filePath\".\n- \"lineContent\": A substring of the line of code where the symbol appears. This is used to locate the exact position in the file. Must be the actual text from the file - do NOT fabricate it.\n\nIMPORTANT: The file and line do NOT need to be the definition of the symbol. Any occurrence works - a usage, an import, a call site, etc. You can pick whichever occurrence is most convenient.\n\nIf the tool returns an error, retry with corrected input - ensure the file path is correct, the line content matches the actual file content, and the symbol name appears in that line.\n\nIf the file's language has no reference provider registered, the tool returns an error.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "The exact name of the symbol (function, class, method, variable, type, etc.) to find usages of."
+            },
+            "uri": {
+              "type": "string",
+              "description": "A full URI of a file where the symbol appears (e.g. \"file:///path/to/file.ts\"). Provide either \"uri\" or \"filePath\"."
+            },
+            "filePath": {
+              "type": "string",
+              "description": "A workspace-relative file path where the symbol appears (e.g. \"src/utils/helpers.ts\"). Provide either \"uri\" or \"filePath\"."
+            },
+            "lineContent": {
+              "type": "string",
+              "description": "A substring of the line of code where the symbol appears. Used to locate the exact position. Must be actual text from the file."
+            }
+          },
+          "required": [
+            "symbol",
+            "lineContent"
+          ]
+        }
+      },
+      {
+        "name": "get_task_output",
+        "description": "Get the output of a task",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The task ID for which to get the output."
+            },
+            "workspaceFolder": {
+              "type": "string",
+              "description": "The workspace folder path containing the task"
+            }
+          },
+          "required": [
+            "id",
+            "workspaceFolder"
+          ]
+        }
+      },
+      {
+        "name": "get_terminal_output",
+        "description": "Get output from a terminal execution that was moved to background (identified by the `id` returned from run_in_terminal). Use this ONLY when the run_in_terminal result explicitly says the command was moved to background, timed out, or needs input. Do NOT call this after a sync command that completed normally — sync commands return full output inline. If a background command has not yet completed, you will be automatically notified when it finishes — do NOT poll; end your turn and wait.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of an active terminal execution to check (returned by run_in_terminal for async executions, or for sync executions that timed out and were moved to the background). This must be the exact opaque UUID returned by that tool; terminal names, labels, or integers are invalid.",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "terminal_last_command",
+        "description": "Get the last command run in the active terminal."
+      },
+      {
+        "name": "terminal_selection",
+        "description": "Get the current selection in the active terminal."
+      },
+      {
+        "name": "testFailure",
+        "description": "Includes test failure information in the prompt. Use this tool to get the details of test failures from the most recent test run. If there are no failures yet, suggest running tests first.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    ]
+  }
+}

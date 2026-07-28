@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { networkInterfaces } from "os";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import Service from "@/models/Service";
@@ -11,13 +12,22 @@ import ClientProject from "@/models/ClientProject";
 import ProjectMessage from "@/models/ProjectMessage";
 import ProjectRequest from "@/models/ProjectRequest";
 import ProjectProposal from "@/models/ProjectProposal";
+import ProjectMember from "@/models/ProjectMember";
+import ProjectAuditLog from "@/models/ProjectAuditLog";
+import ProjectInvitation from "@/models/ProjectInvitation";
+import ChatChannel from "@/models/ChatChannel";
+import ChatMessage from "@/models/ChatMessage";
+import ChatRead from "@/models/ChatRead";
+import ProjectItem from "@/models/ProjectItem";
 import Notification from "@/models/Notification";
 import PushSubscription from "@/models/PushSubscription";
 import {
+  DIGEST_TYPES,
   notifyUser,
   notifyAdmins,
   resolveClientUserId,
 } from "@/lib/notify";
+import { NOTIFICATION_THROTTLE_MS } from "@/lib/notification-policy.mjs";
 import {
   hashPassword,
   comparePassword,
@@ -36,6 +46,51 @@ const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL ||
   process.env.NEXT_PUBLIC_BASE_URL ||
   "http://localhost:3003";
+
+// The dev server binds `--hostname 0.0.0.0` (listens on every interface), but
+// that address is only meaningful to bind to — it is not something a browser
+// on another device (or even the same machine) can actually open. Same idea
+// for `localhost`/`127.0.0.1`: fine for the machine running the server, dead
+// on arrival for a phone or a colleague's laptop testing an invite email.
+// Whenever the incoming request's own host is one of these, substitute the
+// machine's real LAN IPv4 address instead, so a link emailed out mid-dev-test
+// actually opens for whoever clicks it.
+const UNROUTABLE_HOSTS = new Set(["0.0.0.0", "[::]", "localhost", "127.0.0.1"]);
+
+function detectLanIPv4() {
+  const interfaces = networkInterfaces();
+  for (const entries of Object.values(interfaces)) {
+    for (const iface of entries || []) {
+      const family = iface.family === "IPv4" || iface.family === 4;
+      if (family && !iface.internal) return iface.address;
+    }
+  }
+  return null;
+}
+
+// Interactive email links (verify/reset/invite) that the person testing the
+// flow is about to click themselves. In production, always the configured
+// canonical domain — trusting a request's Host header there would let a
+// spoofed header point verification/invite links at an attacker's domain.
+// In development, NEXT_PUBLIC_APP_URL is typically still the eventual
+// production domain (so the build matches prod ahead of deploy), which
+// otherwise sends every dev-mode email link to a site that doesn't have the
+// token being tested — using the dev server's own request origin instead
+// lets the whole invite/verify/reset flow be exercised locally.
+function resolveAppUrl(request) {
+  if (process.env.NODE_ENV === "production") return APP_URL;
+  try {
+    const url = new URL(request.url);
+    const port = url.port ? `:${url.port}` : "";
+    if (UNROUTABLE_HOSTS.has(url.hostname)) {
+      const lanIp = detectLanIPv4();
+      if (lanIp) return `${url.protocol}//${lanIp}${port}`;
+    }
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return APP_URL;
+  }
+}
 import {
   uploadToCloudinary,
   ensureClientFolders,
@@ -50,6 +105,44 @@ import {
   materializeMilestonePlan as materializeProposalMilestones,
   preparePhaseArchive,
 } from "@/lib/project-proposal-domain.mjs";
+import {
+  requireProjectPermission,
+  resolveProjectAccess,
+} from "@/lib/project-access";
+import {
+  serializeInvitationForManager,
+  serializeInvitationPreview,
+  serializeMemberPublic,
+  serializeProjectForAccess,
+} from "@/lib/project-serializers.mjs";
+import {
+  assertInvitationAcceptable,
+  canConvertMessage,
+  canModerateMessage,
+  dmKeyFor,
+  displayRoleLabel,
+  escapeRegExp,
+  hashInviteToken,
+  generateInviteToken,
+  isUserOnline,
+  INVITABLE_ROLES,
+  MESSAGE_FLAGS,
+  nextItemRef,
+  normalizeEmail,
+  PROJECT_ITEM_KINDS,
+  resolveInvitationAction,
+  sanitizeChatMessagePayload,
+  sanitizeConvertPayload,
+  sanitizeInvitationPayload,
+  sanitizeProjectItemUpdate,
+} from "@/lib/chat-domain.mjs";
+import {
+  serializeChannelDetail,
+  serializeChannelMember,
+  serializeChannelSummary,
+  serializeChatMessageForAccess,
+  serializeProjectItem,
+} from "@/lib/chat-serializers.mjs";
 
 function getCorsHeaders() {
   return {
@@ -109,6 +202,39 @@ function clearRefreshCookie(response) {
   return response;
 }
 
+// Carries the raw invite token from GET /invitations/preview through whatever
+// the visitor does next (log in, or register) without it living in browser
+// history or a referrer header. The token in the accept/register body is a
+// fallback if a client can't rely on cookies.
+const INVITE_COOKIE_NAME = "dmdevelon_invite";
+const INVITE_COOKIE_MAX_AGE = 60 * 60; // 1h — just long enough to log in or register
+
+function setInviteCookie(response, rawToken) {
+  response.cookies.set({
+    name: INVITE_COOKIE_NAME,
+    value: rawToken,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: INVITE_COOKIE_MAX_AGE,
+  });
+  return response;
+}
+
+function clearInviteCookie(response) {
+  response.cookies.set({
+    name: INVITE_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
+}
+
 function createSessionResponse(user, { status = 200 } = {}) {
   const response = NextResponse.json(
     {
@@ -153,6 +279,318 @@ function canAccessClientProject(user, project) {
 // Same ownership rule for project requests.
 function canAccessRequest(user, req) {
   return canAccessClientEntity(user, req);
+}
+
+// --- Shared request helpers for the Communication Hub branches ------------
+//
+// Existing branches in this file repeat the same inline
+// `const user = await getUserFromRequest(request); if (!user) return
+// NextResponse.json({ error: "Unauthorized" }, { status: 401, ... })` block,
+// and are inconsistent about which status a permission failure gets (some
+// ownership checks return 401 "Unauthorized", others 403 "Forbidden", for the
+// same kind of "not your project" case). New Communication Hub branches use
+// these three helpers instead, so every new endpoint is uniform from the
+// start; `requireProjectPermission` (lib/project-access.js) throws errors
+// shaped the same way `apiError` already is, so they flow through the
+// existing `errorResponse` handling with no special-casing at the call site.
+
+// Throws (rather than returning a NextResponse) so it composes inside the
+// same try/catch every verb handler already wraps its branches in.
+async function requireAuthenticatedUser(request) {
+  const user = await getUserFromRequest(request);
+  if (!user) throw apiError("Unauthorized", 401);
+  return user;
+}
+
+function forbiddenResponse(message = "Forbidden") {
+  return NextResponse.json(
+    { error: message },
+    { status: 403, headers: getCorsHeaders() },
+  );
+}
+
+function notFoundResponse(message = "Not found") {
+  return NextResponse.json(
+    { error: message },
+    { status: 404, headers: getCorsHeaders() },
+  );
+}
+
+// --- Shared helpers for invitation acceptance and the chat group channel --
+//
+// getOrCreateGroupChannel/postSystemMessage are the one piece of the (not yet
+// built) Chat API this section needs: accepting an invitation posts "<Name>
+// joined the group" into the project's single group channel. Section 6 reuses
+// these exact helpers for its own lazy-creation needs rather than duplicating
+// the get-or-create logic.
+
+// Idempotent under concurrency: the unique partial index on
+// ChatChannel{projectId, kind:'group'} is what actually settles a race between
+// two requests trying to create the first channel for a project at once —
+// this function just makes losing that race a normal, handled outcome.
+async function getOrCreateGroupChannel(project) {
+  const existing = await ChatChannel.findOne({
+    projectId: project._id,
+    kind: "group",
+  });
+  if (existing) return existing;
+  try {
+    return await ChatChannel.create({
+      _id: uuidv4(),
+      projectId: project._id,
+      kind: "group",
+      name: `${project.title} — Project Group`,
+      postingPolicy: "all",
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      const raced = await ChatChannel.findOne({
+        projectId: project._id,
+        kind: "group",
+      });
+      if (raced) return raced;
+    }
+    throw error;
+  }
+}
+
+// System messages are attributed as operator-level (authorRole: 'admin'),
+// the same convention ProjectMessage already uses for its own server-
+// generated change_agreed entries — `kind: 'system'` is what actually marks
+// this as generated, not typed by a person.
+async function postSystemMessage(channel, body) {
+  return ChatMessage.create({
+    _id: uuidv4(),
+    channelId: channel._id,
+    projectId: channel.projectId,
+    authorUserId: null,
+    authorName: "System",
+    authorRole: "admin",
+    body,
+    kind: "system",
+  });
+}
+
+// Same get-or-create-under-a-race shape as getOrCreateGroupChannel, keyed on
+// the unique (projectId, dmKey) index instead — "proveri pa kreiraj" would
+// let two simultaneous "open a DM with this person" requests each create
+// their own channel; the unique index is what actually prevents that (I5).
+async function getOrCreateDmChannel(project, userIdA, userIdB) {
+  const dmKey = dmKeyFor(userIdA, userIdB);
+  const existing = await ChatChannel.findOne({ projectId: project._id, dmKey });
+  if (existing) return existing;
+  try {
+    return await ChatChannel.create({
+      _id: uuidv4(),
+      projectId: project._id,
+      kind: "dm",
+      dmKey,
+      memberUserIds: [String(userIdA), String(userIdB)],
+      postingPolicy: "all",
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      const raced = await ChatChannel.findOne({ projectId: project._id, dmKey });
+      if (raced) return raced;
+    }
+    throw error;
+  }
+}
+
+// Shared entry point for every chat/* branch below: load the channel, resolve
+// project-level access for `permission`, then layer DM privacy on top. A
+// fellow project member who isn't part of THIS dm has no relationship to it
+// specifically — same "don't disclose existence" policy as an unrelated
+// project id, so this throws 404, not 403.
+async function loadChannelWithAccess(channelId, user, permission) {
+  const channel = await ChatChannel.findById(channelId);
+  if (!channel) throw apiError("Channel not found", 404);
+  const project = await ClientProject.findById(channel.projectId);
+  if (!project) throw apiError("Project not found", 404);
+  const access = await requireProjectPermission(user, project, permission);
+  if (
+    channel.kind === "dm" &&
+    !(channel.memberUserIds || []).includes(String(user._id))
+  ) {
+    throw apiError("Channel not found", 404);
+  }
+  return { channel, project, access };
+}
+
+// Same shape, entered from a message id instead of a channel id — every
+// message-scoped branch (pin, edit, delete) needs its channel and project
+// resolved before it can decide anything.
+async function loadMessageWithAccess(messageId, user, permission) {
+  const message = await ChatMessage.findById(messageId);
+  if (!message) throw apiError("Message not found", 404);
+  const channel = await ChatChannel.findById(message.channelId);
+  if (!channel) throw apiError("Channel not found", 404);
+  const project = await ClientProject.findById(channel.projectId);
+  if (!project) throw apiError("Project not found", 404);
+  const access = await requireProjectPermission(user, project, permission);
+  if (
+    channel.kind === "dm" &&
+    !(channel.memberUserIds || []).includes(String(user._id))
+  ) {
+    throw apiError("Message not found", 404);
+  }
+  return { message, channel, project, access };
+}
+
+// The channel's own member roster for @mention matching and the detail view:
+// the project owner (if resolvable) plus active ProjectMembers. Global admins
+// are deliberately not offered as mention candidates in Phase 1 — there is no
+// single obvious admin identity to match a name against per project.
+async function loadChannelRoster(project) {
+  const roster = [];
+  const ownerId = project.clientUserId || null;
+  if (ownerId || project.clientEmail) {
+    const owner = ownerId
+      ? await User.findById(ownerId)
+      : await User.findOne({ email: project.clientEmail });
+    if (owner) {
+      roster.push({
+        userId: owner._id,
+        name: owner.name || owner.email,
+        role: "owner",
+        roleLabel: "",
+      });
+    }
+  }
+  const members = await ProjectMember.find({
+    projectId: project._id,
+    status: "active",
+  });
+  for (const m of members) {
+    roster.push({
+      userId: m.userId,
+      name: m.name || m.email,
+      role: m.role,
+      roleLabel: m.roleLabel,
+    });
+  }
+  return roster;
+}
+
+// The point after which a message counts as unread for this user: the later
+// of "last marked read" and "cleared up to" — clearing a conversation also
+// counts as having read it, so a message that arrives right after a clear is
+// not immediately (and confusingly) unread.
+function readCutoff(read) {
+  const lastReadAt = read?.lastReadAt ? new Date(read.lastReadAt).getTime() : 0;
+  const clearedAt = read?.clearedAt ? new Date(read.clearedAt).getTime() : 0;
+  return new Date(Math.max(lastReadAt, clearedAt));
+}
+
+// Core of both POST /api/invitations/accept and registration-through-invite:
+// turn a valid, unexpired invitation plus an authenticated `user` into an
+// active ProjectMember. Membership creation/reactivation and the invitation's
+// status flip are one transaction (I2) — partial failure must never leave a
+// member with no membership, or an invitation marked used with no membership
+// to show for it. Reused across both call sites so the atomicity guarantee
+// only has to be gotten right once.
+async function acceptInvitationForUser(invitation, project, user) {
+  const session = await ProjectMember.db.startSession();
+  try {
+    await session.withTransaction(async () => {
+      // Reuse a prior (e.g. 'removed') row for this exact (project, user) pair
+      // instead of inserting a second one — the unique index on
+      // ProjectMember{projectId, userId} would reject a duplicate anyway, but
+      // reusing it is what makes this idempotent under a retried transaction.
+      const existing = await ProjectMember.findOne({
+        projectId: invitation.projectId,
+        userId: user._id,
+      }).session(session);
+      if (existing) {
+        existing.status = "active";
+        existing.role = invitation.intendedRole;
+        existing.roleLabel = invitation.roleLabel || existing.roleLabel;
+        existing.name = user.name || existing.name;
+        existing.email = user.email || existing.email;
+        existing.invitedByUserId = invitation.invitedByUserId;
+        if (!existing.joinedAt) existing.joinedAt = new Date();
+        await existing.save({ session });
+      } else {
+        // Mongoose only recognizes the `{ session }` options argument when the
+        // first argument is an array — a single plain object there is instead
+        // treated as a SECOND document to insert, which fails validation with
+        // a confusing "userId/projectId is required" error pointing at the
+        // options object itself.
+        await ProjectMember.create(
+          [
+            {
+              _id: uuidv4(),
+              projectId: invitation.projectId,
+              userId: user._id,
+              name: user.name || "",
+              email: user.email || "",
+              role: invitation.intendedRole,
+              roleLabel: invitation.roleLabel || "",
+              status: "active",
+              invitedByUserId: invitation.invitedByUserId,
+              joinedAt: new Date(),
+            },
+          ],
+          { session },
+        );
+      }
+      // Conditional on 'pending': if a concurrent request already flipped
+      // this (and this attempt is a transaction retry), matchedCount is 0
+      // here and that is fine — the membership branch above already made
+      // this call idempotent regardless of who wins the status update.
+      await ProjectInvitation.updateOne(
+        { _id: invitation._id, status: "pending" },
+        {
+          $set: {
+            status: "accepted",
+            acceptedAt: new Date(),
+            acceptedByUserId: user._id,
+          },
+        },
+        { session },
+      );
+    });
+  } catch (error) {
+    if (
+      /transaction numbers are only allowed|does not support transactions/i.test(
+        String(error?.message || ""),
+      )
+    ) {
+      throw apiError(
+        "Accepting this invitation requires MongoDB transaction support",
+        503,
+      );
+    }
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+
+  // Post-commit, best-effort side effects (I2): never allowed to undo an
+  // already-committed membership if either of these fails.
+  try {
+    await ProjectAuditLog.create({
+      _id: uuidv4(),
+      projectId: invitation.projectId,
+      actorUserId: user._id,
+      actorName: user.name || user.email || "",
+      targetUserId: user._id,
+      targetEmail: user.email || "",
+      eventType: "invitation.accepted",
+      metadata: { role: invitation.intendedRole },
+    });
+  } catch (e) {
+    console.error("audit insert failed (invitation accepted):", e);
+  }
+  try {
+    const channel = await getOrCreateGroupChannel(project);
+    await postSystemMessage(
+      channel,
+      `${user.name || user.email} joined the group.`,
+    );
+  } catch (e) {
+    console.error("system message failed (invitation accepted):", e);
+  }
 }
 
 const CLIENT_PROPOSAL_STATUSES = [
@@ -426,7 +864,10 @@ function isCronAuthorized(request) {
 // notification is included it gets `emailedAt` set so it won't be re-sent.
 async function runEmailDigest() {
   const pending = await Notification.find({
-    type: { $in: ["project_message", "request_message"] },
+    // Imported from lib/notify.js rather than re-listed here. These were two
+    // separate hardcoded lists once and they drifted (a type added to
+    // DIGEST_TYPES was silently never swept).
+    type: { $in: [...DIGEST_TYPES] },
     emailedAt: null,
     read: false,
   }).sort({ createdAt: 1 });
@@ -446,12 +887,36 @@ async function runEmailDigest() {
   const processedIds = [];
 
   for (const [userId, notes] of byUser) {
-    processedIds.push(...notes.map((n) => n._id));
     const recipient = await User.findById(userId);
     // Skip (but still mark processed) if user opted out or has no email.
     if (!recipient?.email || recipient.emailNotifications === false) {
+      processedIds.push(...notes.map((n) => n.id ?? n._id));
       continue;
     }
+
+    // Someone with the app open right now sees the toast and the bell; the
+    // digest would just be noise. Deliberately NOT marked processed — leave
+    // emailedAt null so it still reaches them once they go idle.
+    if (isUserOnline(recipient.lastActiveAt)) continue;
+
+    // The cron runs every 15 minutes, but a conversation should only email
+    // once an hour. Anything still inside that window is left pending for a
+    // later sweep rather than consumed.
+    const lastDigest = await Notification.findOne({
+      userId,
+      emailedAt: { $ne: null },
+    })
+      .sort({ emailedAt: -1 })
+      .select("emailedAt");
+    if (
+      lastDigest?.emailedAt &&
+      Date.now() - new Date(lastDigest.emailedAt).getTime() <
+        NOTIFICATION_THROTTLE_MS
+    ) {
+      continue;
+    }
+
+    processedIds.push(...notes.map((n) => n.id ?? n._id));
 
     const convMap = new Map();
     for (const n of notes) {
@@ -578,60 +1043,68 @@ export async function GET(request, context) {
 
     // Client Projects (auth required)
     if (pathStr === "client-projects") {
-      const user = await getUserFromRequest(request);
-      if (!user) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
+      const user = await requireAuthenticatedUser(request);
+      // Admin and owner scoping is unchanged; a collaborator/viewer additionally
+      // sees the projects they were invited into, alongside anything they own.
+      let query;
+      if (user.isAdmin) {
+        query = {};
+      } else {
+        const memberships = await ProjectMember.find({
+          userId: user._id,
+          status: "active",
+        }).select("projectId");
+        const orClauses = [
+          { clientUserId: user._id },
+          { clientEmail: user.email },
+        ];
+        if (memberships.length > 0) {
+          orClauses.push({
+            _id: { $in: memberships.map((m) => m.projectId) },
+          });
+        }
+        query = { $or: orClauses };
       }
-      const query = user.isAdmin
-        ? {}
-        : { $or: [{ clientUserId: user._id }, { clientEmail: user.email }] };
       const projects = await ClientProject.find(query).sort({ createdAt: -1 });
-      return NextResponse.json(projects, { headers: getCorsHeaders() });
+      // Owner/admin get the raw document exactly as before (zero regression);
+      // a project reached only through membership goes through the allowlist.
+      const result = await Promise.all(
+        projects.map(async (project) => {
+          if (canAccessClientEntity(user, project)) return project;
+          const access = await resolveProjectAccess(user, project);
+          return serializeProjectForAccess(project, access);
+        }),
+      );
+      return NextResponse.json(result, { headers: getCorsHeaders() });
     }
 
     if (pathStr.startsWith("client-projects/")) {
-      const user = await getUserFromRequest(request);
-      if (!user) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
-      }
+      const user = await requireAuthenticatedUser(request);
       const id = path[1];
       const project = await ClientProject.findById(id);
-      if (!project) {
-        return NextResponse.json(
-          { error: "Project not found" },
-          { status: 404, headers: getCorsHeaders() },
-        );
-      }
-      if (!canAccessClientProject(user, project)) {
-        return NextResponse.json(
-          { error: "Forbidden" },
-          { status: 403, headers: getCorsHeaders() },
-        );
-      }
-      // Proposals belonging to this single client project. Drafts are never
+      if (!project) return notFoundResponse("Project not found");
+
+      // Proposals belonging to this single client project. A collaborator/
+      // viewer has a real relationship to the project (projectRead) but not to
+      // its commercial side — that is its own permission, checked here, not
+      // inherited from being able to see the project at all. Drafts are never
       // returned to clients, even when a proposal id is guessed directly.
       if (path[2] === "proposals") {
+        const access = await requireProjectPermission(
+          user,
+          project,
+          "proposalsRead",
+        );
         const proposalQuery = {
           projectId: id,
-          ...(user.isAdmin
+          ...(access.role === "admin"
             ? {}
             : { status: { $in: CLIENT_PROPOSAL_STATUSES } }),
         };
         if (path[3]) proposalQuery._id = path[3];
         if (path[3]) {
           const proposal = await ProjectProposal.findOne(proposalQuery);
-          if (!proposal) {
-            return NextResponse.json(
-              { error: "Proposal not found" },
-              { status: 404, headers: getCorsHeaders() },
-            );
-          }
+          if (!proposal) return notFoundResponse("Proposal not found");
           return NextResponse.json(proposal, { headers: getCorsHeaders() });
         }
         const proposals = await ProjectProposal.find(proposalQuery).sort({
@@ -641,14 +1114,375 @@ export async function GET(request, context) {
         return NextResponse.json(proposals, { headers: getCorsHeaders() });
       }
       // Per-milestone chat thread: client-projects/:id/messages?milestoneId=...
+      // Open to any role with milestoneRead (viewer included) — read-only.
       if (path[2] === "messages") {
+        await requireProjectPermission(user, project, "milestoneRead");
         const milestoneId = searchParams.get("milestoneId");
         const mq = { projectId: id };
         if (milestoneId) mq.milestoneId = milestoneId;
         const messages = await ProjectMessage.find(mq).sort({ createdAt: 1 });
         return NextResponse.json(messages, { headers: getCorsHeaders() });
       }
-      return NextResponse.json(project, { headers: getCorsHeaders() });
+      // Team roster: the project owner, active ProjectMembers, and every
+      // global admin — each individually, so a client can DM any operator
+      // directly rather than a single shared "support" identity — plus,
+      // only for someone who can invite, the pending invitations. Private
+      // emails are a further opt-in beyond that — owner/admin only — not
+      // implied by "can see the team".
+      if (path[2] === "members") {
+        const access = await requireProjectPermission(
+          user,
+          project,
+          "membersRead",
+        );
+        const activeMembers = await ProjectMember.find({
+          projectId: id,
+          status: "active",
+        }).sort({ joinedAt: 1 });
+        const admins = await User.find({ isAdmin: true });
+        const ownerId = project.clientUserId || null;
+        const owner = ownerId
+          ? await User.findById(ownerId)
+          : project.clientEmail
+            ? await User.findOne({ email: project.clientEmail })
+            : null;
+
+        const accountsById = new Map();
+        if (activeMembers.length > 0) {
+          const accounts = await User.find({
+            _id: { $in: activeMembers.map((m) => m.userId) },
+          });
+          for (const account of accounts) {
+            accountsById.set(String(account._id), account);
+          }
+        }
+        const includeEmail = access.role === "admin" || access.role === "owner";
+        const now = new Date();
+
+        // Exactly ONE row per person. The same human can legitimately be
+        // several things at once — a global admin who also accepted an
+        // invitation here, or an owner who is also an admin — and a second
+        // row for them is worse than useless: both rows carry the same
+        // userId, so both open the SAME dm channel (dmKey is per user pair),
+        // making it look like a message went to "the wrong chat" when there
+        // was only ever one conversation.
+        //
+        // Precedence is admin → owner → membership, the same order
+        // resolveRoleFromFacts resolves permissions in, so the row a person
+        // shows up as always matches the rights they actually have here.
+        // That order is also the display order the plan asks for
+        // (admin first, then owner, then everyone else).
+        const byUserId = new Map();
+        const addRow = (userId, member, account) => {
+          const key = String(userId || "");
+          if (!key || byUserId.has(key)) return;
+          byUserId.set(
+            key,
+            serializeMemberPublic(member, {
+              includeEmail,
+              user: account,
+              isOnline: isUserOnline(account?.lastActiveAt, now),
+            }),
+          );
+        };
+
+        for (const admin of admins) {
+          addRow(
+            admin._id,
+            {
+              _id: `admin:${admin._id}`,
+              userId: admin._id,
+              role: "admin",
+              status: "active",
+              joinedAt: admin.createdAt,
+            },
+            admin,
+          );
+        }
+        if (owner) {
+          addRow(
+            owner._id,
+            {
+              _id: `owner:${owner._id}`,
+              userId: owner._id,
+              role: "owner",
+              status: "active",
+              joinedAt: project.createdAt,
+            },
+            owner,
+          );
+        }
+        for (const m of activeMembers) {
+          addRow(m.userId, m, accountsById.get(String(m.userId)));
+        }
+        const members = Array.from(byUserId.values());
+
+        let invitations = [];
+        if (access.permissions.membersInvite) {
+          const pending = await ProjectInvitation.find({
+            projectId: id,
+            status: "pending",
+          }).sort({ createdAt: -1 });
+          invitations = pending.map(serializeInvitationForManager);
+        }
+        return NextResponse.json(
+          { members, invitations },
+          { headers: getCorsHeaders() },
+        );
+      }
+      const access = await requireProjectPermission(
+        user,
+        project,
+        "projectRead",
+      );
+      return NextResponse.json(serializeProjectForAccess(project, access), {
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // Invitation preview — unauthenticated. Whoever holds the link learns only
+    // enough to decide whether to accept: which project, who invited, which
+    // role, and a masked hint of the bound address. Sets an HttpOnly cookie so
+    // the raw token survives a login/registration redirect without sitting in
+    // the URL bar, browser history, or a referrer header.
+    if (pathStr === "invitations/preview") {
+      const token = searchParams.get("token");
+      if (!token) {
+        return NextResponse.json(
+          { error: "Token is required" },
+          { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      const invitation = await ProjectInvitation.findOne({
+        tokenHash: hashInviteToken(token),
+      });
+      if (!invitation) return notFoundResponse("Invitation not found");
+      const project = await ClientProject.findById(invitation.projectId);
+      const preview = serializeInvitationPreview(invitation, project || {});
+      const response = NextResponse.json(preview, {
+        headers: getCorsHeaders(),
+      });
+      return setInviteCookie(response, token);
+    }
+
+    // Every channel the user can see: their projects' group channel (lazily
+    // created here, one per project) plus any DM channel they're part of.
+    // One call fills the whole list, with unread counts and last-message
+    // previews included.
+    if (pathStr === "chat/channels") {
+      const user = await requireAuthenticatedUser(request);
+      // Presence heartbeat: this list is the one thing already polled every
+      // 15s while the chat UI is open, so it doubles as "the caller is
+      // active right now" — no separate heartbeat endpoint/poll needed.
+      // Fire-and-forget: a failed touch should never break the channel list.
+      User.updateOne({ _id: user._id }, { $set: { lastActiveAt: new Date() } }).catch(
+        (e) => console.error("presence heartbeat failed:", e),
+      );
+      let projectQuery;
+      if (user.isAdmin) {
+        projectQuery = {};
+      } else {
+        const memberships = await ProjectMember.find({
+          userId: user._id,
+          status: "active",
+        }).select("projectId");
+        const orClauses = [
+          { clientUserId: user._id },
+          { clientEmail: user.email },
+        ];
+        if (memberships.length > 0) {
+          orClauses.push({
+            _id: { $in: memberships.map((m) => m.projectId) },
+          });
+        }
+        projectQuery = { $or: orClauses };
+      }
+      const projects = await ClientProject.find(projectQuery);
+      const projectsById = new Map(projects.map((p) => [String(p._id), p]));
+
+      const groupChannels = await Promise.all(
+        projects.map((p) => getOrCreateGroupChannel(p)),
+      );
+
+      // DM channels this user is part of. A dm's project might not be one of
+      // the projects above (access could have been revoked since) — those
+      // are skipped: no relationship to the project means no relationship to
+      // a DM under it either.
+      const dmChannelsRaw = await ChatChannel.find({
+        kind: "dm",
+        memberUserIds: String(user._id),
+      });
+      const dmChannels = [];
+      for (const dm of dmChannelsRaw) {
+        if (!projectsById.has(String(dm.projectId))) {
+          const dmProject = await ClientProject.findById(dm.projectId);
+          if (!dmProject) continue;
+          const dmAccess = await resolveProjectAccess(user, dmProject);
+          if (dmAccess.role === null) continue;
+          projectsById.set(String(dmProject._id), dmProject);
+        }
+        dmChannels.push(dm);
+      }
+
+      const allChannels = [...groupChannels, ...dmChannels];
+      const reads = await ChatRead.find({
+        channelId: { $in: allChannels.map((c) => c._id) },
+        userId: user._id,
+      });
+      const readByChannel = new Map(reads.map((r) => [r.channelId, r]));
+
+      const result = await Promise.all(
+        allChannels.map(async (channel) => {
+          const read = readByChannel.get(channel._id);
+          const clearedAt = read?.clearedAt || null;
+          const since = readCutoff(read);
+
+          const lastMessageQuery = { channelId: channel._id, deletedAt: null };
+          if (clearedAt) lastMessageQuery.createdAt = { $gt: clearedAt };
+
+          const unreadCount = await ChatMessage.countDocuments({
+            channelId: channel._id,
+            deletedAt: null,
+            authorUserId: { $ne: user._id },
+            createdAt: { $gt: since },
+          });
+          const lastMessage = await ChatMessage.findOne(lastMessageQuery).sort({
+            createdAt: -1,
+          });
+          const project = projectsById.get(String(channel.projectId));
+          const access = project
+            ? await resolveProjectAccess(user, project)
+            : null;
+          return serializeChannelSummary(channel, {
+            unreadCount,
+            lastMessage,
+            accessObj: access,
+          });
+        }),
+      );
+
+      return NextResponse.json(result, { headers: getCorsHeaders() });
+    }
+
+    // GET /api/chat/channels/:id — meta + member roster.
+    if (pathStr.startsWith("chat/channels/") && !path[3]) {
+      const user = await requireAuthenticatedUser(request);
+      const { channel, project } = await loadChannelWithAccess(
+        path[2],
+        user,
+        "chatRead",
+      );
+      const roster = await loadChannelRoster(project);
+      return NextResponse.json(
+        serializeChannelDetail(channel, {
+          members: roster.map(serializeChannelMember),
+        }),
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // GET /api/chat/channels/:id/messages?before=&limit=&flag=&q=
+    if (pathStr.startsWith("chat/channels/") && path[3] === "messages") {
+      const user = await requireAuthenticatedUser(request);
+      const { channel, access } = await loadChannelWithAccess(
+        path[2],
+        user,
+        "chatRead",
+      );
+      const read = await ChatRead.findOne({
+        channelId: channel._id,
+        userId: user._id,
+      });
+
+      const limitParam = Number.parseInt(searchParams.get("limit") || "", 10);
+      const limit = Math.min(
+        Math.max(Number.isFinite(limitParam) ? limitParam : 50, 1),
+        100,
+      );
+      const before = searchParams.get("before");
+      const flag = searchParams.get("flag");
+      const q = searchParams.get("q");
+      const attachmentType = searchParams.get("attachmentType");
+
+      const query = { channelId: channel._id };
+      const createdAtFilter = {};
+      if (read?.clearedAt) createdAtFilter.$gt = read.clearedAt;
+      if (before) {
+        const beforeDate = new Date(before);
+        if (!Number.isNaN(beforeDate.getTime())) createdAtFilter.$lt = beforeDate;
+      }
+      if (Object.keys(createdAtFilter).length > 0) {
+        query.createdAt = createdAtFilter;
+      }
+      if (flag && flag !== "all") {
+        if (flag === "pinned") query.pinned = true;
+        else if (MESSAGE_FLAGS.includes(flag)) query.flag = flag;
+      }
+      // Matches a message with at least one attachment of this type — a
+      // distinct filter dimension from `flag`, so it composes independently
+      // (the UI only ever sends one or the other today, but the query
+      // doesn't need to assume that).
+      if (attachmentType === "image" || attachmentType === "pdf") {
+        query["attachments.type"] = attachmentType;
+      }
+      if (q && String(q).trim().length >= 2) {
+        query.body = { $regex: escapeRegExp(String(q).trim()), $options: "i" };
+      }
+
+      const messages = await ChatMessage.find(query)
+        .sort({ createdAt: -1 })
+        .limit(limit);
+      return NextResponse.json(
+        messages.reverse().map((m) => serializeChatMessageForAccess(m, access)),
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // GET /api/chat/channels/:id/pinned
+    if (pathStr.startsWith("chat/channels/") && path[3] === "pinned") {
+      const user = await requireAuthenticatedUser(request);
+      const { channel, access } = await loadChannelWithAccess(
+        path[2],
+        user,
+        "chatRead",
+      );
+      const read = await ChatRead.findOne({
+        channelId: channel._id,
+        userId: user._id,
+      });
+      // `deletedAt: null` also covers messages pinned and deleted BEFORE
+      // delete started unpinning — those rows still carry pinned: true.
+      const query = { channelId: channel._id, pinned: true, deletedAt: null };
+      if (read?.clearedAt) query.createdAt = { $gt: read.clearedAt };
+      const pinned = await ChatMessage.find(query).sort({ pinnedAt: -1 });
+      return NextResponse.json(
+        pinned.map((m) => serializeChatMessageForAccess(m, access)),
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // GET /api/project-items?projectId=&kind=&status= — formal records
+    // produced by "Convert to…". Gated by `projectRead`, not something
+    // chat-specific — every role that can see the project at all should be
+    // able to see its decision/incident log, same as milestones/tasks.
+    if (pathStr === "project-items") {
+      const user = await requireAuthenticatedUser(request);
+      const projectId = searchParams.get("projectId");
+      if (!projectId) throw apiError("projectId is required", 400);
+      const project = await ClientProject.findById(projectId);
+      if (!project) return notFoundResponse("Project not found");
+      await requireProjectPermission(user, project, "projectRead");
+
+      const query = { projectId };
+      const kind = searchParams.get("kind");
+      if (kind && PROJECT_ITEM_KINDS.includes(kind)) query.kind = kind;
+      const status = searchParams.get("status");
+      if (status) query.status = status;
+
+      const items = await ProjectItem.find(query).sort({ createdAt: -1 });
+      return NextResponse.json(items.map(serializeProjectItem), {
+        headers: getCorsHeaders(),
+      });
     }
 
     // Project Requests (auth required)
@@ -670,27 +1504,15 @@ export async function GET(request, context) {
     }
 
     if (pathStr.startsWith("project-requests/")) {
-      const user = await getUserFromRequest(request);
-      if (!user) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
-      }
+      const user = await requireAuthenticatedUser(request);
       const id = path[1];
       const req = await ProjectRequest.findById(id);
-      if (!req) {
-        return NextResponse.json(
-          { error: "Request not found" },
-          { status: 404, headers: getCorsHeaders() },
-        );
-      }
-      if (!canAccessRequest(user, req)) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
-      }
+      if (!req) return notFoundResponse("Request not found");
+      // A request is owner/admin-only with no membership concept (unlike
+      // client-projects) — a collaborator has no relationship to it at all,
+      // so this is 404, not 403: existence is not disclosed to someone with
+      // no claim to it, same policy as an unrelated client-projects id.
+      if (!canAccessRequest(user, req)) return notFoundResponse("Request not found");
       return NextResponse.json(req, { headers: getCorsHeaders() });
     }
 
@@ -814,6 +1636,15 @@ export async function GET(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
+      // Second presence heartbeat. GET /chat/channels covers someone with the
+      // chat open; this poll runs on EVERY authenticated page, so a person
+      // reading their dashboard no longer looks offline — which matters now
+      // that presence suppresses email/push. Fire-and-forget: a failed touch
+      // must never break the bell.
+      User.updateOne(
+        { _id: user._id },
+        { $set: { lastActiveAt: new Date() } },
+      ).catch((e) => console.error("presence heartbeat failed:", e));
       const [items, unreadCount] = await Promise.all([
         Notification.find({ userId: user._id })
           .sort({ createdAt: -1 })
@@ -990,7 +1821,36 @@ export async function POST(request, context) {
 
     // Auth - Register
     if (pathStr === "auth/register") {
-      const { name, email, password } = body;
+      const { name, password, inviteToken } = body;
+
+      // Registering through an invite link locks the account's email to the
+      // invitation's own address — body.email (if the form even sends one) is
+      // never used. Holding a token that hashes to a live, pending invitation
+      // is treated as proof of that inbox, the same trust a normal
+      // verification email establishes, just already spent.
+      let invitation = null;
+      let email = body.email;
+      if (inviteToken) {
+        invitation = await ProjectInvitation.findOne({
+          tokenHash: hashInviteToken(inviteToken),
+        });
+        if (!invitation) {
+          throw apiError("Invalid or expired invitation", 400);
+        }
+        // Comparing the invitation's address to itself only exercises the
+        // status/expiry checks — there is no other identity yet to mismatch
+        // against at registration time. A dead invitation here means the
+        // cookie should go too (I4) — but a validation failure further down
+        // (missing field, existing account) must NOT clear it, since the
+        // invitation itself is still perfectly good for a retry.
+        try {
+          assertInvitationAcceptable(invitation, invitation.emailNormalized);
+        } catch (error) {
+          return clearInviteCookie(errorResponse(error, "POST"));
+        }
+        email = invitation.emailNormalized;
+      }
+
       if (!name || !email || !password) {
         return NextResponse.json(
           { error: "Missing required fields" },
@@ -999,39 +1859,54 @@ export async function POST(request, context) {
       }
       const existingUser = await User.findOne({ email });
       if (existingUser) {
+        // Never create a second account for an email that already has one —
+        // true with or without an invite (I3). With one, the fix is to sign
+        // in and accept, not register again.
         return NextResponse.json(
-          { error: "Email already exists" },
+          {
+            error: invitation
+              ? "An account with this email already exists. Please sign in and accept the invitation from your dashboard."
+              : "Email already exists",
+          },
           { status: 400, headers: getCorsHeaders() },
         );
       }
       const hashedPassword = hashPassword(password);
-      const verifyToken = randomBytes(32).toString("hex");
+      const verifyToken = invitation ? undefined : randomBytes(32).toString("hex");
       const user = await User.create({
         _id: uuidv4(),
         name,
         email,
         password: hashedPassword,
         isAdmin: false,
-        emailVerified: false,
+        emailVerified: Boolean(invitation),
         verifyToken,
       });
 
-      try {
-        const verificationUrl = `${APP_URL}/verify-email?token=${verifyToken}`;
-        const template = emailTemplates.emailVerification({
-          name,
-          verificationUrl,
-        });
-        await sendEmail({
-          to: email,
-          ...template,
-          type: "verification",
-        });
-      } catch (error) {
-        console.error("Failed to send verification email:", error);
+      if (invitation) {
+        const project = await ClientProject.findById(invitation.projectId);
+        if (project) {
+          await acceptInvitationForUser(invitation, project, user);
+        }
+      } else {
+        try {
+          const verificationUrl = `${resolveAppUrl(request)}/verify-email?token=${verifyToken}`;
+          const template = emailTemplates.emailVerification({
+            name,
+            verificationUrl,
+          });
+          await sendEmail({
+            to: email,
+            ...template,
+            type: "verification",
+          });
+        } catch (error) {
+          console.error("Failed to send verification email:", error);
+        }
       }
 
-      return createSessionResponse(user, { status: 201 });
+      const response = createSessionResponse(user, { status: 201 });
+      return invitation ? clearInviteCookie(response) : response;
     }
 
     // Auth - Login
@@ -1070,7 +1945,7 @@ export async function POST(request, context) {
           user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1h
           await user.save();
           try {
-            const resetUrl = `${APP_URL}/reset-password?token=${user.resetToken}`;
+            const resetUrl = `${resolveAppUrl(request)}/reset-password?token=${user.resetToken}`;
             const template = emailTemplates.passwordReset({
               name: user.name,
               resetUrl,
@@ -1170,7 +2045,7 @@ export async function POST(request, context) {
       user.verifyToken = randomBytes(32).toString("hex");
       await user.save();
       try {
-        const verificationUrl = `${APP_URL}/verify-email?token=${user.verifyToken}`;
+        const verificationUrl = `${resolveAppUrl(request)}/verify-email?token=${user.verifyToken}`;
         const template = emailTemplates.emailVerification({
           name: user.name,
           verificationUrl,
@@ -1468,6 +2343,37 @@ export async function POST(request, context) {
         return NextResponse.json(proposal, { headers: getCorsHeaders() });
       }
 
+      // Pull a sent proposal back before the client has acted on it, so it
+      // can be corrected and sent again. Only `sent` is reversible: once the
+      // client has accepted there are live milestones behind it (that is what
+      // `archive` is for), and once they have rejected or asked for changes
+      // their answer is part of the record.
+      if (action === "withdraw") {
+        if (!user.isAdmin) return forbiddenResponse();
+        if (proposal.status !== "sent") {
+          throw apiError("Only a sent proposal can be withdrawn", 409);
+        }
+        proposal.status = "draft";
+        proposal.sentAt = null;
+        await proposal.save();
+        await ClientProject.updateOne(
+          { _id: project._id },
+          {
+            $push: {
+              events: {
+                _id: uuidv4(),
+                type: "project_proposal_withdrawn",
+                body: `${proposal.phaseLabel} withdrawn before the client responded`,
+                actorName: user.name || user.email || "",
+                createdAt: now,
+              },
+            },
+            $inc: { __v: 1 },
+          },
+        );
+        return NextResponse.json(proposal, { headers: getCorsHeaders() });
+      }
+
       // Admin-only removal of an accepted follow-up phase. The accepted
       // proposal snapshot and all messages remain archived for audit; only
       // untouched operational milestones are removed from the live project.
@@ -1484,6 +2390,21 @@ export async function POST(request, context) {
         if (body.confirmation !== "DELETE") {
           return NextResponse.json(
             { error: "Deletion confirmation is required" },
+            { status: 400, headers: getCorsHeaders() },
+          );
+        }
+        // Operator override of the started-work guard. It never widens WHAT
+        // may be removed — the master proposal and non-accepted statuses are
+        // still refused inside preparePhaseArchive — only whether work that
+        // has already begun blocks it. Gated on a second, explicit
+        // confirmation so it can never be the result of one stray click.
+        const forceArchive = body.force === true;
+        if (forceArchive && body.forceConfirmation !== "DELETE STARTED WORK") {
+          return NextResponse.json(
+            {
+              error:
+                "Force deletion requires its own confirmation phrase",
+            },
             { status: 400, headers: getCorsHeaders() },
           );
         }
@@ -1514,6 +2435,7 @@ export async function POST(request, context) {
             archivePlan = preparePhaseArchive(
               txProposal,
               txProject.milestones,
+              { force: forceArchive },
             );
             const hasStoredRecipient =
               txProposal.archiveRecipientUserId !== null &&
@@ -1566,7 +2488,12 @@ export async function POST(request, context) {
                     // recipient at archive time; a later project reassignment
                     // must not receive this historical notification.
                     archiveRecipientUserId: recipientUserId || "",
-                    archiveReason: reason,
+                    // When the override discarded work that had already
+                    // begun, say so in the stored reason itself — the phase
+                    // row is the only surviving record of what happened.
+                    archiveReason: archivePlan.forcedOverStartedWork
+                      ? `[Force-deleted over ${archivePlan.startedMilestoneCount} started milestone(s)] ${reason}`
+                      : reason,
                   },
                 },
                 { new: true, runValidators: true, session },
@@ -1835,46 +2762,850 @@ export async function POST(request, context) {
     }
 
     // Post a chat message to a milestone (admin or owner client)
-    if (pathStr.startsWith("client-projects/") && path[2] === "messages") {
-      const user = await getUserFromRequest(request);
-      if (!user) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
-      }
+    // Create an invitation for a new collaborator/viewer.
+    if (
+      pathStr.startsWith("client-projects/") &&
+      path[2] === "invitations" &&
+      !path[3]
+    ) {
+      const user = await requireAuthenticatedUser(request);
       const id = path[1];
       const project = await ClientProject.findById(id);
-      if (!project) {
+      if (!project) return notFoundResponse("Project not found");
+      await requireProjectPermission(user, project, "membersInvite");
+      const sanitized = sanitizeInvitationPayload(body);
+
+      if (
+        project.clientEmail &&
+        normalizeEmail(project.clientEmail) === sanitized.email
+      ) {
+        throw apiError("This is already the project owner's email", 400);
+      }
+
+      // "Already a member" can only be true if a real account exists for this
+      // address — someone who never registered obviously has no membership
+      // row yet, which is exactly the normal case being invited for the first
+      // time.
+      const existingUser = await User.findOne({ email: sanitized.email });
+      const existingMembership = existingUser
+        ? await ProjectMember.findOne({
+            projectId: id,
+            userId: existingUser._id,
+          })
+        : null;
+      const existingInvitation = await ProjectInvitation.findOne({
+        projectId: id,
+        emailNormalized: sanitized.email,
+        status: "pending",
+      });
+      const action = resolveInvitationAction({
+        membershipStatus: existingMembership?.status,
+        invitationStatus: existingInvitation?.status,
+      });
+      if (action === "already_member") {
+        throw apiError("This person is already a member of this project", 409);
+      }
+      if (action === "pending_exists") {
         return NextResponse.json(
-          { error: "Project not found" },
-          { status: 404, headers: getCorsHeaders() },
+          {
+            error: "An invitation is already pending for this email",
+            invitationId: existingInvitation._id,
+          },
+          { status: 409, headers: getCorsHeaders() },
         );
       }
-      if (!canAccessClientProject(user, project)) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
+
+      const rawToken = generateInviteToken();
+      const invitation = await ProjectInvitation.create({
+        _id: uuidv4(),
+        projectId: id,
+        emailNormalized: sanitized.email,
+        invitedByUserId: user._id,
+        invitedByName: user.name || user.email,
+        intendedRole: sanitized.intendedRole,
+        roleLabel: sanitized.roleLabel,
+        tokenHash: hashInviteToken(rawToken),
+        status: "pending",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        personalMessage: sanitized.personalMessage,
+      });
+
+      await ProjectAuditLog.create({
+        _id: uuidv4(),
+        projectId: id,
+        actorUserId: user._id,
+        actorName: user.name || user.email || "",
+        targetEmail: sanitized.email,
+        eventType: "invitation.created",
+        metadata: { intendedRole: sanitized.intendedRole },
+      }).catch((e) =>
+        console.error("audit insert failed (invitation created):", e),
+      );
+
+      try {
+        const inviteUrl = `${resolveAppUrl(request)}/invite?token=${rawToken}`;
+        const template = emailTemplates.projectInvite({
+          inviterName: user.name || user.email,
+          projectTitle: project.title,
+          roleLabel: displayRoleLabel(
+            sanitized.intendedRole,
+            sanitized.roleLabel,
+          ),
+          inviteUrl,
+          recipientEmail: sanitized.email,
+          expiresAt: invitation.expiresAt,
+          personalMessage: sanitized.personalMessage,
+        });
+        await sendEmail({ to: sanitized.email, ...template, type: "project" });
+      } catch (error) {
+        console.error("Failed to send invitation email:", error);
       }
+
+      return NextResponse.json(serializeInvitationForManager(invitation), {
+        status: 201,
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // Resend an invitation: new token, new expiry. The old link stops working
+    // the moment tokenHash changes — nothing else needs to revoke it.
+    if (
+      pathStr.startsWith("client-projects/") &&
+      path[2] === "invitations" &&
+      path[3] &&
+      path[4] === "resend"
+    ) {
+      const user = await requireAuthenticatedUser(request);
+      const id = path[1];
+      const project = await ClientProject.findById(id);
+      if (!project) return notFoundResponse("Project not found");
+      await requireProjectPermission(user, project, "membersInvite");
+      const invitation = await ProjectInvitation.findOne({
+        _id: path[3],
+        projectId: id,
+      });
+      if (!invitation) return notFoundResponse("Invitation not found");
+      if (invitation.status !== "pending") {
+        throw apiError("Only a pending invitation can be resent", 409);
+      }
+      const rawToken = generateInviteToken();
+      invitation.tokenHash = hashInviteToken(rawToken);
+      invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await invitation.save();
+
+      await ProjectAuditLog.create({
+        _id: uuidv4(),
+        projectId: id,
+        actorUserId: user._id,
+        actorName: user.name || user.email || "",
+        targetEmail: invitation.emailNormalized,
+        eventType: "invitation.resent",
+        metadata: {},
+      }).catch((e) =>
+        console.error("audit insert failed (invitation resent):", e),
+      );
+
+      try {
+        const inviteUrl = `${resolveAppUrl(request)}/invite?token=${rawToken}`;
+        const template = emailTemplates.projectInvite({
+          inviterName: user.name || user.email,
+          projectTitle: project.title,
+          roleLabel: displayRoleLabel(
+            invitation.intendedRole,
+            invitation.roleLabel,
+          ),
+          inviteUrl,
+          recipientEmail: invitation.emailNormalized,
+          expiresAt: invitation.expiresAt,
+          personalMessage: invitation.personalMessage,
+        });
+        await sendEmail({
+          to: invitation.emailNormalized,
+          ...template,
+          type: "project",
+        });
+      } catch (error) {
+        console.error("Failed to send invitation email:", error);
+      }
+
+      return NextResponse.json(serializeInvitationForManager(invitation), {
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // Accept an invitation. Auth required; token from the body or the
+    // HttpOnly cookie GET /invitations/preview set.
+    if (pathStr === "invitations/accept") {
+      const user = await requireAuthenticatedUser(request);
+      const token =
+        body.token || request.cookies.get(INVITE_COOKIE_NAME)?.value;
+      if (!token) {
+        throw apiError("Invitation token is required", 400);
+      }
+      // A dead invitation (revoked/accepted/expired) or an email mismatch
+      // means this token is spent either way — clear the cookie the same as
+      // on success (I4), rather than leaving a dead token to linger in it for
+      // up to an hour.
+      try {
+        const invitation = await ProjectInvitation.findOne({
+          tokenHash: hashInviteToken(token),
+        });
+        if (!invitation) {
+          return clearInviteCookie(notFoundResponse("Invitation not found"));
+        }
+        assertInvitationAcceptable(invitation, user.email);
+        const project = await ClientProject.findById(invitation.projectId);
+        if (!project) {
+          return clearInviteCookie(notFoundResponse("Project not found"));
+        }
+
+        await acceptInvitationForUser(invitation, project, user);
+
+        const response = NextResponse.json(
+          { message: "Invitation accepted", projectId: project._id },
+          { status: 200, headers: getCorsHeaders() },
+        );
+        return clearInviteCookie(response);
+      } catch (error) {
+        return clearInviteCookie(errorResponse(error, "POST"));
+      }
+    }
+
+    // A collaborator/viewer removes themselves. Owner/admin have no
+    // leaveProject permission — there is no membership row for them to leave.
+    if (pathStr.startsWith("client-projects/") && path[2] === "leave") {
+      const user = await requireAuthenticatedUser(request);
+      const id = path[1];
+      const project = await ClientProject.findById(id);
+      if (!project) return notFoundResponse("Project not found");
+      await requireProjectPermission(user, project, "leaveProject");
+      const member = await ProjectMember.findOne({
+        projectId: id,
+        userId: user._id,
+        status: "active",
+      });
+      if (!member) return notFoundResponse("Membership not found");
+      member.status = "removed";
+      await member.save();
+
+      await ProjectAuditLog.create({
+        _id: uuidv4(),
+        projectId: id,
+        actorUserId: user._id,
+        actorName: user.name || user.email || "",
+        targetUserId: user._id,
+        targetEmail: user.email || "",
+        eventType: "member.left",
+        metadata: {},
+      }).catch((e) => console.error("audit insert failed (member left):", e));
+
+      return NextResponse.json(
+        { message: "Left project" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // POST /api/chat/channels/:id/messages — send a message.
+    if (pathStr.startsWith("chat/channels/") && path[3] === "messages") {
+      const user = await requireAuthenticatedUser(request);
+      const { channel, project, access } = await loadChannelWithAccess(
+        path[2],
+        user,
+        "chatWrite",
+      );
+      const roster = await loadChannelRoster(project);
+
+      let replyToMessage = null;
+      if (body.replyToMessageId) {
+        replyToMessage = await ChatMessage.findById(body.replyToMessageId);
+        if (!replyToMessage) throw apiError("Replied message not found", 400);
+      }
+
+      const sanitized = sanitizeChatMessagePayload(body, {
+        accessObj: access,
+        channel,
+        members: roster,
+        replyToMessage,
+      });
+
+      const authorRole =
+        access.role === "admin"
+          ? "admin"
+          : access.role === "owner"
+            ? "client"
+            : "member";
+
+      const message = await ChatMessage.create({
+        _id: uuidv4(),
+        channelId: channel._id,
+        projectId: channel.projectId,
+        authorUserId: user._id,
+        authorName: user.name || user.email,
+        authorRole,
+        body: sanitized.body,
+        attachments: sanitized.attachments,
+        flag: sanitized.flag,
+        kind: "user",
+        replyToMessageId: sanitized.replyToMessageId,
+        replyToPreview: sanitized.replyToPreview,
+        mentions: sanitized.mentions,
+      });
+
+      // Sending implicitly marks the channel read for the sender — never show
+      // someone their own message as unread.
+      await ChatRead.updateOne(
+        { channelId: channel._id, userId: user._id },
+        { $set: { lastReadAt: new Date(), lastReadMessageId: message._id } },
+        { upsert: true },
+      );
+
+      // Notification fan-out (I6): recipients are computed from the roster/DM
+      // membership resolved above — the CURRENT active state, never a stale
+      // list. Mentions only ever resolve to roster entries (loadChannelRoster
+      // excludes global admins as mention candidates), so the admin leg below
+      // is always a plain "chat_message", never "chat_mention".
+      const preview = sanitized.body
+        ? sanitized.body.slice(0, 140)
+        : "(attachment)";
+      const mentionedIds = new Set((sanitized.mentions || []).map(String));
+
+      if (channel.kind === "dm") {
+        const otherUserId = (channel.memberUserIds || []).find(
+          (uid) => uid !== String(user._id),
+        );
+        if (otherUserId) {
+          const otherUser = await User.findById(otherUserId).select("isAdmin");
+          const isMentioned = mentionedIds.has(String(otherUserId));
+          await notifyUser({
+            userId: otherUserId,
+            actorId: user._id,
+            type: isMentioned ? "chat_mention" : "chat_message",
+            title: isMentioned
+              ? `${message.authorName} mentioned you`
+              : `New direct message from ${message.authorName}`,
+            body: preview,
+            link: otherUser?.isAdmin
+              ? `/admin?tab=chat&channel=${channel._id}`
+              : `/dashboard?tab=chat&channel=${channel._id}`,
+            entityType: "project",
+            entityId: project._id,
+            channelId: channel._id,
+            email: true,
+          });
+        }
+      } else {
+        // Everyone else currently in the group (owner + active members).
+        await Promise.all(
+          roster
+            .filter((r) => String(r.userId) !== String(user._id))
+            .map((r) => {
+              const isMentioned = mentionedIds.has(String(r.userId));
+              return notifyUser({
+                userId: r.userId,
+                actorId: user._id,
+                type: isMentioned ? "chat_mention" : "chat_message",
+                title: isMentioned
+                  ? `${message.authorName} mentioned you in ${project.title}`
+                  : `New message in ${project.title}`,
+                body: preview,
+                link: `/dashboard?tab=chat&channel=${channel._id}`,
+                entityType: "project",
+                entityId: project._id,
+                channelId: channel._id,
+                email: true,
+              });
+            }),
+        );
+        // Admins too — unless the author already is one (mirrors the existing
+        // milestone-chat convention: an admin's own message doesn't re-notify
+        // the rest of the admin team).
+        //
+        // Anyone already reached through the roster above is skipped here: an
+        // admin who also accepted an invitation to this project is in BOTH
+        // lists and was otherwise getting two notifications for one message.
+        if (access.role !== "admin") {
+          const alreadyNotified = new Set(
+            roster.map((r) => String(r.userId)),
+          );
+          const admins = await User.find({ isAdmin: true }).select("_id");
+          await Promise.all(
+            admins
+              .filter((a) => !alreadyNotified.has(String(a._id)))
+              .map((a) =>
+                notifyUser({
+                  userId: a._id,
+                  actorId: user._id,
+                  type: "chat_message",
+                  title: `New message in ${project.title}`,
+                  body: `${message.authorName}: ${preview}`,
+                  link: `/admin?tab=chat&channel=${channel._id}`,
+                  entityType: "project",
+                  entityId: project._id,
+                  channelId: channel._id,
+                  email: true,
+                }),
+              ),
+          );
+        }
+      }
+
+      return NextResponse.json(serializeChatMessageForAccess(message, access), {
+        status: 201,
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // POST /api/chat/channels/:id/read — mark everything up to now (or a
+    // specific message) as read.
+    if (pathStr.startsWith("chat/channels/") && path[3] === "read") {
+      const user = await requireAuthenticatedUser(request);
+      const { channel } = await loadChannelWithAccess(
+        path[2],
+        user,
+        "chatRead",
+      );
+      await ChatRead.updateOne(
+        { channelId: channel._id, userId: user._id },
+        {
+          $set: {
+            lastReadAt: new Date(),
+            lastReadMessageId: body?.messageId || null,
+          },
+        },
+        { upsert: true },
+      );
+      return NextResponse.json(
+        { message: "Marked as read" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // POST /api/chat/channels/:id/clear — hide everything up to now for the
+    // caller only; everyone else's view (and the project's history) is
+    // untouched.
+    if (pathStr.startsWith("chat/channels/") && path[3] === "clear") {
+      const user = await requireAuthenticatedUser(request);
+      const { channel } = await loadChannelWithAccess(
+        path[2],
+        user,
+        "chatRead",
+      );
+      const now = new Date();
+      await ChatRead.updateOne(
+        { channelId: channel._id, userId: user._id },
+        { $set: { lastReadAt: now, clearedAt: now } },
+        { upsert: true },
+      );
+      return NextResponse.json(
+        { message: "Conversation cleared" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // POST /api/chat/dm — get-or-create a direct-message channel with a
+    // fellow participant of the SAME project. The target must already have a
+    // real relationship to the project (owner, admin, or active member) —
+    // otherwise this would be a way to message an arbitrary stranger by
+    // guessing their user id.
+    if (pathStr === "chat/dm") {
+      const user = await requireAuthenticatedUser(request);
+      const { projectId, userId: targetUserId } = body;
+      if (!projectId || !targetUserId) {
+        throw apiError("projectId and userId are required", 400);
+      }
+      const project = await ClientProject.findById(projectId);
+      if (!project) return notFoundResponse("Project not found");
+      const access = await requireProjectPermission(user, project, "chatWrite");
+
+      const targetUser = await User.findById(targetUserId);
+      if (!targetUser) return notFoundResponse("User not found");
+      const targetAccess = await resolveProjectAccess(targetUser, project);
+      if (targetAccess.role === null) {
+        throw apiError("That person is not part of this project", 400);
+      }
+
+      const channel = await getOrCreateDmChannel(project, user._id, targetUserId);
+      return NextResponse.json(
+        serializeChannelSummary(channel, { accessObj: access }),
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // POST /api/chat/messages/:id/pin — { pinned }.
+    if (pathStr.startsWith("chat/messages/") && path[3] === "pin") {
+      const user = await requireAuthenticatedUser(request);
+      const { message, access } = await loadMessageWithAccess(
+        path[2],
+        user,
+        "pin",
+      );
+      const pinned = body?.pinned !== false;
+      message.pinned = pinned;
+      message.pinnedAt = pinned ? new Date() : null;
+      message.pinnedByUserId = pinned ? user._id : null;
+      await message.save();
+      return NextResponse.json(serializeChatMessageForAccess(message, access), {
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // POST /api/chat/messages/:id/convert — turn a flagged message into a
+    // formal record: an item (idea/problem/incident/decision — open to
+    // collaborators too, that's the point of letting the team capture things
+    // as they come up), or a request/task/milestone comment (owner/admin
+    // only — these change the project's actual commitments).
+    if (pathStr.startsWith("chat/messages/") && path[3] === "convert") {
+      const user = await requireAuthenticatedUser(request);
+      const { message, channel, project, access } = await loadMessageWithAccess(
+        path[2],
+        user,
+        "chatRead",
+      );
+      if (message.deletedAt) {
+        throw apiError("Cannot convert a deleted message", 409);
+      }
+      const sanitized = sanitizeConvertPayload(body?.target, body, access, {
+        sourceBody: message.body || "",
+      });
+      const actorName = user.name || user.email;
+      let created;
+      let convertedToEntry;
+
+      if (sanitized.target === "item") {
+        // Duplicate-ref races are rare (two people converting different
+        // messages into the same kind at the same moment) but the unique
+        // index on (projectId, kind, ref) is what actually prevents a
+        // collision — this loop just makes losing that race a normal,
+        // handled outcome (I5), same shape as getOrCreateGroupChannel above.
+        // Sorted by createdAt, not ref: a lexicographic sort on the ref
+        // string breaks once a kind passes 999 items in one project ("D-1000"
+        // sorts before "D-999") — creation order never has that problem.
+        for (let attempt = 0; attempt < 5 && !created; attempt++) {
+          const last = await ProjectItem.findOne({
+            projectId: project._id,
+            kind: sanitized.kind,
+          }).sort({ createdAt: -1 });
+          const ref = nextItemRef(sanitized.kind, last?.ref);
+          try {
+            created = await ProjectItem.create({
+              _id: uuidv4(),
+              projectId: project._id,
+              kind: sanitized.kind,
+              ref,
+              title: sanitized.title,
+              body: sanitized.body,
+              severity: sanitized.severity,
+              sourceChannelId: channel._id,
+              sourceMessageId: message._id,
+              createdByUserId: user._id,
+              createdByName: actorName,
+              // Converting a message flagged "decision" into a formal Decision
+              // record IS the act of confirming it — the converting user is
+              // the first confirmation, not a bystander creating an open item.
+              confirmedBy:
+                sanitized.kind === "decision"
+                  ? [{ userId: user._id, name: actorName, at: new Date() }]
+                  : [],
+              decidedAt: sanitized.kind === "decision" ? new Date() : null,
+            });
+          } catch (error) {
+            if (error?.code !== 11000) throw error;
+          }
+        }
+        if (!created) {
+          throw apiError(
+            "Could not allocate a reference number, please retry",
+            409,
+          );
+        }
+        convertedToEntry = {
+          target: "item",
+          targetId: created._id,
+          kind: created.kind,
+          ref: created.ref,
+          byUserId: user._id,
+          byName: actorName,
+        };
+      } else if (sanitized.target === "request") {
+        // Identity is the PROJECT's client, not the acting user — a
+        // ProjectRequest's clientName/-Email/-UserId mean "who this is from"
+        // everywhere else in the app, and an admin converting on a client's
+        // behalf doesn't change whose request this actually is.
+        created = await ProjectRequest.create({
+          _id: uuidv4(),
+          clientUserId: project.clientUserId,
+          clientName: project.clientName,
+          clientEmail: project.clientEmail,
+          clientSlug: project.clientSlug,
+          title: sanitized.title,
+          description: sanitized.body,
+          status: "new",
+          sourceProjectId: project._id,
+          sourceMessageId: message._id,
+        });
+        await notifyAdmins({
+          actorId: user._id,
+          type: "request_created",
+          title: `New project request: ${created.title}`,
+          body: `${actorName} converted a chat message into a request on ${project.title}.`,
+          link: `/admin?tab=project-requests&id=${created._id}`,
+          entityType: "request",
+          entityId: created._id,
+          email: true,
+        });
+        convertedToEntry = {
+          target: "request",
+          targetId: created._id,
+          byUserId: user._id,
+          byName: actorName,
+        };
+      } else if (sanitized.target === "task") {
+        // Same resource-first idiom as the milestone chat branch below: the
+        // milestone is looked up from the already permission-checked
+        // project's own array, never a separate collection by client id.
+        const milestone = (project.milestones || []).find(
+          (item) => String(item._id) === String(sanitized.milestoneId),
+        );
+        if (!milestone) throw apiError("Milestone not found", 404);
+        const newTask = {
+          _id: uuidv4(),
+          title: sanitized.title,
+          description: sanitized.body,
+          order: milestone.tasks.length,
+          status: "pending",
+        };
+        milestone.tasks.push(newTask);
+        await project.save();
+        created = newTask;
+        convertedToEntry = {
+          target: "task",
+          targetId: newTask._id,
+          byUserId: user._id,
+          byName: actorName,
+        };
+      } else {
+        // milestone_comment
+        const milestone = (project.milestones || []).find(
+          (item) => String(item._id) === String(sanitized.milestoneId),
+        );
+        if (!milestone) throw apiError("Milestone not found", 404);
+        const authorRole = access.role === "admin" ? "admin" : "client";
+        created = await ProjectMessage.create({
+          _id: uuidv4(),
+          projectId: project._id,
+          milestoneId: milestone._id,
+          proposalId: milestone.proposalId || null,
+          messageType: "message",
+          authorUserId: user._id,
+          authorName:
+            authorRole === "admin"
+              ? "DMDevelon"
+              : project.clientName || actorName,
+          authorRole,
+          body: sanitized.body,
+        });
+        convertedToEntry = {
+          target: "milestone_comment",
+          targetId: created._id,
+          byUserId: user._id,
+          byName: actorName,
+        };
+      }
+
+      message.convertedTo.push(convertedToEntry);
+      await message.save();
+
+      return NextResponse.json(
+        {
+          message: serializeChatMessageForAccess(message, access),
+          target: sanitized.target,
+          created:
+            sanitized.target === "item"
+              ? serializeProjectItem(created)
+              : { _id: created._id, title: created.title || "" },
+        },
+        { status: 201, headers: getCorsHeaders() },
+      );
+    }
+
+    // POST /api/project-items/:id/task — turn an accepted item into real work.
+    // Gated by `convertToFormal` (owner + admin), the same permission as
+    // converting a message straight into a task: both create a commitment.
+    if (pathStr.startsWith("project-items/") && path[2] === "task") {
+      const user = await requireAuthenticatedUser(request);
+      const item = await ProjectItem.findById(path[1]);
+      if (!item) return notFoundResponse("Item not found");
+      const project = await ClientProject.findById(item.projectId);
+      if (!project) return notFoundResponse("Project not found");
+      await requireProjectPermission(user, project, "convertToFormal");
+
+      const milestoneId = cleanString(body.milestoneId, "Milestone", 200, {
+        required: true,
+      });
+      const milestone = (project.milestones || []).find(
+        (m) => String(m._id) === String(milestoneId),
+      );
+      if (!milestone) throw apiError("Milestone not found", 404);
+
+      const newTask = {
+        _id: uuidv4(),
+        title: item.title,
+        description: item.body,
+        order: milestone.tasks.length,
+        status: "pending",
+      };
+      milestone.tasks.push(newTask);
+      await project.save();
+
+      // Reuse the item's existing milestoneId as the link back to the work it
+      // produced — no new field needed for a one-to-one relationship.
+      item.milestoneId = milestone._id;
+      await item.save();
+
+      return NextResponse.json(
+        { item: serializeProjectItem(item), task: newTask },
+        { status: 201, headers: getCorsHeaders() },
+      );
+    }
+
+    // POST /api/project-items/:id/handoff — hand this item off as NEW
+    // billable work: a DRAFT phase proposal the admin then prices and sends,
+    // and that the client has to accept before any milestone exists.
+    //
+    // There is deliberately no "add a milestone to an existing phase with
+    // approval" variant: `{ projectId, phaseNumber }` is a UNIQUE index
+    // (models/ProjectProposal.js), so a phase can only ever have one
+    // proposal. New approved work therefore always becomes the next phase.
+    // The un-approved variant that used to live here (POST .../milestone,
+    // which wrote a live milestone immediately) was removed — new work means
+    // new hours and a new price, and must not appear in the client's plan
+    // without them agreeing to it.
+    if (pathStr.startsWith("project-items/") && path[2] === "handoff") {
+      const user = await requireAuthenticatedUser(request);
+      const item = await ProjectItem.findById(path[1]);
+      if (!item) return notFoundResponse("Item not found");
+      const project = await ClientProject.findById(item.projectId);
+      if (!project) return notFoundResponse("Project not found");
+      // `itemsApprove` is operator-only by construction, matching the existing
+      // rule that only an admin drafts a proposal — no role-name check needed.
+      await requireProjectPermission(user, project, "itemsApprove");
+
+      if (item.handoffProposalId) {
+        const existing = await ProjectProposal.findById(item.handoffProposalId);
+        // A live handoff already exists. Only a dead one (deleted, or a phase
+        // the client refused) may be superseded, otherwise a double click
+        // would quietly burn a phase number.
+        if (existing && existing.status !== "rejected") {
+          throw apiError(
+            "This item has already been handed off; withdraw or delete that proposal first",
+            409,
+          );
+        }
+      }
+
+      const lastProposal = await ProjectProposal.findOne({
+        projectId: project._id,
+      })
+        .sort({ phaseNumber: -1 })
+        .select("phaseNumber");
+      const phaseNumber = Math.max(2, (lastProposal?.phaseNumber || 1) + 1);
+      const fields = normalizeProposalFields(
+        {
+          title: body.title || item.title,
+          scope: body.scope ?? item.body ?? "",
+          timeline: body.timeline,
+          budget: body.budget,
+          phaseLabel: body.phaseLabel || `Faza ${phaseNumber}`,
+          // The caller may design the whole plan in the handoff dialog; if it
+          // sends nothing, seed one milestone carrying the item as its task
+          // so the draft is never empty.
+          milestonePlan:
+            Array.isArray(body.milestonePlan) && body.milestonePlan.length > 0
+              ? body.milestonePlan
+              : [
+                  {
+                    title: item.title,
+                    description: item.body || "",
+                    tasks: [{ title: item.title, description: item.body || "" }],
+                  },
+                ],
+        },
+        null,
+      );
+      try {
+        const proposal = await ProjectProposal.create({
+          _id: uuidv4(),
+          projectId: project._id,
+          requestId: null,
+          clientUserId: project.clientUserId || null,
+          kind: "phase",
+          phaseNumber,
+          ...fields,
+          sourceItemId: item._id,
+          sourceItemRef: item.ref || "",
+          status: "draft",
+          version: 1,
+          revisionHistory: [],
+          createdByUserId: user._id,
+          sentAt: null,
+          acceptedAt: null,
+          rejectedAt: null,
+        });
+
+        item.handoffProposalId = proposal._id;
+        await item.save();
+
+        return NextResponse.json(
+          { item: serializeProjectItem(item), proposal },
+          { status: 201, headers: getCorsHeaders() },
+        );
+      } catch (error) {
+        if (error?.code === 11000) {
+          throw apiError(
+            "Another proposal already uses that phase number; refresh and try again",
+            409,
+          );
+        }
+        throw error;
+      }
+    }
+
+    if (pathStr.startsWith("client-projects/") && path[2] === "messages") {
+      const user = await requireAuthenticatedUser(request);
+      const id = path[1];
+      const project = await ClientProject.findById(id);
+      if (!project) return notFoundResponse("Project not found");
+      const access = await requireProjectPermission(
+        user,
+        project,
+        "milestoneComment",
+      );
       if (!body.milestoneId) {
-        return NextResponse.json(
-          { error: "milestoneId is required" },
-          { status: 400, headers: getCorsHeaders() },
-        );
+        throw apiError("milestoneId is required", 400);
       }
+      // The milestone is looked up from the already permission-checked
+      // project's own array, never from a separate collection by a
+      // client-supplied id — so a milestoneId belonging to another project
+      // simply isn't found here, it can never leak that project's data.
       const milestone = (project.milestones || []).find(
         (item) => String(item._id) === String(body.milestoneId),
       );
-      if (!milestone) {
-        return NextResponse.json(
-          { error: "Milestone not found" },
-          { status: 404, headers: getCorsHeaders() },
-        );
-      }
-      const allowedMessageTypes = user.isAdmin
-        ? new Set(["message", "question", "system", "change_agreed"])
-        : new Set(["message", "question", "change_request"]);
+      if (!milestone) return notFoundResponse("Milestone not found");
+
+      const authorRole =
+        access.role === "admin"
+          ? "admin"
+          : access.role === "owner"
+            ? "client"
+            : "member";
+      // A collaborator/viewer never drives the change_request -> change_agreed
+      // flow — that stays between the client and the operator.
+      const allowedMessageTypes =
+        authorRole === "admin"
+          ? new Set(["message", "question", "system", "change_agreed"])
+          : authorRole === "client"
+            ? new Set(["message", "question", "change_request"])
+            : new Set(["message", "question"]);
       const messageType = body.messageType || "message";
       if (!allowedMessageTypes.has(messageType)) {
         return NextResponse.json(
@@ -1882,6 +3613,14 @@ export async function POST(request, context) {
           { status: 400, headers: getCorsHeaders() },
         );
       }
+      const authorName =
+        user.name ||
+        (authorRole === "admin"
+          ? "DMDevelon"
+          : authorRole === "client"
+            ? project.clientName
+            : "") ||
+        user.email;
       const message = await ProjectMessage.create({
         _id: uuidv4(),
         projectId: id,
@@ -1889,14 +3628,13 @@ export async function POST(request, context) {
         proposalId: milestone.proposalId || null,
         messageType,
         authorUserId: user._id,
-        authorName:
-          user.name || (user.isAdmin ? "DMDevelon" : project.clientName) || user.email,
-        authorRole: user.isAdmin ? "admin" : "client",
+        authorName,
+        authorRole,
         body: cleanString(body.body, "Message", 10000),
         attachments: Array.isArray(body.attachments) ? body.attachments : [],
       });
       const msgPreview = (body.body || "").slice(0, 140);
-      if (user.isAdmin) {
+      if (authorRole === "admin") {
         const clientId = await resolveClientUserId(project);
         await notifyUser({
           userId: clientId,
@@ -1911,7 +3649,7 @@ export async function POST(request, context) {
           proposalId: message.proposalId || "",
           email: true,
         });
-      } else {
+      } else if (authorRole === "client") {
         const notificationType =
           messageType === "change_request"
             ? "milestone_change_requested"
@@ -1924,6 +3662,22 @@ export async function POST(request, context) {
               ? `Change requested: ${milestone.title}`
               : `Client message on ${project.title}`,
           body: `${project.clientName}: ${msgPreview}`,
+          link: `/admin?tab=client-projects&id=${project._id}&m=${message.milestoneId}`,
+          entityType: "project",
+          entityId: project._id,
+          milestoneId: message.milestoneId,
+          proposalId: message.proposalId || "",
+          email: true,
+        });
+      } else {
+        // Collaborator/viewer message: never a change_request, so this always
+        // notifies as a plain project_message. Notifying the client owner too
+        // (not just admins) is a Section 10 decision, not made here.
+        await notifyAdmins({
+          actorId: user._id,
+          type: "project_message",
+          title: `Message on ${project.title}`,
+          body: `${authorName}: ${msgPreview}`,
           link: `/admin?tab=client-projects&id=${project._id}&m=${message.milestoneId}`,
           entityType: "project",
           entityId: project._id,
@@ -2079,26 +3833,10 @@ export async function POST(request, context) {
 
     // Project Request sub-actions (messages / accept / request-changes)
     if (pathStr.startsWith("project-requests/") && path[1]) {
-      const user = await getUserFromRequest(request);
-      if (!user) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
-      }
+      const user = await requireAuthenticatedUser(request);
       const reqDoc = await ProjectRequest.findById(path[1]);
-      if (!reqDoc) {
-        return NextResponse.json(
-          { error: "Request not found" },
-          { status: 404, headers: getCorsHeaders() },
-        );
-      }
-      if (!canAccessRequest(user, reqDoc)) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
-      }
+      if (!reqDoc) return notFoundResponse("Request not found");
+      if (!canAccessRequest(user, reqDoc)) return notFoundResponse("Request not found");
       const now = new Date();
       const role = user.isAdmin ? "admin" : "client";
 
@@ -2389,7 +4127,10 @@ export async function POST(request, context) {
       }
       const filter = { userId: user._id, read: false };
       if (body.id) filter._id = body.id;
-      else if (body.entityId) {
+      else if (body.channelId) {
+        filter.channelId = body.channelId;
+        if (body.entityId) filter.entityId = body.entityId;
+      } else if (body.entityId) {
         filter.entityId = body.entityId;
         if (body.milestoneId) filter.milestoneId = body.milestoneId;
         if (body.proposalId) filter.proposalId = body.proposalId;
@@ -2421,13 +4162,7 @@ export async function POST(request, context) {
 
     // File upload (images + PDF) to Cloudinary (auth required)
     if (pathStr === "upload") {
-      const user = await getUserFromRequest(request);
-      if (!user) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401, headers: getCorsHeaders() },
-        );
-      }
+      const user = await requireAuthenticatedUser(request);
       const { file, name, projectId, requestId, kind } = body;
       if (!file) {
         return NextResponse.json(
@@ -2445,27 +4180,31 @@ export async function POST(request, context) {
         );
       }
       // Resolve destination folder: admin -> portfolio/admin/<kind>,
-      // client -> portfolio/clients/<slug>/<kind>. Requires owner access to
-      // the referenced project or request.
+      // client -> portfolio/clients/<slug>/<kind>. The project/request is
+      // loaded first and permission is checked against THAT document — the
+      // projectId/requestId in the body only ever selects which record to
+      // load, never which one to check access against.
       let folder;
       if (projectId) {
         const project = await ClientProject.findById(projectId);
-        if (!project || !canAccessClientProject(user, project)) {
-          return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401, headers: getCorsHeaders() },
-          );
-        }
-        folder = user.isAdmin
-          ? adminFolder(kind)
-          : clientFolder(project.clientSlug || slugify(project.clientName), kind);
+        if (!project) return notFoundResponse("Project not found");
+        const access = await requireProjectPermission(
+          user,
+          project,
+          "filesUpload",
+        );
+        folder =
+          access.role === "admin"
+            ? adminFolder(kind)
+            : clientFolder(
+                project.clientSlug || slugify(project.clientName),
+                kind,
+              );
       } else if (requestId) {
         const reqDoc = await ProjectRequest.findById(requestId);
-        if (!reqDoc || !canAccessRequest(user, reqDoc)) {
-          return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401, headers: getCorsHeaders() },
-          );
+        if (!reqDoc) return notFoundResponse("Request not found");
+        if (!canAccessRequest(user, reqDoc)) {
+          return notFoundResponse("Request not found");
         }
         folder = user.isAdmin
           ? adminFolder(kind)
@@ -3314,6 +5053,41 @@ export async function DELETE(request, context) {
   try {
     const user = await getUserFromRequest(request);
 
+    // DELETE /api/chat/messages/:id — soft delete. Author or admin
+    // (canModerateMessage) — unlike edit (PATCH), which is author-only.
+    if (pathStr.startsWith("chat/messages/") && path[2] && !path[3]) {
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const { message, access } = await loadMessageWithAccess(
+        path[2],
+        user,
+        "chatWrite",
+      );
+      if (!canModerateMessage(access, message, { userId: user._id })) {
+        return forbiddenResponse("You cannot delete this message");
+      }
+      if (!message.deletedAt) {
+        message.deletedAt = new Date();
+        message.deletedByUserId = user._id;
+        // Deleting also unpins. A pin is a pointer to something worth coming
+        // back to; once the content is gone the pin is a dead entry the user
+        // cannot clear (the moderation menu only exists on live messages).
+        // The message row itself survives — convertedTo links depend on it.
+        message.pinned = false;
+        message.pinnedAt = null;
+        message.pinnedByUserId = null;
+        await message.save();
+      }
+      return NextResponse.json(
+        { message: "Message deleted" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
     // Services
     if (pathStr.startsWith("services/")) {
       if (!user || !user.isAdmin) {
@@ -3359,7 +5133,172 @@ export async function DELETE(request, context) {
       );
     }
 
+    // DELETE /client-projects/:id/proposals/:pid — throw away a proposal that
+    // never became work. Same "match the more specific path first" reasoning
+    // as the invitation branch below: the admin-only project delete further
+    // down would otherwise shadow this and soft-delete the whole project.
+    //
+    // Deletable: `draft` (never sent), `rejected` (the client said no), and
+    // `archived` (an accepted phase already unwound by `archive`, which pulled
+    // its milestones back out of the project). Not `sent` — it is still in
+    // front of the client, so withdraw it first — and not `accepted`, which
+    // still has live milestones hanging off its proposalId; that has to go
+    // through `archive` first. Those two rules together give every status a
+    // complete path to full removal.
+    if (
+      pathStr.startsWith("client-projects/") &&
+      path[2] === "proposals" &&
+      path[3]
+    ) {
+      const user = await requireAuthenticatedUser(request);
+      const project = await ClientProject.findById(path[1]);
+      if (!project) return notFoundResponse("Project not found");
+      if (!user.isAdmin) return forbiddenResponse();
+
+      const proposal = await ProjectProposal.findOne({
+        _id: path[3],
+        projectId: project._id,
+      });
+      if (!proposal) return notFoundResponse("Proposal not found");
+      if (!["draft", "rejected", "archived"].includes(proposal.status)) {
+        throw apiError(
+          proposal.status === "sent"
+            ? "Withdraw this proposal before deleting it"
+            : proposal.status === "accepted"
+              ? "Delete this phase from active work first, then delete it permanently"
+              : "Only a draft, rejected or archived proposal can be deleted",
+          409,
+        );
+      }
+
+      // Defensive: an archive that only half-completed would leave milestones
+      // still pointing at this proposal, and deleting it would orphan them
+      // with no way to trace where they came from.
+      const orphanCount = (project.milestones || []).filter(
+        (m) => String(m.proposalId || "") === String(proposal._id),
+      ).length;
+      if (orphanCount > 0) {
+        throw apiError(
+          `This proposal still owns ${orphanCount} milestone(s) in the plan; remove the phase from active work first`,
+          409,
+        );
+      }
+
+      await ProjectProposal.deleteOne({ _id: proposal._id });
+      // Drop the archive tombstone too: it exists purely to stop an accept
+      // replay from re-materializing this phase's milestones, and with the
+      // proposal itself gone there is nothing left that could replay.
+      await ClientProject.updateOne(
+        { _id: project._id },
+        {
+          $pull: { archivedProposalIds: proposal._id },
+          $inc: { __v: 1 },
+        },
+      );
+      // Release the originating chat item so it can be handed off again.
+      await ProjectItem.updateMany(
+        { handoffProposalId: proposal._id },
+        { $set: { handoffProposalId: null } },
+      );
+
+      return NextResponse.json(
+        { success: true, deletedId: proposal._id },
+        { headers: getCorsHeaders() },
+      );
+    }
+
     // Client Projects (admin only)
+    // Revoke a pending invitation. Checked BEFORE the admin-only project
+    // delete below, which would otherwise shadow this and soft-delete the
+    // whole project instead — a more specific path must be matched first.
+    if (
+      pathStr.startsWith("client-projects/") &&
+      path[2] === "invitations" &&
+      path[3]
+    ) {
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const id = path[1];
+      const project = await ClientProject.findById(id);
+      if (!project) return notFoundResponse("Project not found");
+      await requireProjectPermission(user, project, "membersInvite");
+      const invitation = await ProjectInvitation.findOne({
+        _id: path[3],
+        projectId: id,
+      });
+      if (!invitation) return notFoundResponse("Invitation not found");
+      if (invitation.status !== "pending") {
+        throw apiError("Only a pending invitation can be revoked", 409);
+      }
+      invitation.status = "revoked";
+      await invitation.save();
+
+      await ProjectAuditLog.create({
+        _id: uuidv4(),
+        projectId: id,
+        actorUserId: user._id,
+        actorName: user.name || user.email || "",
+        targetEmail: invitation.emailNormalized,
+        eventType: "invitation.revoked",
+        metadata: {},
+      }).catch((e) =>
+        console.error("audit insert failed (invitation revoked):", e),
+      );
+
+      return NextResponse.json(
+        { message: "Invitation revoked" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // Remove an active member. Same shadowing concern as above.
+    if (
+      pathStr.startsWith("client-projects/") &&
+      path[2] === "members" &&
+      path[3]
+    ) {
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+      const id = path[1];
+      const project = await ClientProject.findById(id);
+      if (!project) return notFoundResponse("Project not found");
+      await requireProjectPermission(user, project, "membersManage");
+      const member = await ProjectMember.findOne({
+        _id: path[3],
+        projectId: id,
+        status: { $ne: "removed" },
+      });
+      if (!member) return notFoundResponse("Member not found");
+      member.status = "removed";
+      await member.save();
+
+      await ProjectAuditLog.create({
+        _id: uuidv4(),
+        projectId: id,
+        actorUserId: user._id,
+        actorName: user.name || user.email || "",
+        targetUserId: member.userId,
+        targetEmail: member.email || "",
+        eventType: "member.removed",
+        metadata: { reason: "removed_by_manager" },
+      }).catch((e) =>
+        console.error("audit insert failed (member removed):", e),
+      );
+
+      return NextResponse.json(
+        { message: "Member removed" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
     if (pathStr.startsWith("client-projects/")) {
       if (!user || !user.isAdmin) {
         return NextResponse.json(
@@ -3522,12 +5461,78 @@ export async function DELETE(request, context) {
           { status: 409, headers: getCorsHeaders() },
         );
       }
-      const deletedUser = await User.findByIdAndDelete(id);
+      // Every project this person owns is now guaranteed terminal (the guard
+      // above rejects anything still active) — closing them and removing this
+      // person's memberships elsewhere is the other half of "this identity is
+      // gone", so it happens in the same transaction as the delete itself.
+      // Partial failure here (account deleted but projects still marked open,
+      // or vice versa) is exactly the inconsistency I2 rules out for invitation
+      // accept; the same reasoning applies to account deletion.
+      const ownedProjectQuery = {
+        $or: [
+          { clientUserId: id },
+          ...(target?.email ? [{ clientEmail: target.email }] : []),
+        ],
+      };
+      const memberships = await ProjectMember.find({
+        userId: id,
+        status: { $ne: "removed" },
+      });
+      const session = await User.db.startSession();
+      let deletedUser;
+      try {
+        await session.withTransaction(async () => {
+          deletedUser = await User.findByIdAndDelete(id).session(session);
+          if (!deletedUser) return; // handled after the transaction, as 404
+          await ClientProject.updateMany(
+            { ...ownedProjectQuery, ownerAccountDeletedAt: null },
+            { $set: { ownerAccountDeletedAt: new Date() } },
+            { session },
+          );
+          if (memberships.length > 0) {
+            await ProjectMember.updateMany(
+              { userId: id, status: { $ne: "removed" } },
+              { $set: { status: "removed" } },
+              { session },
+            );
+          }
+        });
+      } catch (error) {
+        if (
+          /transaction numbers are only allowed|does not support transactions/i.test(
+            String(error?.message || ""),
+          )
+        ) {
+          throw apiError(
+            "Account deletion requires MongoDB transaction support",
+            503,
+          );
+        }
+        throw error;
+      } finally {
+        await session.endSession();
+      }
       if (!deletedUser) {
         return NextResponse.json(
           { error: "User not found" },
           { status: 404, headers: getCorsHeaders() },
         );
+      }
+      // Audit is a post-commit side effect: idempotent inserts, never allowed
+      // to undo an already-committed deletion if it fails.
+      if (memberships.length > 0) {
+        await ProjectAuditLog.insertMany(
+          memberships.map((m) => ({
+            _id: uuidv4(),
+            projectId: m.projectId,
+            actorUserId: user._id,
+            actorName: user.name || user.email || "",
+            targetUserId: m.userId,
+            targetEmail: m.email || "",
+            eventType: "member.removed",
+            metadata: { reason: "account_deleted" },
+          })),
+        ).catch((e) => console.error("audit insert failed (account deletion):", e));
       }
       return NextResponse.json(
         { message: "User deleted" },
@@ -3540,11 +5545,11 @@ export async function DELETE(request, context) {
       { status: 404, headers: getCorsHeaders() },
     );
   } catch (error) {
-    console.error("DELETE Error:", error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500, headers: getCorsHeaders() },
-    );
+    // Was a hardcoded 500, which flattened every deliberate status thrown in
+    // this handler: requireAuthenticatedUser's 401, requireProjectPermission's
+    // 403/404, and apiError's 409. GET/POST/PATCH have always used
+    // errorResponse; DELETE was the odd one out.
+    return errorResponse(error, "DELETE");
   }
 }
 
@@ -3557,6 +5562,71 @@ export async function PATCH(request, context) {
 
   try {
     const body = await request.json();
+
+    // PATCH /api/project-items/:id — decide on a converted item. Accepting a
+    // Decision also co-signs it (sanitizeProjectItemUpdate folds the two
+    // together), so an accepted record always carries the name of whoever
+    // accepted it. Operator-only via the `itemsApprove` permission.
+    if (path[0] === "project-items" && path[1] && !path[2]) {
+      const user = await requireAuthenticatedUser(request);
+      // Resource-first: the project comes from the loaded item, never from
+      // anything the caller sent.
+      const item = await ProjectItem.findById(path[1]);
+      if (!item) return notFoundResponse("Item not found");
+      const project = await ClientProject.findById(item.projectId);
+      if (!project) return notFoundResponse("Project not found");
+      const access = await requireProjectPermission(
+        user,
+        project,
+        "itemsApprove",
+      );
+
+      const { status, confirm } = sanitizeProjectItemUpdate(body, access);
+      item.status = status;
+      if (
+        confirm &&
+        !(item.confirmedBy || []).some(
+          (c) => String(c.userId) === String(user._id),
+        )
+      ) {
+        item.confirmedBy.push({
+          userId: user._id,
+          name: user.name || user.email || "",
+          at: new Date(),
+        });
+      }
+      if (status === "accepted" && !item.decidedAt) item.decidedAt = new Date();
+      await item.save();
+
+      return NextResponse.json(serializeProjectItem(item), {
+        headers: getCorsHeaders(),
+      });
+    }
+
+    // PATCH /api/chat/messages/:id — edit own message. Author-only, no admin
+    // override (unlike delete) — see plan section 9's Chat table.
+    if (path[0] === "chat" && path[1] === "messages" && path[2] && !path[3]) {
+      const user = await requireAuthenticatedUser(request);
+      const { message, access } = await loadMessageWithAccess(
+        path[2],
+        user,
+        "chatWrite",
+      );
+      if (String(message.authorUserId) !== String(user._id)) {
+        return forbiddenResponse("Only the author can edit this message");
+      }
+      if (message.deletedAt) {
+        throw apiError("A deleted message cannot be edited", 409);
+      }
+      message.body = cleanString(body.body, "Message", 10000, {
+        required: true,
+      });
+      message.editedAt = new Date();
+      await message.save();
+      return NextResponse.json(serializeChatMessageForAccess(message, access), {
+        headers: getCorsHeaders(),
+      });
+    }
 
     // PATCH /client-projects/:projectId/proposals/:proposalId (admin draft
     // editing only). Server-owned lifecycle and ownership fields are ignored.
@@ -3615,6 +5685,67 @@ export async function PATCH(request, context) {
       Object.assign(proposal, fields);
       await proposal.save();
       return NextResponse.json(proposal, { headers: getCorsHeaders() });
+    }
+
+    // PATCH /client-projects/:id/members/:memberId — role/roleLabel. Checked
+    // BEFORE the admin-only catch-all just below, which would otherwise
+    // shadow this and reject anyone but a global admin — membersManage also
+    // belongs to the project owner, not only the operator.
+    if (
+      path[0] === "client-projects" &&
+      path[1] &&
+      path[2] === "members" &&
+      path[3]
+    ) {
+      const user = await requireAuthenticatedUser(request);
+      const id = path[1];
+      const project = await ClientProject.findById(id);
+      if (!project) return notFoundResponse("Project not found");
+      const access = await requireProjectPermission(
+        user,
+        project,
+        "membersManage",
+      );
+      const member = await ProjectMember.findOne({
+        _id: path[3],
+        projectId: id,
+        status: "active",
+      });
+      if (!member) return notFoundResponse("Member not found");
+
+      const previousRole = member.role;
+      if (body.role !== undefined) {
+        if (!INVITABLE_ROLES.includes(body.role)) {
+          throw apiError("Invalid role", 400);
+        }
+        member.role = body.role;
+      }
+      if (body.roleLabel !== undefined) {
+        member.roleLabel = cleanString(body.roleLabel, "Role label", 80);
+      }
+      await member.save();
+
+      if (body.role !== undefined && body.role !== previousRole) {
+        await ProjectAuditLog.create({
+          _id: uuidv4(),
+          projectId: id,
+          actorUserId: user._id,
+          actorName: user.name || user.email || "",
+          targetUserId: member.userId,
+          targetEmail: member.email || "",
+          eventType: "member.role_changed",
+          metadata: { from: previousRole, to: member.role },
+        }).catch((e) =>
+          console.error("audit insert failed (member role changed):", e),
+        );
+      }
+
+      const includeEmail = access.role === "admin" || access.role === "owner";
+      const memberAccount = await User.findById(member.userId);
+      return NextResponse.json(
+        serializeMemberPublic(member, { includeEmail, user: memberAccount }),
+        { headers: getCorsHeaders() },
+      );
     }
 
     if (path[0] === "client-projects" && path[1]) {

@@ -5,6 +5,14 @@ const nextConfig = {
 
   turbopack: {},
 
+  // Dev-only (ignored in production builds): since Next.js 15.2, the dev
+  // server blocks HMR/asset requests from any origin other than localhost —
+  // that's what breaks the invite/verify/reset links when they're opened via
+  // the LAN IP (ws://192.168.1.x:3003/_next/webpack-hmr fails to connect,
+  // and the page hangs). Add/replace this IP if it changes (e.g. after a
+  // DHCP lease renewal) to keep testing those flows across devices.
+  allowedDevOrigins: ["192.168.1.108"],
+
   serverExternalPackages: ["mongodb"],
 
   images: {

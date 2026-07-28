@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,7 +10,9 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useCardHighlight } from "@/hooks/useCardHighlight";
 import ProposalEditorDialog from "@/components/admin/ProposalEditorDialog";
 import DeletePhaseDialog from "@/components/admin/DeletePhaseDialog";
+import DeleteProposalForeverDialog from "@/components/admin/DeleteProposalForeverDialog";
 import MilestoneEditorDialog from "@/components/admin/MilestoneEditorDialog";
+import PendingWorkSection from "@/components/admin/PendingWorkSection";
 import {
   MilestonePlanEditor,
   createEmptyMilestone,
@@ -18,6 +20,7 @@ import {
   validateMilestonePlan,
 } from "@/components/admin/MilestonePlanEditor";
 import { MilestoneChat } from "@/components/dashboard/MilestoneChat";
+import { getMilestonePhase } from "@/components/ui/project-timeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -127,10 +130,12 @@ function ProjectProposalsAdmin({
     updateProposal,
     sendProposal,
     archiveProposal,
+    deleteProposal,
     createRevision,
   } = useProjectProposals(project._id);
   const [editor, setEditor] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteForeverTarget, setDeleteForeverTarget] = useState(null);
   const openedHighlight = useRef(null);
 
   const sorted = useMemo(() => sortProposals(proposals), [proposals]);
@@ -237,6 +242,23 @@ function ProjectProposalsAdmin({
     }
   };
 
+  // Irreversible, so it asks for the phase name back — but through a real
+  // dialog, not window.prompt: after the first native prompt the browser
+  // offers "prevent this page from creating additional dialogs", and once
+  // that is on, prompt() returns null immediately without showing anything.
+  // The button then looks broken while silently doing nothing.
+  const handleDeleteForever = async (proposal) => {
+    const label = proposal.phaseLabel || proposal.title || "this proposal";
+    try {
+      await deleteProposal.mutateAsync({ proposalId: proposal._id });
+      onPhaseDeleted?.(proposal._id);
+      setDeleteForeverTarget(null);
+      toast.success(`"${label}" deleted permanently`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to delete the proposal");
+    }
+  };
+
   const openRevision = (proposal) => {
     setEditor({
       sourceProposalId: proposal._id,
@@ -297,6 +319,13 @@ function ProjectProposalsAdmin({
   };
 
   return (
+    <>
+    {/* Rendered here rather than by the parent so it can reuse this
+        component's proposal editor instead of duplicating the dialog. */}
+    <PendingWorkSection
+      projectId={project._id}
+      onEdit={(proposal) => setEditor({ proposal, readOnly: false })}
+    />
     <section className="rounded-xl border border-white/10 bg-black/10 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -412,7 +441,10 @@ function ProjectProposalsAdmin({
                         )}
                       </>
                     )}
-                    {["accepted", "rejected"].includes(
+                    {/* `archived` included so an old plan can be brought
+                        back: the revision copies its content into a fresh
+                        draft, which then goes through send/approve again. */}
+                    {["accepted", "rejected", "archived"].includes(
                       proposal.status,
                     ) && (
                       <Button
@@ -420,14 +452,26 @@ function ProjectProposalsAdmin({
                         variant="outline"
                         size="sm"
                         onClick={() => openRevision(proposal)}
+                        title={
+                          proposal.status === "archived"
+                            ? "Bring this archived plan back as a new draft"
+                            : undefined
+                        }
                         className="border-white/15 text-gray-300 hover:text-white"
                       >
-                        <RotateCcw className="mr-1 h-3.5 w-3.5" /> Create revision
+                        <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                        {proposal.status === "archived"
+                          ? "Restore as draft"
+                          : "Create revision"}
                       </Button>
                     )}
-                    {["draft", "changes_requested", "accepted", "rejected"].includes(
-                      proposal.status,
-                    ) && (
+                    {[
+                      "draft",
+                      "changes_requested",
+                      "accepted",
+                      "rejected",
+                      "archived",
+                    ].includes(proposal.status) && (
                       <Button
                         type="button"
                         variant="outline"
@@ -445,20 +489,39 @@ function ProjectProposalsAdmin({
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={
-                            archiveProposal.isPending || phaseWorkStarted
-                          }
+                          disabled={archiveProposal.isPending}
                           title={
                             phaseWorkStarted
-                              ? "This phase cannot be deleted because work has already started"
+                              ? "Work has already started — removing it needs an extra confirmation"
                               : "Delete this untouched phase from active work"
                           }
                           onClick={() => setDeleteTarget(proposal)}
                           className="border-red-500/30 text-red-300 hover:bg-red-500/10 hover:text-red-200"
                         >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete phase
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />
+                          {phaseWorkStarted ? "Force delete phase" : "Delete phase"}
                         </Button>
                       )}
+                    {/* Hard delete. Separate from "Delete phase" above, which
+                        only unwinds an accepted phase into `archived` — the
+                        row survives, which is right for real history but
+                        leaves no way to clear a test. `sent`/`accepted` are
+                        absent on purpose: withdraw or archive them first. */}
+                    {["draft", "rejected", "archived"].includes(
+                      proposal.status,
+                    ) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={deleteProposal.isPending}
+                        title="Remove this proposal from the database entirely"
+                        onClick={() => setDeleteForeverTarget(proposal)}
+                        className="border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete forever
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -510,10 +573,22 @@ function ProjectProposalsAdmin({
         affectedMilestoneCount={(project.milestones || []).filter(
           (milestone) => milestone.proposalId === deleteTarget?._id,
         ).length}
+        workHasStarted={
+          !!deleteTarget &&
+          phaseWorkHasStarted(project.milestones, deleteTarget._id)
+        }
         onConfirm={handleDeletePhase}
         isSubmitting={archiveProposal.isPending}
       />
+      <DeleteProposalForeverDialog
+        open={!!deleteForeverTarget}
+        onOpenChange={(open) => !open && setDeleteForeverTarget(null)}
+        proposal={deleteForeverTarget}
+        onConfirm={handleDeleteForever}
+        isSubmitting={deleteProposal.isPending}
+      />
     </section>
+    </>
   );
 }
 
@@ -917,11 +992,36 @@ export default function ClientProjectsManager({
                         </div>
                       </div>
                     )}
+                    {/* Sorted by phase FIRST, then order. `order` is
+                        phase-local (materializeMilestonePlan always starts a
+                        phase at 0), so sorting by order alone made Faza 2
+                        interleave with the master phase — the single biggest
+                        source of "I can't tell what belongs where". The
+                        client view has always sorted this way. */}
                     {[...(project.milestones || [])]
-                      .sort((a, b) => (a.order || 0) - (b.order || 0))
-                      .map((m) => (
+                      .sort(
+                        (a, b) =>
+                          getMilestonePhase(a).phaseNumber -
+                            getMilestonePhase(b).phaseNumber ||
+                          (a.order || 0) - (b.order || 0),
+                      )
+                      .map((m, index, sorted) => {
+                        const phase = getMilestonePhase(m);
+                        const startsPhase =
+                          index === 0 ||
+                          getMilestonePhase(sorted[index - 1]).phaseNumber !==
+                            phase.phaseNumber;
+                        return (
+                        <Fragment key={m._id}>
+                        {startsPhase && (
+                          <div className="flex items-center gap-3 pt-2 first:pt-0">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#FFB633] shrink-0">
+                              {phase.phaseLabel}
+                            </span>
+                            <span className="h-px flex-1 bg-white/10" />
+                          </div>
+                        )}
                         <div
-                          key={m._id}
                           id={`ms-${m._id}`}
                           className="bg-white/5 rounded-lg p-4"
                         >
@@ -1000,7 +1100,9 @@ export default function ClientProjectsManager({
                             </div>
                           )}
                         </div>
-                      ))}
+                        </Fragment>
+                        );
+                      })}
                   </div>
                 )}
               </div>

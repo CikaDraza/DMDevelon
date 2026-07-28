@@ -13,9 +13,14 @@ const NotificationSchema = new mongoose.Schema(
     entityId: { type: String, default: '' },
     milestoneId: { type: String, default: '' }, // set for per-milestone chat messages
     proposalId: { type: String, default: '' }, // set for a project proposal deep-link
+    channelId: { type: String, default: '' }, // set for project chat / DM messages
     dedupeKey: { type: String, default: null },
     read: { type: Boolean, default: false },
-    emailedAt: { type: Date, default: null }, // set once included in a digest email
+    emailedAt: { type: Date, default: null }, // set once included in a digest
+    // Set when a web push was actually delivered for this notification.
+    // Tracked separately from emailedAt because push and email are throttled
+    // independently (lib/notification-policy.mjs).
+    pushedAt: { type: Date, default: null },
   },
   { timestamps: true, _id: false }
 );
@@ -23,6 +28,7 @@ const NotificationSchema = new mongoose.Schema(
 NotificationSchema.index({ userId: 1, read: 1 });
 NotificationSchema.index({ userId: 1, entityId: 1 });
 NotificationSchema.index({ userId: 1, entityId: 1, proposalId: 1 });
+NotificationSchema.index({ userId: 1, channelId: 1 });
 NotificationSchema.index(
   { userId: 1, dedupeKey: 1 },
   {

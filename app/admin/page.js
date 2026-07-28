@@ -25,6 +25,7 @@ import {
   Briefcase,
   FolderKanban,
   MessageSquare,
+  MessagesSquare,
   Settings,
   FileText,
   LogOut,
@@ -44,7 +45,8 @@ import {
   Database,
   Layers,
   Building,
-  Mail,  Monitor,
+  Mail,
+  Monitor,
   ShoppingCart,
   Home,
   NotebookPen,
@@ -89,10 +91,12 @@ import {
 import Loader from "@/components/loaders/Loader";
 import Link from "next/link";
 import { useCompanyProfile } from "@/hooks/useCompanyProfile";
+import { useChatChannels } from "@/hooks/useProjectChat";
 import ClientProjectsManager from "@/components/admin/ClientProjectsManager";
 import ProjectRequestsManager from "@/components/admin/ProjectRequestsManager";
 import NotificationBell from "@/components/NotificationBell";
 import PushManager from "@/components/PushManager";
+import { ProjectChat } from "@/components/chat/ProjectChat";
 
 // Icon mapping
 const iconMap = {
@@ -188,12 +192,14 @@ function AdminSidebar({
   onLogout,
   isMobileOpen,
   setIsMobileOpen,
+  totalUnreadChat = 0,
 }) {
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "services", label: "Services", icon: Briefcase },
     { id: "projects", label: "Projects", icon: FolderKanban },
     { id: "client-projects", label: "Client Projects", icon: Handshake },
+    { id: "chat", label: "Chat", icon: MessagesSquare },
     { id: "project-requests", label: "Project Requests", icon: Inbox },
     { id: "testimonials", label: "Testimonials", icon: MessageSquare },
     { id: "users", label: "Users", icon: Users },
@@ -219,7 +225,11 @@ function AdminSidebar({
         {/* Logo */}
         <div className="p-6 border-b border-white/10">
           <a href="/" className="flex items-center gap-3">
-            <img src="/icons/dmd-logo.png" alt="DMDevelon" className="h-8 w-auto" />
+            <img
+              src="/icons/dmd-logo.png"
+              alt="DMDevelon"
+              className="h-8 w-auto"
+            />
             <div>
               <h1 className="font-bold text-white">DMDevelon</h1>
               <p className="text-xs text-gray-400">Admin Panel</p>
@@ -240,7 +250,12 @@ function AdminSidebar({
                 ${activeTab === item.id ? "bg-[#FFB633] text-black" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
             >
               <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
+              <span className="font-medium flex-1 text-left">{item.label}</span>
+              {item.id === "chat" &&
+                activeTab !== "chat" &&
+                totalUnreadChat > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-[#FFB633] shrink-0" />
+                )}
             </button>
           ))}
         </nav>
@@ -2304,6 +2319,7 @@ const ADMIN_TABS = [
   "services",
   "projects",
   "client-projects",
+  "chat",
   "project-requests",
   "testimonials",
   "users",
@@ -2318,6 +2334,11 @@ function AdminPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, logout, loading, getAuthHeaders } = useAuth();
+  const { channels: chatChannels } = useChatChannels();
+  const totalUnreadChat = chatChannels.reduce(
+    (sum, c) => sum + (c.unreadCount || 0),
+    0,
+  );
   const [activeTab, setActiveTab] = useState("dashboard");
   const [highlightId, setHighlightId] = useState(null);
   const [highlightMilestoneId, setHighlightMilestoneId] = useState(null);
@@ -2438,6 +2459,13 @@ function AdminPageInner() {
             highlightProposalId={highlightProposalId}
           />
         );
+      case "chat":
+        return (
+          <ProjectChat
+            viewerRole="admin"
+            initialChannelId={searchParams.get("channel")}
+          />
+        );
       case "project-requests":
         return <ProjectRequestsManager highlightId={highlightId} />;
       case "testimonials":
@@ -2472,32 +2500,33 @@ function AdminPageInner() {
         onLogout={handleLogout}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
+        totalUnreadChat={totalUnreadChat}
       />
 
       {/* Main Content */}
       <div className="lg:ml-64">
         {/* Top Bar */}
-        <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4">
+        <header className="bg-[#1a1a1b] border-b border-white/10 px-2 lg:px-6 py-4 overflow-hidden">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setIsMobileOpen(true)}
-              className="lg:hidden p-2 text-gray-400 hover:text-white"
+              className="lg:hidden p-2 text-gray-400 hover:text-white shrink-0"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="flex items-center gap-4 ml-auto">
+            <div className="flex items-center gap-2 lg:gap-4 ml-auto min-w-0">
               <Link
                 href="/"
-                className="text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 shrink-0"
               >
                 <Home className="w-4 h-4" />
                 <span className="hidden sm:inline">Home</span>
               </Link>
               <NotificationBell variant="admin" />
-              <span className="text-gray-400 text-sm">
+              <span className="text-gray-400 text-sm truncate hidden sm:inline">
                 Welcome, {user?.name}
               </span>
-              <div className="w-10 h-10 rounded-full bg-[#FFB633]/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-[#FFB633]/20 flex items-center justify-center shrink-0">
                 <Users className="w-5 h-5 text-[#FFB633]" />
               </div>
             </div>

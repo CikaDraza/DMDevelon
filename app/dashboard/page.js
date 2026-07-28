@@ -9,15 +9,19 @@ import { useClientProjects } from "@/hooks/useClientProjects";
 import { useProjectRequests } from "@/hooks/useProjectRequests";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useCardHighlight } from "@/hooks/useCardHighlight";
+import { useChatChannels } from "@/hooks/useProjectChat";
 import NotificationBell from "@/components/NotificationBell";
 import PushManager from "@/components/PushManager";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { AvatarUploader } from "@/components/dashboard/AvatarUploader";
+import { ProjectChat } from "@/components/chat/ProjectChat";
+import { TeamPanel } from "@/components/chat/TeamPanel";
 import toast from "react-hot-toast";
 import axios from "axios";
 import {
   Briefcase,
   MessageSquare,
+  MessagesSquare,
   Settings,
   LogOut,
   Star,
@@ -29,6 +33,7 @@ import {
   AlertTriangle,
   ArrowRight,
   MessageCircle,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +47,7 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 
-const DASHBOARD_TABS = ["services", "testimonials"];
+const DASHBOARD_TABS = ["services", "testimonials", "chat"];
 const DASHBOARD_TAB_STORAGE_KEY = "dmdevelonDashboardActiveTab";
 
 // Client Dashboard Page
@@ -72,12 +77,14 @@ function DashboardInner() {
     createRequest,
   } = useProjectRequests();
   const { unreadEntityIds } = useNotifications();
+  const { channels: chatChannels } = useChatChannels();
   const [activeTab, setActiveTab] = useState("services");
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isTestimonialModalOpen, setIsTestimonialModalOpen] = useState(false);
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] =
     useState(false);
   const [isStartProjectModalOpen, setIsStartProjectModalOpen] = useState(false);
+  const [inviteProjectId, setInviteProjectId] = useState(null);
   const [requestTitle, setRequestTitle] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
   const [requestSubmitting, setRequestSubmitting] = useState(false);
@@ -101,7 +108,7 @@ function DashboardInner() {
     }
   }, [user, loading, router]);
 
-  // Deep-link from a notification: ?tab=services|testimonials switches view.
+  // Deep-link from a notification: ?tab=services|testimonials|chat switches view.
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (DASHBOARD_TABS.includes(tab)) {
@@ -359,6 +366,11 @@ function DashboardInner() {
     (r) => r.status !== "approved",
   );
 
+  const totalUnreadChat = chatChannels.reduce(
+    (sum, c) => sum + (c.unreadCount || 0),
+    0,
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0f0f10] flex items-center justify-center">
@@ -485,6 +497,20 @@ function DashboardInner() {
               >
                 <MessageSquare className="w-5 h-5" />
                 <span>Testimonials</span>
+              </button>
+              <button
+                onClick={() => handleTabChange("chat")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  activeTab === "chat"
+                    ? "bg-[#FFB633] text-black"
+                    : "text-gray-400 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <MessagesSquare className="w-5 h-5" />
+                <span className="flex-1 text-left">Chat</span>
+                {activeTab !== "chat" && totalUnreadChat > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-[#FFB633] shrink-0" />
+                )}
               </button>
               <Link
                 href="/dashboard/settings"
@@ -675,9 +701,22 @@ function DashboardInner() {
                                       style={{ width: `${progress}%` }}
                                     />
                                   </div>
-                                  <div className="flex items-center gap-1 mt-3 text-sm text-[#FFB633]">
-                                    View progress
-                                    <ArrowRight className="w-4 h-4" />
+                                  <div className="flex items-center justify-between mt-3">
+                                    <span className="flex items-center gap-1 text-sm text-[#FFB633]">
+                                      View progress
+                                      <ArrowRight className="w-4 h-4" />
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setInviteProjectId(project._id);
+                                      }}
+                                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#FFB633] transition-colors"
+                                    >
+                                      <UserPlus className="w-3.5 h-3.5" />
+                                      Invite team member
+                                    </button>
                                   </div>
                                 </div>
                               </motion.div>
@@ -796,6 +835,13 @@ function DashboardInner() {
                   </div>
                 )}
               </div>
+            )}
+
+            {activeTab === "chat" && (
+              <ProjectChat
+                viewerRole="client"
+                initialChannelId={searchParams.get("channel")}
+              />
             )}
           </div>
         </div>
@@ -1054,6 +1100,14 @@ function DashboardInner() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {inviteProjectId && (
+        <TeamPanel
+          projectId={inviteProjectId}
+          open={!!inviteProjectId}
+          onOpenChange={(open) => !open && setInviteProjectId(null)}
+        />
+      )}
     </div>
   );
 }

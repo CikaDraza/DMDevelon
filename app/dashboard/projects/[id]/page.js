@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import {
   ArrowLeft,
+  BellRing,
   MessageSquare,
   Check,
   CheckCircle2,
@@ -176,6 +177,11 @@ function ClientProjectDetailInner() {
   const [changeMessage, setChangeMessage] = useState("");
   const [proposalActionId, setProposalActionId] = useState(null);
   const openedProposalDeepLink = useRef(null);
+  // Proposals the client has expanded during this visit. A proposal that is
+  // still `sent` genuinely still needs their decision, so the glow returns on
+  // a later visit — but it stops nagging the moment they are actually reading
+  // it.
+  const [reviewedProposalIds, setReviewedProposalIds] = useState(() => new Set());
   const { markRead, unreadMilestoneIds, unreadByMilestone } = useNotifications();
 
   const visibleProposals = useMemo(
@@ -186,6 +192,14 @@ function ClientProjectDetailInner() {
         ),
       ),
     [proposals, user?.isAdmin],
+  );
+  // `sent` is the only status where the ball is in the client's court.
+  const awaitingClientCount = useMemo(
+    () =>
+      user?.isAdmin
+        ? 0
+        : visibleProposals.filter((p) => p.status === "sent").length,
+    [visibleProposals, user?.isAdmin],
   );
   const nextPhaseNumber = useMemo(
     () =>
@@ -582,6 +596,17 @@ function ClientProjectDetailInner() {
               <p className="mt-1 text-sm text-gray-500">
                 Approved scope and every phase planned inside this project.
               </p>
+              {/* Says outright what needs doing. The status pills alone did
+                  not read as "act on this" to someone seeing the page for
+                  the first time. */}
+              {awaitingClientCount > 0 && (
+                <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#FFB633]/10 px-3 py-1 text-xs font-medium text-[#FFB633]">
+                  <BellRing className="h-3.5 w-3.5" />
+                  {awaitingClientCount === 1
+                    ? "1 proposal is waiting for your approval"
+                    : `${awaitingClientCount} proposals are waiting for your approval`}
+                </p>
+              )}
             </div>
             {user?.isAdmin && (
               <Button
@@ -620,21 +645,40 @@ function ClientProjectDetailInner() {
                   project.milestones,
                   proposal._id,
                 );
+                const awaitsYou = !user?.isAdmin && proposal.status === "sent";
+                // Glow only until they open it; the solid gold border stays
+                // for as long as it actually needs a decision.
+                const glow = awaitsYou && !reviewedProposalIds.has(proposal._id);
                 return (
                   <article
                     id={`proposal-${proposal._id}`}
                     key={proposal._id}
                     className={`overflow-hidden rounded-xl border bg-[#1a1a1b] transition-colors ${
-                      searchParams.get("proposal") === proposal._id
-                        ? "border-[#FFB633]/70 ring-1 ring-[#FFB633]/30"
-                        : "border-white/10"
+                      glow ? "animate-attention-glow" : ""
+                    } ${
+                      awaitsYou
+                        ? "border-[#FFB633]/70"
+                        : searchParams.get("proposal") === proposal._id
+                          ? "border-[#FFB633]/70 ring-1 ring-[#FFB633]/30"
+                          : "border-white/10"
                     }`}
                   >
                     <button
                       type="button"
-                      onClick={() =>
-                        setOpenProposalId(isOpen ? null : proposal._id)
-                      }
+                      onClick={() => {
+                        setOpenProposalId(isOpen ? null : proposal._id);
+                        if (!isOpen) {
+                          setReviewedProposalIds((prev) =>
+                            new Set(prev).add(proposal._id),
+                          );
+                          // Also clears it from the bell — opening the
+                          // proposal is exactly "I have seen this".
+                          markRead.mutate({
+                            entityId: project._id,
+                            proposalId: proposal._id,
+                          });
+                        }
+                      }}
                       aria-expanded={isOpen}
                       className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-white/5"
                     >
@@ -654,6 +698,15 @@ function ClientProjectDetailInner() {
                           >
                             {(proposal.status || "sent").replaceAll("_", " ")}
                           </span>
+                          {/* "sent" describes what WE did; this says what the
+                              client has to do, which is the part that was
+                              not landing. */}
+                          {awaitsYou && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#FFB633] px-2 py-0.5 text-[10px] font-semibold text-black">
+                              <BellRing className="h-3 w-3" />
+                              Needs your approval
+                            </span>
+                          )}
                           <span className="text-[11px] text-gray-500">
                             v{proposal.version || 1}
                           </span>

@@ -97,7 +97,17 @@ export function useProjectProposals(projectId, { enabled = true } = {}) {
     projectId,
     action: "accept",
     getAuthHeaders,
-    onSuccess: invalidate,
+    // Accept is the one action whose response already contains the fully
+    // reconciled project (with the phase's milestones now materialized).
+    // Writing it straight into the cache makes the new milestones appear the
+    // instant the client clicks, instead of after the invalidated refetch
+    // lands — the difference between "it worked" and "did that do anything?".
+    onSuccess: async (data) => {
+      if (data?.project?._id) {
+        queryClient.setQueryData(["client-projects", projectId], data.project);
+      }
+      await invalidate();
+    },
   });
   const requestChanges = useProposalLifecycleMutation({
     projectId,
@@ -116,6 +126,29 @@ export function useProjectProposals(projectId, { enabled = true } = {}) {
     action: "archive",
     getAuthHeaders,
     onSuccess: invalidate,
+  });
+  // Pull a sent proposal back to draft, before the client has answered.
+  const withdrawProposal = useProposalLifecycleMutation({
+    projectId,
+    action: "withdraw",
+    getAuthHeaders,
+    onSuccess: invalidate,
+  });
+
+  // Hard delete, allowed only for a draft or a rejected proposal — nothing
+  // has been materialized from either, so there is nothing to unwind.
+  const deleteProposal = useMutation({
+    mutationFn: async ({ proposalId }) => {
+      const response = await axios.delete(proposalUrl(projectId, proposalId), {
+        headers: getAuthHeaders(),
+      });
+      return response.data;
+    },
+    onSuccess: async () => {
+      await invalidate();
+      // The originating chat item was just released for another handoff.
+      await queryClient.invalidateQueries({ queryKey: ["project-items"] });
+    },
   });
 
   // Revisions are created as new drafts through the collection endpoint. The
@@ -144,6 +177,8 @@ export function useProjectProposals(projectId, { enabled = true } = {}) {
     requestChanges,
     rejectProposal,
     archiveProposal,
+    withdrawProposal,
+    deleteProposal,
     createRevision,
   };
 }
