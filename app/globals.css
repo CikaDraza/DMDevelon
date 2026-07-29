@@ -58,6 +58,16 @@ body {
   background: #e5a32e;
 }
 
+/* Keep scrollable areas usable without exposing a visual scrollbar. */
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* CMS Content Styles for HTML */
 .cms-content section {
   margin: 1.5rem 0;

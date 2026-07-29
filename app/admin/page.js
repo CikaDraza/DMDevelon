@@ -219,11 +219,11 @@ function AdminSidebar({
       )}
 
       <aside
-        className={`fixed left-0 top-0 h-full bg-[#1a1a1b] border-r border-white/10 z-50 transition-transform duration-300 w-64
+        className={`fixed left-0 top-0 h-dvh flex flex-col bg-[#1a1a1b] border-r border-white/10 z-50 transition-transform duration-300 w-64
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-white/10">
+        <div className="shrink-0 p-6 border-b border-white/10">
           <a href="/" className="flex items-center gap-3">
             <img
               src="/icons/dmd-logo.png"
@@ -238,7 +238,7 @@ function AdminSidebar({
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-2">
+        <nav className="flex-1 min-h-0 overflow-y-auto scrollbar-hidden p-4 space-y-2">
           {menuItems.map((item) => (
             <button
               key={item.id}
@@ -261,7 +261,7 @@ function AdminSidebar({
         </nav>
 
         {/* Logout */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
+        <div className="shrink-0 p-4 border-t border-white/10">
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-red-600 hover:bg-gray-500/10 transition-colors"
