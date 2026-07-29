@@ -43,10 +43,18 @@ export function ChannelSidebar({
   mobileHidden = false,
 }) {
   const groupChannels = channels.filter((c) => c.kind === "group");
-  const dmChannels = channels.filter((c) => c.kind === "dm");
   const activeChannel = channels.find((c) => c._id === activeChannelId);
   const rosterProjectId =
     activeChannel?.projectId || groupChannels[0]?.projectId || null;
+  // Only DMs that belong to the currently active project's roster — showing
+  // every DM the admin has ever opened across all projects floods the Direct
+  // list with unresolvable "Direct message" placeholders (the members array
+  // is scoped to rosterProjectId, so a DM from a different project can never
+  // look up its partner's name).
+  const dmChannels = channels.filter(
+    (c) =>
+      c.kind === "dm" && (!rosterProjectId || c.projectId === rosterProjectId),
+  );
   const { members } = useProjectMembers(rosterProjectId);
 
   const otherDmMember = (channel) => {

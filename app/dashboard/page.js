@@ -14,7 +14,6 @@ import NotificationBell from "@/components/NotificationBell";
 import PushManager from "@/components/PushManager";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { AvatarUploader } from "@/components/dashboard/AvatarUploader";
-import { ProjectChat } from "@/components/chat/ProjectChat";
 import { TeamPanel } from "@/components/chat/TeamPanel";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -47,7 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 
-const DASHBOARD_TABS = ["services", "testimonials", "chat"];
+const DASHBOARD_TABS = ["services", "testimonials"];
 const DASHBOARD_TAB_STORAGE_KEY = "dmdevelonDashboardActiveTab";
 
 // Client Dashboard Page
@@ -446,20 +445,8 @@ function DashboardInner() {
         </div>
       )}
 
-      <div
-        className={
-          activeTab === "chat"
-            ? "flex-1 min-h-0 flex flex-col px-4 py-4"
-            : "container mx-auto px-4 py-8"
-        }
-      >
-        <div
-          className={
-            activeTab === "chat"
-              ? "flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-8"
-              : "grid grid-cols-1 lg:grid-cols-4 gap-8"
-          }
-        >
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
             {/* User Info Card */}
@@ -510,20 +497,16 @@ function DashboardInner() {
                 <MessageSquare className="w-5 h-5" />
                 <span>Testimonials</span>
               </button>
-              <button
-                onClick={() => handleTabChange("chat")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  activeTab === "chat"
-                    ? "bg-[#FFB633] text-black"
-                    : "text-gray-400 hover:bg-white/5 hover:text-white"
-                }`}
+              <Link
+                href="/dashboard/chat"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-gray-400 hover:bg-white/5 hover:text-white"
               >
                 <MessagesSquare className="w-5 h-5" />
                 <span className="flex-1 text-left">Chat</span>
-                {activeTab !== "chat" && totalUnreadChat > 0 && (
+                {totalUnreadChat > 0 && (
                   <span className="w-2 h-2 rounded-full bg-[#FFB633] shrink-0" />
                 )}
-              </button>
+              </Link>
               <Link
                 href="/dashboard/settings"
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
@@ -544,13 +527,7 @@ function DashboardInner() {
           </div>
 
           {/* Main Content */}
-          <div
-            className={
-              activeTab === "chat"
-                ? "lg:col-span-3 flex flex-col min-h-0"
-                : "lg:col-span-3"
-            }
-          >
+          <div className="lg:col-span-3">
             {activeTab === "services" && (
               <div>
                 <div className="px-4 md:px-0 flex items-center justify-between mb-6 gap-4 flex-wrap">
@@ -853,13 +830,6 @@ function DashboardInner() {
                   </div>
                 )}
               </div>
-            )}
-
-            {activeTab === "chat" && (
-              <ProjectChat
-                viewerRole="client"
-                initialChannelId={searchParams.get("channel")}
-              />
             )}
           </div>
         </div>

@@ -291,7 +291,7 @@ export function MessageComposer({
               disabled={uploading}
               className="gap-2 cursor-pointer"
             >
-              <Paperclip className="w-3.5 h-3.5" /> Attach image or PDF
+              <Paperclip className="w-3.5 h-3.5" /> Attach file
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="gap-2 cursor-pointer">
@@ -327,7 +327,7 @@ export function MessageComposer({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           className="hidden md:block p-2 text-gray-400 hover:text-[#FFB633] transition-colors shrink-0"
-          title="Attach image or PDF"
+          title="Attach file"
         >
           {uploading ? (
             <Loader2 className="w-5 h-5 animate-spin" />

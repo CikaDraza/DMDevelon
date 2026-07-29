@@ -208,7 +208,7 @@ export function RequestConversation({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           className="p-2 text-gray-400 hover:text-[#FFB633] transition-colors"
-          title="Attach image or PDF"
+          title="Attach file"
         >
           {uploading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -225,7 +225,9 @@ export function RequestConversation({
         />
         <button
           type="submit"
-          disabled={postMessage.isPending || (!text.trim() && pending.length === 0)}
+          disabled={
+            postMessage.isPending || (!text.trim() && pending.length === 0)
+          }
           className="p-2 bg-[#FFB633] text-black rounded-lg hover:bg-[#e5a32e] disabled:opacity-50 transition-colors"
         >
           <Send className="w-5 h-5" />

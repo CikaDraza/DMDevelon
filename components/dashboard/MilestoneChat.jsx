@@ -301,7 +301,7 @@ export function MilestoneChat({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           className="p-2 text-gray-400 hover:text-[#FFB633] transition-colors"
-          title="Attach image or PDF"
+          title="Attach file"
         >
           {uploading ? (
             <Loader2 className="w-5 h-5 animate-spin" />

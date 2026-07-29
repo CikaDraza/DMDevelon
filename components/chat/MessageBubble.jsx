@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { cn, downloadFileToDevice } from "@/lib/utils";
 import { ConvertMessageDialog } from "./ConvertMessageDialog";
 import { AttachmentPreview } from "./AttachmentPreview";
@@ -39,6 +39,40 @@ const CONVERT_TARGET_LABEL = {
 // (components/dashboard/MilestoneChat.jsx) — this is the wider flag set from
 // the plan's color map, not a replacement for that one. Exported so PinnedBar
 // renders the exact same badge instead of a second, drifting copy.
+// Splits a message body into plain-text and URL segments so links render
+// as tappable, colour-coded anchors that open in a new tab.
+const URL_RE =
+  /(https?:\/\/[^\s<>"{}|\\^`[\]]+?)(?=[.,;:!?]*(?:\s|$)|[.,;:!?]*$)/g;
+
+function renderBodyWithLinks(text) {
+  if (!text) return text;
+  const parts = [];
+  let last = 0;
+  for (const match of text.matchAll(URL_RE)) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    parts.push(
+      <a
+        key={match.index}
+        href={match[1]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline"
+        style={{ color: "rgb(0, 69, 156)" }}
+      >
+        {match[1]}
+      </a>,
+    );
+    last = match.index + match[1].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  // `parts.length` can be 1 when a URL occupies the entire message body
+  // with nothing before or after — e.g. just "https://example.com". In
+  // that case the single element is the <a> React node, and returning
+  // the raw `text` string would drop it.  Use `last > 0` because `last`
+  // only advances past 0 when at least one URL was actually found.
+  return last > 0 ? parts : text;
+}
+
 export const FLAG_META = {
   request: { color: "bg-amber-600", icon: FileText, label: "Request" },
   task: { color: "bg-indigo-600", icon: ListChecks, label: "Task" },
@@ -194,7 +228,7 @@ export function MessageBubble({
           <>
             {message.body && (
               <p className="text-sm whitespace-pre-wrap break-words">
-                {message.body}
+                {renderBodyWithLinks(message.body)}
               </p>
             )}
             {message.editedAt && (
