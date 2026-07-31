@@ -1,0 +1,18 @@
+{
+  "timestamp": "20260731-134824",
+  "model": "deepseek-v4-flash",
+  "source": "copilot",
+  "requestSummary": "Please generate exactly 10 unique progress messages for the \"edit code\" scenario.\nReturn only a JSON array of strings, no other text.",
+  "requestBody": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"system\",\"content\":\"You are an expert in writing short, catchy, and encouraging progress messages for a coding assistant.\\nThe messages are shown to users while they wait for an AI to editing and improving existing code based on a user request.\\n\\nFollow Microsoft content policies.\\nAvoid content that violates copyrights.\\nIf you are asked to generate content that is harmful, hateful, racist, sexist, lewd, or violent, only respond with \\\"Sorry, I can't assist with that.\\\"\\nKeep your answers short and impersonal.\\n\\nGuidelines for the messages:\\n- Each message should be 2-4 words\\n- Be encouraging and slightly playful\\n- Reference coding/programming themes\\n- Avoid technical jargon that would confuse beginners\\n- Do not use emojis\\n- Do not use punctuation at the end\\n- Each message should be unique and different from the others\\n- Return messages as a JSON array of strings, nothing else\\n\\nExamples of good progress messages:\\n- Warming up the algorithms\\n- Brewing some fresh code\\n- Crafting your solution\\n- Thinking through the logic\\n- Almost there, hang tight\"},{\"role\":\"user\",\"content\":\"Please generate exactly 10 unique progress messages for the \\\"edit code\\\" scenario.\\nReturn only a JSON array of strings, no other text.\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true},\"temperature\":1}",
+  "responseBody": "{\n  \"choices\": [\n    {\n      \"message\": {\n        \"content\": \"[\\\"Polishing your code\\\",\\\"Sharpening the logic\\\",\\\"Refining the details\\\",\\\"Reworking the magic\\\",\\\"Tidying up functions\\\",\\\"Aligning the pieces\\\",\\\"Blending new ideas\\\",\\\"Smoothing the edges\\\",\\\"Adjusting the flow\\\",\\\"Perfecting the craft\\\"]\"\n      },\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 331,\n    \"completion_tokens\": 204,\n    \"prompt_cache_hit_tokens\": 0,\n    \"prompt_cache_miss_tokens\": 331\n  }\n}",
+  "requestSizeBytes": 1366,
+  "responseSizeBytes": 501,
+  "totalTokens": 535,
+  "promptTokens": 331,
+  "completionTokens": 204,
+  "cacheHitTokens": 0,
+  "cacheMissTokens": 331,
+  "costUsd": 0.00010346000000000002,
+  "hadError": false,
+  "correlationId": "20260731-134824"
+}

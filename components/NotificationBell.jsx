@@ -168,6 +168,11 @@ export default function NotificationBell({ variant = "client" }) {
           ) : (
             categories
               .filter((cat) => grouped[cat]?.length)
+              .sort((a, b) => {
+                const dA = new Date(grouped[a][0]?.createdAt || 0);
+                const dB = new Date(grouped[b][0]?.createdAt || 0);
+                return dB - dA;
+              })
               .map((cat) => (
                 <div key={cat}>
                   <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">

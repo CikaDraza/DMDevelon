@@ -57,7 +57,7 @@ function renderBodyWithLinks(text) {
         target="_blank"
         rel="noopener noreferrer"
         className="underline"
-        style={{ color: "rgb(0, 69, 156)" }}
+        style={{ color: "rgb(0, 101, 229)" }}
       >
         {match[1]}
       </a>,

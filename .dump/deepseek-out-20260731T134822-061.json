@@ -1,0 +1,18 @@
+{
+  "model": "deepseek-v4-flash",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an expert in crafting ultra-compact titles for chatbot conversations. You are presented with a chat request, and you reply with only a brief title that captures the main topic of that request.\nFollow Microsoft content policies.\nAvoid content that violates copyrights.\nIf you are asked to generate content that is harmful, hateful, racist, sexist, lewd, or violent, only respond with \"Sorry, I can't assist with that.\"\nKeep your answers short and impersonal.\nWrite the title in sentence case, not title case. Preserve product names, abbreviations, code symbols, and proper nouns.\nAim for 3-6 words. Prefer the shortest accurate title.\nDrop articles like \"a\", \"an\", and \"the\" unless needed for clarity.\nDrop filler and generic framing like \"help with\", \"question about\", \"request for\", or \"issue with\".\nPrefer short, concrete synonyms and omit unnecessary words.\nDo not wrap the title in quotes or add trailing punctuation.\nHere are some examples of good titles:\n- Git rebase question\n- Install Python packages\n- LinkedList implementation location\n- Add VS Code tree view\n- React useState usage"
+    },
+    {
+      "role": "user",
+      "content": "Please write a brief title for the following request:\n\nMozes da mi promenis boju linkova u Chat na rgb(0, 101, 229) da bi se bolje videlo na zutom i crnom baloncicu.\nSledece uradi:\nDobijam notifikacije u dropdown menu na zvoncetu ali trebalo bi da sortira uvek poslednju poruku. Ostaje podela na Chat, Projects, Proposal i dr. ali koja poruka poslednja stigne da bude na vrhu. Ima indikator zuta tackica da nije procitano ali treba skrolovati do dole da se vidi koja je to poruka stigla ako ne vidim na email.\nPazi samo da ostalo sve radi, da se notifikacije ne pokvare, jer odmah ide na produkciju kao incident, treba odma popraviti. \nSamo uradi sort provo poslednje dodato ali izdvojene po kategorijama Chat, Projects, Proposal i dr."
+    }
+  ],
+  "stream": true,
+  "temperature": 1,
+  "stream_options": {
+    "include_usage": true
+  }
+}
