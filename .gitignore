@@ -11,6 +11,8 @@ coverage/
 out/
 build/
 app/api/seed
+.dump
+.smartercode
 
 # Production
 dist/

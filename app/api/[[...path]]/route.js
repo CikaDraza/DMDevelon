@@ -3197,7 +3197,7 @@ export async function POST(request, context) {
             body: preview,
             link: otherUser?.isAdmin
               ? `/admin?tab=chat&channel=${channel._id}`
-              : `/dashboard?tab=chat&channel=${channel._id}`,
+              : `/dashboard/chat?channel=${channel._id}`,
             entityType: "project",
             entityId: project._id,
             channelId: channel._id,
@@ -3219,7 +3219,7 @@ export async function POST(request, context) {
                   ? `${message.authorName} mentioned you in ${project.title}`
                   : `New message in ${project.title}`,
                 body: preview,
-                link: `/dashboard?tab=chat&channel=${channel._id}`,
+                link: `/dashboard/chat?channel=${channel._id}`,
                 entityType: "project",
                 entityId: project._id,
                 channelId: channel._id,

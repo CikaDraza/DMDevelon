@@ -89,7 +89,15 @@ export default function NotificationBell({ variant = "client" }) {
   };
 
   const handleClick = (n) => {
-    if (!n.read) markRead.mutate({ id: n._id });
+    if (!n.read) {
+      // Chat notifications: mark the entire channel's batch read at once
+      // so the badge clears immediately instead of one-by-one.
+      if (n.channelId) {
+        markRead.mutate({ channelId: n.channelId });
+      } else {
+        markRead.mutate({ id: n._id });
+      }
+    }
     setOpen(false);
     if (n.link) router.push(n.link);
   };

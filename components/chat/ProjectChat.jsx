@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useChatChannels } from "@/hooks/useProjectChat";
@@ -25,6 +26,8 @@ export function ProjectChat({
 }) {
   const { user } = useAuth();
   const { channels, isLoading, startDirectMessage } = useChatChannels();
+  const router = useRouter();
+  const pathname = usePathname();
   const [activeChannelId, setActiveChannelId] = useState(null);
   const [flagFilter, setFlagFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -50,6 +53,17 @@ export function ProjectChat({
       initialChannelId && channels.some((c) => c._id === initialChannelId);
     setActiveChannelId(deepLinked ? initialChannelId : channels[0]._id);
   }, [channels, activeChannelId, initialChannelId]);
+
+  // Sync the active channel to the URL so the user can see which channel
+  // they're in and share / bookmark the link. Admin page manages its own
+  // tab-based URL, so this only runs on the dedicated /dashboard/chat page.
+  useEffect(() => {
+    if (pathname === "/dashboard/chat" && activeChannelId) {
+      router.replace(`/dashboard/chat?channel=${activeChannelId}`, {
+        scroll: false,
+      });
+    }
+  }, [activeChannelId, pathname, router]);
 
   // Switching conversations abandons any in-progress reply — replying across
   // channels makes no sense (the quoted message wouldn't even be there).

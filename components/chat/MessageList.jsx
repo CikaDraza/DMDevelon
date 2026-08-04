@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useChatMessages } from "@/hooks/useProjectChat";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -11,6 +11,14 @@ import { ArrowDown, Loader2 } from "lucide-react";
  * Scrolling thread with backward pagination: scrolling near the top loads
  * older history (useChatMessages' `before` cursor) and the scroll position is
  * preserved across that prepend, instead of jumping.
+ *
+ * Smart scroll behaviour (like real chat apps):
+ *  - First load / channel switch → instant scroll to bottom.
+ *  - New message arrives while you're near the bottom → smooth follow.
+ *  - New message arrives while you're reading history → "New messages"
+ *    button appears instead of yanking you down.
+ *  - Manually scroll back to the bottom → button disappears, auto-follow
+ *    resumes.
  */
 export function MessageList({
   channelId,
@@ -43,23 +51,66 @@ export function MessageList({
   const containerRef = useRef(null);
   const endRef = useRef(null);
   const prevLengthRef = useRef(0);
+  const prevLastMessageIdRef = useRef(null);
+  const isInitialLoadRef = useRef(true);
+  const isNearBottomRef = useRef(true);
   const [highlightedId, setHighlightedId] = useState(null);
   // Message to return to after jumping up to a quoted reply — cleared once
   // the user actually jumps back (or switches channels/reply targets again).
   const [jumpBackId, setJumpBackId] = useState(null);
+  // "New messages" pill — shown when the user scrolled up and new content
+  // arrived at the bottom.
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // Scroll to the newest message on first load and whenever the thread grows
-  // at the end (a new message arrives). Loading OLDER history (prepended at
-  // the start) must not trigger this — handleScroll restores position for
-  // that case instead.
+  // ── channel switch → reset everything ──────────────────────────────
   useEffect(() => {
-    if (messages.length > prevLengthRef.current) {
-      endRef.current?.scrollIntoView({
-        behavior: prevLengthRef.current === 0 ? "auto" : "smooth",
-      });
+    isInitialLoadRef.current = true;
+    isNearBottomRef.current = true;
+    setShowScrollButton(false);
+    setJumpBackId(null);
+    prevLastMessageIdRef.current = null;
+  }, [channelId]);
+
+  // ── scroll-to-bottom helper ────────────────────────────────────────
+  const scrollToBottom = useCallback((smooth = false) => {
+    // Wrap in rAF so scrollHeight reflects the just-rendered DOM.
+    requestAnimationFrame(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      if (smooth) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+  }, []);
+
+  // ── smart auto‑scroll ──────────────────────────────────────────────
+  // Compares both message count AND the last message id so we don't
+  // mistake a history prepend (more messages at the top, same last id)
+  // for a new message arriving at the bottom.
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    const lastId = messages[messages.length - 1]?._id;
+    const lengthIncreased = messages.length > prevLengthRef.current;
+    const isNewAtBottom = lastId !== prevLastMessageIdRef.current;
+
+    if (isInitialLoadRef.current) {
+      // First paint for this channel — instant jump to latest.
+      scrollToBottom(false);
+      isInitialLoadRef.current = false;
+    } else if (lengthIncreased && isNewAtBottom) {
+      if (isNearBottomRef.current) {
+        scrollToBottom(true);
+      } else {
+        setShowScrollButton(true);
+      }
     }
+
     prevLengthRef.current = messages.length;
-  }, [messages.length]);
+    prevLastMessageIdRef.current = lastId;
+  }, [messages.length, scrollToBottom]);
 
   // Viewing the thread marks it read. Simple and matches the existing
   // milestone-chat convention of marking read on open rather than tracking
@@ -78,8 +129,20 @@ export function MessageList({
 
   const handleScroll = () => {
     const el = containerRef.current;
-    if (!el || isLoadingMoreHistory || !hasMoreHistory) return;
-    if (el.scrollTop < 80) {
+    if (!el) return;
+
+    // ── near‑bottom detection ────────────────────────────────────
+    const threshold = 100; // px from the absolute bottom
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = dist < threshold;
+    isNearBottomRef.current = nearBottom;
+
+    if (nearBottom) {
+      setShowScrollButton(false); // user caught up → dismiss pill
+    }
+
+    // ── infinite scroll upward ────────────────────────────────────
+    if (!isLoadingMoreHistory && hasMoreHistory && el.scrollTop < 80) {
       const prevHeight = el.scrollHeight;
       loadMoreHistory().then(() => {
         requestAnimationFrame(() => {
@@ -136,6 +199,11 @@ export function MessageList({
     scrollToMessage(target);
   };
 
+  const handleScrollToBottom = () => {
+    scrollToBottom(true);
+    setShowScrollButton(false);
+  };
+
   return (
     <div className="relative flex-1 min-h-[200px] flex flex-col">
       <div
@@ -176,7 +244,21 @@ export function MessageList({
         )}
         <div ref={endRef} />
       </div>
-      {jumpBackId && (
+
+      {/* "New messages" pill — only when user scrolled up & new content arrived */}
+      {showScrollButton && (
+        <button
+          type="button"
+          onClick={handleScrollToBottom}
+          className="absolute bottom-3 right-4 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#FFB633] text-black text-xs font-medium shadow-lg hover:bg-[#e5a32e] transition-all animate-bounce"
+        >
+          <ArrowDown className="w-3.5 h-3.5" />
+          New messages
+        </button>
+      )}
+
+      {/* Jump-back pill — don't overlap with the "New messages" pill */}
+      {jumpBackId && !showScrollButton && (
         <button
           type="button"
           onClick={handleJumpBack}

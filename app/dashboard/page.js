@@ -108,8 +108,19 @@ function DashboardInner() {
   }, [user, loading, router]);
 
   // Deep-link from a notification: ?tab=services|testimonials|chat switches view.
+  // Chat has its own dedicated page (/dashboard/chat), so ?tab=chat is a
+  // legacy notification URL that needs a redirect — both old (pre-fix) and
+  // new notifications resolve correctly this way.
   useEffect(() => {
     const tab = searchParams.get("tab");
+    if (tab === "chat") {
+      const channel = searchParams.get("channel");
+      const dest = channel
+        ? `/dashboard/chat?channel=${channel}`
+        : "/dashboard/chat";
+      router.replace(dest);
+      return;
+    }
     if (DASHBOARD_TABS.includes(tab)) {
       setActiveTab(tab);
       localStorage.setItem(DASHBOARD_TAB_STORAGE_KEY, tab);
@@ -117,7 +128,7 @@ function DashboardInner() {
       const storedTab = localStorage.getItem(DASHBOARD_TAB_STORAGE_KEY);
       if (DASHBOARD_TABS.includes(storedTab)) setActiveTab(storedTab);
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleTabChange = (tab) => {
     if (!DASHBOARD_TABS.includes(tab)) return;
