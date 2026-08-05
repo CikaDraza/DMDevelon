@@ -10,10 +10,11 @@ import { useAuth } from './useAuth';
 // thin wrapper).
 export function useChatChannels() {
   const queryClient = useQueryClient();
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
 
   const channelsQuery = useQuery({
     queryKey: ['chat-channels'],
+    enabled: isAuthenticated,
     refetchInterval: 15000,
     queryFn: async () => {
       const res = await axios.get('/api/chat/channels', {
@@ -50,10 +51,10 @@ export function useChatChannels() {
 // Pinned messages for one channel — its own small query since the pinned bar
 // (Section 11) renders independently of the main scroll-back thread below.
 export function useChatPinned(channelId) {
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
   const pinnedQuery = useQuery({
     queryKey: ['chat-pinned', channelId],
-    enabled: !!channelId,
+    enabled: isAuthenticated && !!channelId,
     queryFn: async () => {
       const res = await axios.get(`/api/chat/channels/${channelId}/pinned`, {
         headers: getAuthHeaders(),
@@ -76,7 +77,7 @@ export function useChatPinned(channelId) {
 // order so the caller always gets one flat, oldest-to-newest array.
 export function useChatMessages(channelId, { flag, q } = {}) {
   const queryClient = useQueryClient();
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
 
   const invalidate = () => {
     // A prefix match: invalidates every {flag, q} variant of this channel's
@@ -87,7 +88,7 @@ export function useChatMessages(channelId, { flag, q } = {}) {
 
   const messagesQuery = useInfiniteQuery({
     queryKey: ['chat-messages', channelId, { flag: flag || 'all', q: q || '' }],
-    enabled: !!channelId,
+    enabled: isAuthenticated && !!channelId,
     refetchInterval: 4000,
     staleTime: 0,
     refetchOnMount: 'always',

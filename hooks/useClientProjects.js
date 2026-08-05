@@ -8,7 +8,7 @@ import { useAuth } from './useAuth';
 // (the API scopes the result based on the auth token).
 export function useClientProjects() {
   const queryClient = useQueryClient();
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
 
   const invalidate = async (projectId) => {
     const invalidations = [
@@ -30,6 +30,7 @@ export function useClientProjects() {
 
   const projectsQuery = useQuery({
     queryKey: ['client-projects'],
+    enabled: isAuthenticated,
     queryFn: async () => {
       const res = await axios.get('/api/client-projects', {
         headers: getAuthHeaders(),

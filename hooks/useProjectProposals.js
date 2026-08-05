@@ -35,7 +35,7 @@ function useProposalLifecycleMutation({
  */
 export function useProjectProposals(projectId, { enabled = true } = {}) {
   const queryClient = useQueryClient();
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
   const queryKey = ["project-proposals", projectId];
 
   const invalidate = async () => {
@@ -54,7 +54,7 @@ export function useProjectProposals(projectId, { enabled = true } = {}) {
 
   const proposalsQuery = useQuery({
     queryKey,
-    enabled: enabled && !!projectId,
+    enabled: enabled && isAuthenticated && !!projectId,
     queryFn: async () => {
       const response = await axios.get(proposalUrl(projectId), {
         headers: getAuthHeaders(),

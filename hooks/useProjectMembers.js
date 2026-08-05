@@ -9,7 +9,7 @@ import { useAuth } from './useAuth';
 // emails to owner/admin — this hook just exposes what the server returns.
 export function useProjectMembers(projectId) {
   const queryClient = useQueryClient();
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['project-members', projectId] });
@@ -17,7 +17,7 @@ export function useProjectMembers(projectId) {
 
   const membersQuery = useQuery({
     queryKey: ['project-members', projectId],
-    enabled: !!projectId,
+    enabled: isAuthenticated && !!projectId,
     queryFn: async () => {
       const res = await axios.get(
         `/api/client-projects/${projectId}/members`,

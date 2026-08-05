@@ -67,6 +67,12 @@ function installAuthRefreshInterceptor() {
         return Promise.reject(error);
       }
 
+      // Ako nema tokena, nema šta da se refreshuje — odmah odbij request.
+      // Ovo sprečava kaskadne 401 nakon logout-a.
+      if (!localStorage.getItem("token")) {
+        return Promise.reject(error);
+      }
+
       if (request._dmdevelonSessionRetried) {
         return Promise.reject(error);
       }

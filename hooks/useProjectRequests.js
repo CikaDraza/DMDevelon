@@ -8,13 +8,14 @@ import { useAuth } from './useAuth';
 // (admin -> all, client -> own).
 export function useProjectRequests() {
   const queryClient = useQueryClient();
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['project-requests'] });
 
   const requestsQuery = useQuery({
     queryKey: ['project-requests'],
+    enabled: isAuthenticated,
     queryFn: async () => {
       const res = await axios.get('/api/project-requests', {
         headers: getAuthHeaders(),

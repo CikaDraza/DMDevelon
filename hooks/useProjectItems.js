@@ -10,7 +10,7 @@ import { useAuth } from './useAuth';
 // on one afterwards (deciding its status, or turning it into real work).
 export function useProjectItems(projectId, { kind } = {}) {
   const queryClient = useQueryClient();
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
 
   const invalidate = () => {
     // Prefix match: refreshes every {kind} variant for this project, not
@@ -20,7 +20,7 @@ export function useProjectItems(projectId, { kind } = {}) {
 
   const query = useQuery({
     queryKey: ['project-items', projectId, kind || 'all'],
-    enabled: !!projectId,
+    enabled: isAuthenticated && !!projectId,
     queryFn: async () => {
       const params = new URLSearchParams({ projectId });
       if (kind) params.set('kind', kind);
