@@ -2459,13 +2459,9 @@ function AdminPageInner() {
             highlightProposalId={highlightProposalId}
           />
         );
-      case "chat":
-        return (
-          <ProjectChat
-            viewerRole="admin"
-            initialChannelId={searchParams.get("channel")}
-          />
-        );
+      // "chat" is handled outside renderContent (see <main> JSX above)
+      // so the main element can stay padding-free, exactly matching the
+      // /dashboard/chat page layout.
       case "project-requests":
         return <ProjectRequestsManager highlightId={highlightId} />;
       case "testimonials":
@@ -2533,9 +2529,24 @@ function AdminPageInner() {
           </div>
         </header>
 
-        {/* Page Content — flex-1 fills the remaining viewport below the header
-             so the chat panel can stretch all the way down with h-full. */}
-        <main className="flex-1 min-h-0 p-4 lg:p-6">{renderContent()}</main>
+        {/* Page Content — flex-1 fills the remaining viewport below the header.
+             No padding or flex-col on <main> itself so that the chat tab can
+             use the exact same h-full chain as /dashboard/chat (the CSS spec
+             only guarantees percentage heights resolve against a flex/grid
+             item, not a block-level child whose height happens to be computed
+             by a flex parent). Non-chat tabs get their own padding wrapper. */}
+        <main className="flex-1 min-h-0">
+          {activeTab === "chat" ? (
+            <div className="h-full">
+              <ProjectChat
+                viewerRole="admin"
+                initialChannelId={searchParams.get("channel")}
+              />
+            </div>
+          ) : (
+            <div className="p-4 lg:p-6">{renderContent()}</div>
+          )}
+        </main>
       </div>
     </div>
   );

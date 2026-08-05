@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,13 +42,42 @@ export function ProjectChat({
   // see the "md:flex"/"md:w-64" overrides on each pane below.
   const [mobileView, setMobileView] = useState("list");
 
+  // Tracks the last seen initialChannelId so we can detect when an external
+  // navigation (notification click, deep link) changes it and force-switch
+  // even when a channel is already selected.
+  const prevInitialRef = useRef(initialChannelId);
+
   // Default to the deep-linked channel (a notification's ?channel=) if it's
-  // one this viewer actually has, else the first channel in the list. Only
-  // runs while nothing is selected yet, so it never overrides a channel the
-  // user has since clicked — the poll refreshing `channels` every 15s must
-  // not keep snapping selection back to the deep link.
+  // one this viewer actually has, else the first channel in the list.
+  //
+  // Two entry paths:
+  // 1. First mount / fresh channel list → pick deep-linked or first channel.
+  // 2. External navigation (notification click while chat is already open)
+  //    → force-switch to the new deep link, because the user's intent is
+  //    clear — they clicked a link — and the old selection is stale.
+  // The poll refreshing `channels` every 15s must NOT keep snapping
+  // selection back to the deep link (covered by path 1's early return when
+  // activeChannelId is already set AND initialChannelId hasn't changed).
   useEffect(() => {
-    if (activeChannelId || channels.length === 0) return;
+    if (channels.length === 0) return;
+
+    // Path 2 — the deep link changed from what it was last render. This
+    // means the user clicked a notification (or navigated externally) while
+    // already viewing the chat. Force-switch to the new channel.
+    if (
+      initialChannelId &&
+      initialChannelId !== prevInitialRef.current
+    ) {
+      prevInitialRef.current = initialChannelId;
+      const exists = channels.some((c) => c._id === initialChannelId);
+      if (exists) {
+        setActiveChannelId(initialChannelId);
+        return;
+      }
+    }
+
+    // Path 1 — nothing selected yet; pick deep-linked or first channel.
+    if (activeChannelId) return;
     const deepLinked =
       initialChannelId && channels.some((c) => c._id === initialChannelId);
     setActiveChannelId(deepLinked ? initialChannelId : channels[0]._id);

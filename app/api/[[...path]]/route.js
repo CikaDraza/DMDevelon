@@ -3206,11 +3206,20 @@ export async function POST(request, context) {
         }
       } else {
         // Everyone else currently in the group (owner + active members).
+        // Pre-load the set of admin user IDs once so every roster row can
+        // decide whether its notification link should point to the Admin
+        // Panel or the Client Dashboard without N per-member round-trips.
+        const adminIdSet = new Set(
+          (await User.find({ isAdmin: true }).select("_id")).map((a) =>
+            String(a._id),
+          ),
+        );
         await Promise.all(
           roster
             .filter((r) => String(r.userId) !== String(user._id))
             .map((r) => {
               const isMentioned = mentionedIds.has(String(r.userId));
+              const isAdminUser = adminIdSet.has(String(r.userId));
               return notifyUser({
                 userId: r.userId,
                 actorId: user._id,
@@ -3219,7 +3228,9 @@ export async function POST(request, context) {
                   ? `${message.authorName} mentioned you in ${project.title}`
                   : `New message in ${project.title}`,
                 body: preview,
-                link: `/dashboard/chat?channel=${channel._id}`,
+                link: isAdminUser
+                  ? `/admin?tab=chat&channel=${channel._id}`
+                  : `/dashboard/chat?channel=${channel._id}`,
                 entityType: "project",
                 entityId: project._id,
                 channelId: channel._id,
@@ -3234,15 +3245,15 @@ export async function POST(request, context) {
         // Anyone already reached through the roster above is skipped here: an
         // admin who also accepted an invitation to this project is in BOTH
         // lists and was otherwise getting two notifications for one message.
+        // Reuse the adminIdSet already loaded above — no second DB round-trip.
         if (access.role !== "admin") {
           const alreadyNotified = new Set(roster.map((r) => String(r.userId)));
-          const admins = await User.find({ isAdmin: true }).select("_id");
           await Promise.all(
-            admins
-              .filter((a) => !alreadyNotified.has(String(a._id)))
-              .map((a) =>
+            [...adminIdSet]
+              .filter((id) => !alreadyNotified.has(id))
+              .map((adminId) =>
                 notifyUser({
-                  userId: a._id,
+                  userId: adminId,
                   actorId: user._id,
                   type: "chat_message",
                   title: `New message in ${project.title}`,
