@@ -813,3 +813,31 @@ Drugi nalaz: `HomeClient` je imao **jedan zajednički loading gate** za pet klij
 - [ ] Case studies (npr. Marysoll) — najjači E-E-A-T signal za B2B i prirodan izvor linkova
 - [ ] Blog / vodiči za vlasnike salona
 - [ ] „Powered by DMDevelon" u footeru klijentskih platformi
+
+---
+
+## 15. Paddle i pretplate — dogovoreno, nije započeto
+
+Sledeći posao. Ovde stoji samo ono što je **odlučeno**, da se ne izgubi između sesija; pun plan se piše pre prve linije koda.
+
+### Zahtev
+
+`ProjectProposal` danas nosi **ručno unetu cenu koja se ne naplaćuje automatski**. Pored nje treba da nosi i **odgovarajući plan pretplate**: Website $49 · WebApp $149 · Workspace $299 · Growth $549 mesečno (isti skup je u `PRICING_TIERS`, `components/pages/HomeClient.js`). Pretplata kreće **mesec dana posle prihvatanja** ponude.
+
+Poslovni razlog: model je sufinansiranje — nema velike fakture unapred, izgradnja se plaća kroz pretplatu — pa je ponuda mesto gde se komercijalna odluka donosi i prirodno mesto da se plan zapiše.
+
+### Pravilo koje sve ostalo mora da poštuje
+
+> **Jedan projekat — jedna pretplata.** Nikad jedna po milestone-u ili po fazi.
+
+Dodavanje milestone-a ili faze **pomera postojeću pretplatu na viši (ili isti) tier — nikad ne pravi drugu**. Naplata prati ukupan obim projekta, ne zbir naplata po fazama. Iz toga sledi da „tier za projekat" i „tier upisan na prihvaćenoj ponudi" moraju završiti kao **ista vrednost**, ne dve koje mogu da se raziđu.
+
+### Otvorena pitanja — rešiti PRE implementacije
+
+- [ ] **Da li tier ikad ide naniže?** Pravilo iznad pokriva samo put nagore. Šta se dešava kad se faza arhivira, force-obriše ili se obim smanji?
+- [ ] **Koji događaj je okidač naplate?** `accept` je očigledan kandidat, ali životni ciklus već ima `withdraw` i `archive` **posle** prihvatanja (sekcija 12d), pa i ti slučajevi traže odgovor.
+- [ ] **Gde tier autoritativno živi?** Polje na projektu koje ponuda samo *predlaže*, ili izvedeno iz poslednje prihvaćene ponude. Šta god se izabere, ono drugo mora biti **čitanje** toga, nikad drugi izvor istine.
+
+### Zatečeno stanje koje ograničava dizajn
+
+**Faza *jeste* ponuda** — `kind: "phase"`, uz unique indeks `{projectId, phaseNumber}` (sekcija 12d). Svaki novi prihvaćen obim kreira **novi** `ProjectProposal` red. Zato „pretplata po projektu" ne može naivno da se izvede iz jedne ponude; to je tačka na kojoj se dizajn lomi ako se ne odluči unapred.
