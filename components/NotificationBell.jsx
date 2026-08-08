@@ -96,6 +96,8 @@ export default function NotificationBell({ variant = "client" }) {
     busy,
     subscribe,
     iosNeedsInstall,
+    unavailableMessage,
+    lastErrorMessage,
   } = usePush();
   const { getAuthHeaders } = useAuth();
   const [open, setOpen] = useState(false);
@@ -103,9 +105,10 @@ export default function NotificationBell({ variant = "client" }) {
 
   const showEnablePush =
     supported && (permission !== "granted" || !isSubscribed);
-  // Only worth offering once this device is actually set up — before that,
-  // "Enable push notifications" above is the useful button.
-  const showTestPush = supported && permission === "granted" && isSubscribed;
+  // Always offered. Gating it on "already subscribed" hid the diagnostic in
+  // precisely the situation it exists for — someone whose push is not working
+  // and who needs to be told which of the five causes it is.
+  const showTestPush = true;
 
   const handleEnablePush = async () => {
     if (permission === "denied") {
@@ -118,6 +121,10 @@ export default function NotificationBell({ variant = "client" }) {
       const ok = await subscribe();
       if (ok) {
         toast.success("Push notifications enabled");
+      } else if (lastErrorMessage) {
+        // The real failure, naming the step. Long-lived because this is the
+        // sentence someone has to read out or screenshot to get help.
+        toast.error(lastErrorMessage, { duration: 12000 });
       } else if (
         typeof Notification !== "undefined" &&
         Notification.permission === "denied"
@@ -137,6 +144,24 @@ export default function NotificationBell({ variant = "client" }) {
   // "can the server reach this device at all", which is the one thing you
   // cannot tell from the outside when a push simply never shows up.
   const handleTestPush = async () => {
+    // Browser-side blockers first: no point asking the server to push to a
+    // device that cannot receive one, and this is the layer that carries the
+    // reason people actually need (wrong origin, key missing from the build).
+    if (unavailableMessage) {
+      toast.error(unavailableMessage, { duration: 10000 });
+      return;
+    }
+    if (lastErrorMessage && !isSubscribed) {
+      toast.error(lastErrorMessage, { duration: 12000 });
+      return;
+    }
+    if (!isSubscribed) {
+      toast(
+        "This device isn't subscribed yet — tap “Enable push notifications” above first.",
+        { icon: "🔔", duration: 7000 },
+      );
+      return;
+    }
     setTesting(true);
     try {
       const res = await axios.post(
@@ -144,10 +169,26 @@ export default function NotificationBell({ variant = "client" }) {
         {},
         { headers: getAuthHeaders() },
       );
-      const { sent, subscriptions, vapidConfigured, pushEnabledOnAccount } =
-        res.data || {};
+      const {
+        sent,
+        pruned,
+        subscriptions,
+        vapidConfigured,
+        pushEnabledOnAccount,
+      } = res.data || {};
       if (!vapidConfigured) {
-        toast.error("Server has no VAPID keys configured — push cannot work.");
+        toast.error(
+          "This server has no VAPID keys set. They live in the deployment's environment variables, not in the app.",
+          { duration: 8000 },
+        );
+      } else if (pruned > 0 && sent === 0) {
+        // The subscription was bound to a superseded VAPID key; it has just
+        // been dropped, and the next page load re-creates it against the
+        // current one.
+        toast(
+          "This device was registered against an older key. It has been reset — reload the page and try again.",
+          { icon: "🔄", duration: 8000 },
+        );
       } else if (!pushEnabledOnAccount) {
         toast.error("Push is switched off for your account in settings.");
       } else if (!subscriptions) {
@@ -302,10 +343,14 @@ export default function NotificationBell({ variant = "client" }) {
           <button
             onClick={handleTestPush}
             disabled={testing}
-            className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-gray-300 hover:bg-white/5 transition-colors disabled:opacity-60"
+            className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-left text-sm text-gray-300 hover:bg-white/5 transition-colors disabled:opacity-60"
           >
             <Wifi className="w-4 h-4 shrink-0" />
-            {testing ? "Sending…" : "Send a test push to this device"}
+            {testing
+              ? "Sending…"
+              : unavailableMessage
+                ? "Why can't I get notifications?"
+                : "Send a test push to this device"}
           </button>
         )}
         {iosNeedsInstall && (

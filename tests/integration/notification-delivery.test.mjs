@@ -20,6 +20,7 @@ import {
   subscribeToPush,
 } from "./harness.mjs";
 import Notification from "@/models/Notification";
+import PushSubscription from "@/models/PushSubscription";
 import User from "@/models/User";
 import { v4 as uuidv4 } from "uuid";
 
@@ -198,6 +199,40 @@ describe("web push delivery", () => {
     expect(JSON.stringify(withDevice.body)).not.toContain(
       `push.test.local/${cast.client._id}`,
     );
+  });
+
+  it("a subscription rejected for bad credentials is pruned, not retried forever", async () => {
+    // 401/403 from the push service means this subscription was created
+    // against a VAPID key the server no longer signs with — a key rotation
+    // leaves every existing device in exactly this state. Keeping the row
+    // means failing on every send forever with nothing to show for it; the
+    // client rebuilds it against the current key once it is gone.
+    const { sendPushToUser } = await import("@/lib/push");
+    const working = sendPushToUser.getMockImplementation();
+    await subscribeToPush(cast.collaborator);
+
+    sendPushToUser.mockImplementation(async (userId) => {
+      const { default: PushSubscription } = await import(
+        "@/models/PushSubscription"
+      );
+      await PushSubscription.deleteMany({ userId });
+      return { sent: 0, failed: 0, pruned: 1, skipped: null };
+    });
+
+    await admin.post(`chat/channels/${channelId}/messages`, {
+      body: "goes to a device bound to an old key",
+    });
+
+    const remaining = await PushSubscription.countDocuments({
+      userId: cast.collaborator._id,
+    });
+    expect(remaining).toBe(0);
+
+    // Nothing was delivered, so nothing may claim it was.
+    const [row] = await Notification.find({ userId: cast.collaborator._id });
+    expect(row.pushedAt).toBeNull();
+
+    sendPushToUser.mockImplementation(working);
   });
 
   it("the test endpoint refuses an anonymous caller", async () => {

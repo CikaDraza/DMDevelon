@@ -6,7 +6,7 @@ Ovde se označava šta je urađeno, a šta nije.
 Legenda: `[ ]` nije urađeno · `[x]` urađeno · `[~]` u toku · `[-]` odloženo / preskočeno uz obrazloženje
 
 Status: **Faza 1 u toku — sekcije 1–12 kod-kompletne, plus 12b/12c/12d/12e i 12f (isporuka notifikacija, chat scroll, pin i optimizacija). Sledeća: Sekcija 13 (finalna verifikacija/regresija) — traži dva browsera i dozvolu za pisanje u pravu bazu.**
-Poslednje ažuriranje: 2026-08-08 · **362 testa, sve prolazi**: `npm test` 163 (čiste funkcije, `node --test`) + `npm run test:api` 177 (integracioni, pravi route handleri protiv jednokratne Mongo replike) + `npm run test:ui` 20 (jsdom, chat komponente + zvono). `npm run build` prolazi; `npx tsc --noEmit` čist; `pyright` čist. Sekcije 4, 5, 6 i 10 uživo testirane protiv produkcione baze sa jednorazno kreiranim, potom obrisanim test podacima (uz izričitu dozvolu pre svakog destruktivnog koraka)
+Poslednje ažuriranje: 2026-08-08 · **365 testova, sve prolazi**: `npm test` 163 (čiste funkcije, `node --test`) + `npm run test:api` 180 (integracioni, pravi route handleri protiv jednokratne Mongo replike) + `npm run test:ui` 22 (jsdom, chat komponente + zvono). `npm run build` prolazi; `npx tsc --noEmit` čist; `pyright` čist. Sekcije 4, 5, 6 i 10 uživo testirane protiv produkcione baze sa jednorazno kreiranim, potom obrisanim test podacima (uz izričitu dozvolu pre svakog destruktivnog koraka)
 
 v3 dopuna ugrađena pre Sekcije 4: **cross-cutting invarijante I1–I10** (sekcija 3A, razrada u planu 4A) i **životni ciklus projekta / preživljavanje istorije** (plan 5A). Modeli su već usklađeni sa I5 i I10 — `dmKey`, `ProjectMember.name/email`, `ChatRead.clearedAt`, `ClientProject.ownerAccountDeletedAt`.
 
@@ -632,16 +632,61 @@ Uzrok „ne dobijam push na telefonu": `resolveDeliveryChannels` je gasio push �
   - čita razgovor → nema ni mejla ni push-a
   - aktivan negde drugde → **nema mejla** (zvono na laptopu to pokriva), **push ide**, i dalje ograničen throttle-om na jedan po razgovoru na sat
   - offline → oba, po throttle-u
+- [x] **Rotacija VAPID ključa se sad sama leči.** Pretplata u browseru je trajno vezana za `applicationServerKey` sa kojim je napravljena; posle rotacije `getSubscription()` je i dalje vraća, red u bazi i dalje postoji, ali push servis odbija **svaki** send sa 403 — simptom je tačno „radilo pa jednog dana prestalo", bez ijedne greške bilo gde. `usePush.ensureSubscribed` sad poredi ključ na pretplati sa aktuelnim i, ako se razlikuju, radi `unsubscribe()` pa novu pretplatu; `lib/push.js` tretira 401/403 kao mrtvu pretplatu (uz `console.warn`) umesto da je večno pokušava. **Provereno da rotacija NIJE potrebna** za trenutne ključeve: par u `.env.local` je validan (javni == `NEXT_PUBLIC_` kopija, 65B nekompresovana P-256 tačka, 32B privatni, `web-push` gradi ispravan `Authorization` header)
 - [x] `POST /api/push/test` + dugme **„Send a test push to this device"** u zvonu — „push ne radi" ima najmanje pet različitih uzroka (nema VAPID ključeva · nijedna pretplata · istekla pretplata · politika isporuke · OS blokira) i nijedan se ne vidi spolja. Endpoint zaobilazi politiku namerno: to je provera ožičenja, ne notifikacija. Vraća `sent/failed/pruned`, broj pretplata, host i user-agent po uređaju — **nikad pun endpoint URL**, jer je njegova putanja bearer kredencijal za taj browser
+
+### Zašto push, install banner i settings switch ne rade na telefonu — jedan uzrok
+
+Korisnik: „kad instaliram app na telefon kaže ne mogu da uključim push · switch u Settings se sam vrati na off · nema više install banner-a". Sva tri imaju **isti** uzrok, koji aplikacija nigde nije pominjala.
+
+**Service Worker, `PushManager` i `Notification` postoje samo u secure context-u** — https, ili izuzetak za `localhost`/`127.0.0.1`. Plain-http LAN adresa (`http://192.168.1.x:3003`, tačno kako se ovaj dev server otvara sa telefona, vidi 12b) **nije** secure context, pa browser te API-je uopšte ne definiše. Otud:
+
+- `usePush.supported` → `false` → switch u Settings je `disabled` i `checked={pushOn && push.supported}` ga crta kao **off**
+- `beforeinstallprompt` se nikad ne okine (traži isti secure context + registrovan SW) → **nema install banner-a**
+- poruka koju je korisnik video bila je „Not supported on this device/browser" — što šalje čoveka da traži problem na telefonu, a problem je adresa na kojoj je otvorio aplikaciju
+
+- [x] `usePush` vraća `unavailableReason` + `unavailableMessage` — `insecure-origin` · `missing-key` (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` nedostaje u buildu) · `unsupported-browser` · `ios-needs-install` · `blocked`. Redosled je od najkonkretnijeg: prvi tačan razlog je onaj koji stvarno treba popraviti
+- [x] `blocked` **ne** obara `supported` — to je stanje dozvole, ne sposobnosti uređaja; UI sad može da objasni umesto da tvrdi da telefon ne ume
+- [x] Settings prikazuje konkretan razlog i u opisu i u toastu kad switch odbije da se uključi
+- [x] `PWAInstallBanner`: novi `insecure` režim koji kaže zašto instalacija nije moguća, umesto uputstva koje ne može da uspe
+- [x] **Odbacivanje banner-a više nije trajno** — bio je `localStorage` flag bez isteka, pa je „nema banner-a" imalo dva nerazlučiva uzroka (ne može da se prikaže / dodirnuo si × pre par nedelja). Sad je datirano, 30 dana; stara `"1"` vrednost se migrira na „prikaži ponovo"
+- [x] **BUG u prethodnoj rundi, moj:** dugme „Send a test push to this device" bilo je uslovljeno sa `isSubscribed`, pa je jedina kontrola koja objašnjava zašto push ne radi **bila sakrivena svima kojima push ne radi**. Sad je uvek prisutno; bez pretplate menja tekst u „Why can't I get notifications?" i prijavljuje razlog sa klijentske strane pre nego što uopšte pozove server
+
+### „Permission odobren, pa ipak Couldn't enable push" (Android Chrome, produkcija)
+
+Sledeća prijava: na deployovanom https sajtu, sa sva četiri VAPID vara na Vercelu, Android prikaže sistemski prompt, korisnik potvrdi — i **onda** aplikacija kaže „Couldn't enable push notification". Dakle pada **posle** dozvole, a `subscribe()` je celu grešku gutao u `console.error` i vraćao `false`. Dve runde nagađanja su bile posledica toga; ovo je zatvoreno tako što aplikacija sad **prijavljuje pravu grešku**.
+
+- [x] `subscribe()` prati **fazu** (`permission` → `service-worker` → `subscribe` → `save`) i pamti `{ stage, name, message }`; `lastErrorMessage` je rečenica tipa „Push service: AbortError — Registration failed - push service error". Svaka od tih faza pada iz nepovezanih razloga (browser · push servis/FCM · naš server) i traži drugu ispravku
+- [x] Greška se prikazuje u toastu (12s) **i trajno** u Settings ispod prekidača — toast nestane pre nego što se stigne pročitati ili slikati
+- [x] **`InvalidStateError` se sad sam leči.** Klasično Android Chrome odbijanje: push servis još drži pretplatu za tu registraciju pod **drugim** ključem, a `getSubscription()` je ne prijavljuje. Bez toga je uključivanje push-a na tom uređaju **trajno nemoguće**, bez ijednog načina da korisnik to očisti. Sad: `unsubscribe()` postojeće pa jedan ponovni pokušaj
+- [x] Provera poklapanja VAPID ključa dodata i u `subscribe()` (ranije samo u `ensureSubscribed`) — ponovna upotreba pretplate vezane za stari ključ je gore od nijedne: „uspešno" uključivanje koje ne isporučuje ništa
+- [x] `next.config.js` CSP: `worker-src 'self'` i `manifest-src 'self'` napisani eksplicitno. Oba su i ranije prolazila kroz fallback na `default-src 'self'`, ali PWA stoji i pada na njima, a implicitna dozvola se lako slomi prvim stezanjem `default-src`
+- [x] **Trajno mesto za „Install on your phone" u Settings** — banner je odbaciv, a Chrome-ov sopstveni prompt ima svoja pravila prigušivanja; između to dvoje je sasvim moguće ostati bez ijednog puta do instalacije, što se korisniku i desilo. Tekst se menja po platformi i po tome da li je adresa secure
+
+### Ishod — potvrđeno uživo od strane korisnika ✓
+
+Pravi uzrok cele serije „push ne radi na telefonu" bio je **zastareo keš u Chrome-u**: telefon je držao stariji deployovan build. Otvaranje svežeg Vercel deploy-a bez zastarelog keša → **radi na sva tri uređaja**.
+
+Redosled koji je korisnik prošao, i koji je tačno ono za šta je dijagnostika napravljena:
+
+1. „Enable push notifications" → sistemski prompt → dozvolio
+2. **„Send a test push to this device"** → javio da je push **ugašen u Settings** za taj nalog (`pushEnabledOnAccount: false`) — podatak koji se ranije nije video nigde
+3. uključio u Settings → push radi
+4. install banner se pojavio (datirano odbacivanje iz ove runde ga je vratilo)
+
+Napomena za ubuduće: `public/sw.js` **ne kešira** ništa (`skipWaiting` + `clients.claim`), pa se sam osvežava; zastarelost je bila u Chrome-ovom HTTP kešu instalirane aplikacije, ne u service worker-u. Pri testiranju PWA izmena na telefonu vredi otvoriti svež deploy (ili hard-reload), inače se debug-uje stari kod.
+
+**Sve stavke iz 12g su potvrđene uživo osim chat scroll-a i textarea layout-a** (korisnik nije eksplicitno potvrdio; ostaju za proveru).
 
 ### Testovi
 
+- [x] `tests/ui/notification-bell.test.jsx` +2: dijagnostika je ponuđena i kad push NE radi; postaje pravi test tek kad je uređaj pretplaćen
 - [x] `tests/ui/message-list.test.jsx` +2: istorija se NE učitava pre nego što se pogled slegao (regresija sredine prepiske); smooth follow-scroll ne broji svoje evente kao korisnikov scroll
 - [x] `tests/notification-policy.test.mjs` +2 / izmenjen 1: čitanje razgovora gasi oba kanala; online negde drugde gasi mejl ali **ne** push; push i tada poštuje throttle
 - [x] `tests/integration/chat-notifications.test.mjs`: „online negde drugde i dalje dobija push na telefon", „star read receipt ne znači da čita sada"
 - [x] `tests/integration/notification-delivery.test.mjs` +2: `push/test` izveštaj sa i bez uređaja, i 401 za anonimnog
 
-**Verifikacija:** 163 (`npm test`) + 199 (`vitest`: 177 API + 20 UI + smoke) = **362 testa, sve prolazi**. `npm run build` prolazi, `npx tsc --noEmit` čist, `pyright` čist. Scroll i push na pravom telefonu ostaju na korisniku — dugme „Send a test push to this device" je tu baš zato.
+**Verifikacija:** 163 (`npm test`) + 202 (`vitest`: 180 API + 22 UI) = **365 testova, sve prolazi**. `npm run build` prolazi, `npx tsc --noEmit` čist, `pyright` čist. Scroll i push na pravom telefonu ostaju na korisniku — dugme „Send a test push to this device" je tu baš zato.
 
 ---
 
@@ -725,3 +770,46 @@ Sve stavke sa ove liste su razrešene i prebačene u **sekciju 3A** kao invarija
 - [ ] Migracija milestone chata (`ProjectMessage`) pod isti model kanala
 - [ ] Razbijanje `route.js` na module
 - [ ] Razmotriti SSE ako polling na 4s postane usko grlo
+
+---
+
+## 14. SEO — tehnički (2026-08-08)
+
+Povod: analiza od „Google SEO Optimizations Studio" + mejl iz Search Console-a („Blocked by robots.txt").
+
+### Šta je zaista bilo pokvareno (izmereno, ne pretpostavljeno)
+
+`curl` na produkciju je pokazao uzrok Search Console greške, i on nije bio u sadržaju robots.txt-a — **robots.txt uopšte nije postojao**:
+
+```
+GET https://dmdevelon.website/robots.txt
+  status=200 · content-type: text/html · x-matched-path: /[...slug]
+GET https://dmdevelon.website/sitemap.xml
+  status=200 · content-type: text/html · x-matched-path: /[...slug]
+```
+
+Catch-all ruta `app/[...slug]` je hvatala oba i odgovarala HTML dokumentom CMS stranice. Google je tražio robots.txt, dobio HTML sa statusom 200, i prijavio sajt kao blokiran. Sitemap-a nije bilo uopšte.
+
+Drugi nalaz: `HomeClient` je imao **jedan zajednički loading gate** za pet klijentskih upita — dok bilo koji traje, cela stranica vraća `<Loader/>` („Processing…"). Na serveru nijedan od njih nema podatke, pa je serviran HTML sadržao **nula** tekstualnog sadržaja: bez heroja, usluga, projekata, kontakta. Analiza je bila u pravu za simptom; uzrok je bio ovaj gate, ne „SPA arhitektura" kao takva — Next je već renderovao na serveru, gate ga je poništavao.
+
+### Urađeno
+
+- [x] `app/robots.js` — pravi robots.txt (`text/plain`), disallow za `/api/ /admin /dashboard /invite /verify-email /reset-password`, plus `Sitemap:` i `Host:`. File-convention ruta se poklapa **pre** catch-all-a, pa je to ceo popravak
+- [x] `app/sitemap.js` — sitemap iz baze (CMS stranice bez `seo.noIndex` + Portfolio projekti), `revalidate 3600`; pad baze degradira na „samo početna", nikad na 500
+- [x] `lib/site-url.js` — jedno mesto za apsolutni origin. `app/page.js` je ranije interpolirao `process.env.NEXT_PUBLIC_APP_URL` direktno i pravio `undefined/` kad var nedostaje
+- [x] **Uklonjen blokirajući preloader.** Svaka sekcija se sad renderuje odmah; `projects`/`testimonials` već imaju `[]` default, svi `profile` pristupi su optional-chained
+- [x] **Početna čita bazu direktno** umesto `fetch()` na sopstveni `/api/services`. Taj round trip je bio čist trošak (dodatni mrežni hop + druga serverless invokacija za podatke koje proces već ume da upita), padao je pri buildu, i **terao stranicu da bude dinamička**. Sad je `○` sa `revalidate: 300` — prerenderovan, keširan HTML
+- [x] Metadata: `alternates.canonical` (stari top-level `canonical` u `layout.js` **nije** deo Metadata API-ja i nije emitovao ništa), `metadataBase`, `openGraph.images` (staro `ogImage` polje nije validno pa je tiho ispadalo — svaki share je bio bez slike), `twitter` card
+- [x] `lib/seo.js` fallback opis: „Web Development" → stvarni opis usluge sa cenom. Fallback je ono što se indeksira onog dana kad neko isprazni polje u CMS-u
+- [x] Nova **About + finansiranje** sekcija između heroja i Services (`#about`, dodata i u nav): kako se radi (zahtev → ponuda → faze), i sufinansiranje sa pretplatama $49 / $149 / $299 / $549
+
+**Rezultat na prerenderovanom HTML-u:** 22 KB (samo meta) → **120 KB sa stvarnim sadržajem**; „Processing" se više ne pojavljuje.
+
+### Ostaje korisniku (sadržaj i off-page, ne kod)
+
+- [ ] Search Console: posle deploy-a `robots.txt` → Validate Fix, i submit `sitemap.xml`
+- [ ] SEO title/description po stranici kroz CMS (kod sad ima solidan fallback, ali fallback nije strategija)
+- [ ] Namenske landing stranice po usluzi — CMS ih već podržava (`/[...slug]`), treba tekst
+- [ ] Case studies (npr. Marysoll) — najjači E-E-A-T signal za B2B i prirodan izvor linkova
+- [ ] Blog / vodiči za vlasnike salona
+- [ ] „Powered by DMDevelon" u footeru klijentskih platformi

@@ -56,6 +56,13 @@ const nextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' https: data:",
               "connect-src 'self'", // add your API domains if needed
+              // Both would fall back to default-src 'self' and be allowed
+              // anyway, but a PWA lives or dies on these two and an implicit
+              // grant is easy to break later by tightening default-src.
+              // Spelled out so registering /sw.js and fetching the manifest
+              // never depend on a fallback chain nobody remembers.
+              "worker-src 'self'",
+              "manifest-src 'self'",
             ].join("; "),
           },
           {

@@ -25,15 +25,21 @@ vi.mock("@/hooks/useNotifications", () => ({
   }),
 }));
 
+const pushState = {
+  supported: false,
+  permission: "default",
+  isSubscribed: false,
+  busy: false,
+  iosNeedsInstall: false,
+  unavailableMessage: null,
+};
+
 vi.mock("@/hooks/usePush", () => ({
-  usePush: () => ({
-    supported: false,
-    permission: "default",
-    isSubscribed: false,
-    busy: false,
-    subscribe: vi.fn(),
-    iosNeedsInstall: false,
-  }),
+  usePush: () => ({ ...pushState, subscribe: vi.fn() }),
+}));
+
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({ getAuthHeaders: () => ({}) }),
 }));
 
 const bellModule = await import("@/components/NotificationBell");
@@ -64,6 +70,14 @@ beforeEach(() => {
   notificationState.unreadCount = 0;
   routeState.pathname = "/dashboard";
   routeState.search = "";
+  Object.assign(pushState, {
+    supported: false,
+    permission: "default",
+    isSubscribed: false,
+    busy: false,
+    iosNeedsInstall: false,
+    unavailableMessage: null,
+  });
 });
 
 describe("clicking a notification", () => {
@@ -137,6 +151,37 @@ describe("clicking a notification", () => {
     await openBellAndClickFirst();
 
     expect(push).toHaveBeenCalledWith("/dashboard/chat?channel=chan-2&m=msg-3");
+  });
+});
+
+describe("the push diagnostic", () => {
+  it("is offered even when push is not working — that is when it is needed", async () => {
+    // It used to be gated on `isSubscribed`, so the one control that explains
+    // why push is broken was hidden from everyone whose push was broken.
+    pushState.supported = false;
+    pushState.unavailableMessage = "This page is not on HTTPS.";
+
+    render(<NotificationBell />);
+    await userEvent.click(screen.getByRole("button", { name: "Notifications" }));
+
+    expect(
+      await screen.findByRole("button", {
+        name: /Why can't I get notifications\?/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("reads as a live test once the device is actually subscribed", async () => {
+    pushState.supported = true;
+    pushState.permission = "granted";
+    pushState.isSubscribed = true;
+
+    render(<NotificationBell />);
+    await userEvent.click(screen.getByRole("button", { name: "Notifications" }));
+
+    expect(
+      await screen.findByRole("button", { name: /Send a test push/i }),
+    ).toBeInTheDocument();
   });
 });
 

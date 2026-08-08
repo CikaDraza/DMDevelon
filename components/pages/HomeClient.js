@@ -13,7 +13,8 @@ import {
   Bot,
   BrainCircuit,
   Cog,
-  ShoppingCart,  CodeXml,
+  ShoppingCart,
+  CodeXml,
   LockIcon,
   Menu,
   X,
@@ -70,7 +71,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import Slider from "react-slick";
 import LogoIcon from "../ui/logo-icon";
 import Link from "next/link";
-import Loader from "../loaders/Loader";
 import FacebookIcon from "../ui/assets/FacebookIcon";
 import TikTokIcon from "../ui/assets/TikTokIcon";
 import GitHubicon from "../ui/assets/GitHubIcon";
@@ -242,6 +242,7 @@ function Header({ user, onLoginClick, onLogout }) {
 
   const navLinks = [
     { href: "#hero", label: "Home" },
+    { href: "#about", label: "About" },
     { href: "#services", label: "Services" },
     { href: "#projects", label: "Projects" },
     { href: "#testimonials", label: "Testimonials" },
@@ -495,6 +496,169 @@ function HeroSection({ profile }) {
       {/* Background decoration */}
       <div className="absolute top-1/4 right-0 w-96 h-96 bg-[#FFB633]/5 rounded-full blur-3xl" />
       <div className="absolute bottom-1/4 left-0 w-96 h-96 bg-[#FFB633]/5 rounded-full blur-3xl z-0" />
+    </section>
+  );
+}
+
+// Subscription tiers. Plain data, rendered server-side with the rest of the
+// section: pricing is the single most searched-for thing on a site like this,
+// so it must be in the initial HTML rather than appearing after hydration.
+const PRICING_TIERS = [
+  {
+    name: "Website",
+    price: 49,
+    summary: "A presence that is found, not just built.",
+    for: "Presentation sites, portfolios, landing pages",
+  },
+  {
+    name: "WebApp",
+    price: 149,
+    summary: "Booking, accounts and everything behind a login.",
+    for: "Appointment booking, client areas, custom tools",
+  },
+  {
+    name: "Workspace",
+    price: 299,
+    summary: "The whole operation in one place.",
+    for: "Multi-user teams, internal processes, integrations",
+  },
+  {
+    name: "Growth",
+    price: 549,
+    summary: "Ongoing engineering, search and conversion work.",
+    for: "Platforms that grow month over month",
+  },
+];
+
+/**
+ * About + how the work is paid for.
+ *
+ * Sits between the hero and Services deliberately: it answers the two
+ * questions a visitor has before they care about a service list — who is
+ * doing the work, and what it costs to start.
+ */
+function AboutSection() {
+  return (
+    <section id="about" className="section-full py-20 relative">
+      <div className="container mx-auto px-4">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={fadeInUp}
+          className="text-center mb-14"
+        >
+          <span className="text-[#FFB633] text-sm font-semibold tracking-widest">
+            HOW I WORK
+          </span>
+          <h2 className="mt-4 text-4xl font-bold text-white lg:text-5xl">
+            Built with you, not billed at you
+          </h2>
+          <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-gray-400">
+            I design and engineer booking, search and growth systems for service
+            businesses — salons, clinics, studios and the platforms that serve
+            them. Not a template with your logo on it: a system shaped around
+            how your business actually takes bookings, answers clients and gets
+            found.
+          </p>
+        </motion.div>
+
+        <div className="mx-auto mb-16 grid max-w-5xl gap-6 md:grid-cols-3">
+          {[
+            {
+              title: "We start from the request",
+              body: "You describe what you need. I turn it into a written proposal with scope, milestones and a price — before any work begins, and before any subscription starts.",
+            },
+            {
+              title: "It is built in phases",
+              body: "Each phase is agreed, accepted and only then built. You follow progress, comment on milestones and approve new work in your own dashboard — nothing is added silently.",
+            },
+            {
+              title: "It keeps growing",
+              body: "The system is not finished on launch day. New work becomes a new phase, and the subscription grows with it — gradually, at the pace the business actually needs.",
+            },
+          ].map((item) => (
+            <motion.div
+              key={item.title}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-80px" }}
+              variants={fadeInUp}
+              className="rounded-2xl border border-white/10 bg-[#1a1a1b] p-6"
+            >
+              <h3 className="mb-3 text-lg font-semibold text-white">
+                {item.title}
+              </h3>
+              <p className="text-sm leading-relaxed text-gray-400">
+                {item.body}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Financing */}
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={fadeInUp}
+          className="text-center"
+        >
+          <span className="text-[#FFB633] text-sm font-semibold tracking-widest">
+            HOW IT IS FINANCED
+          </span>
+          <h2 className="mt-4 text-3xl font-bold text-white lg:text-4xl">
+            You don&apos;t pay for the project up front
+          </h2>
+          <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-gray-400">
+            The build is co-financed: instead of one large invoice, you pay a
+            monthly subscription that starts the month after you accept the
+            proposal. It covers continued development, maintenance, domain,
+            hosting and everything listed under Services — for as long as we
+            work together.
+          </p>
+        </motion.div>
+
+        <div className="mx-auto mt-12 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {PRICING_TIERS.map((tier) => (
+            <motion.div
+              key={tier.name}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-80px" }}
+              variants={fadeInUp}
+              className="flex flex-col rounded-2xl border border-white/10 bg-[#1a1a1b] p-6 transition-colors hover:border-[#FFB633]/40"
+            >
+              <h3 className="text-lg font-semibold text-white">{tier.name}</h3>
+              <p className="mt-3 flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-[#FFB633]">
+                  ${tier.price}
+                </span>
+                <span className="text-sm text-gray-500">/ month</span>
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-gray-300">
+                {tier.summary}
+              </p>
+              <p className="mt-3 text-xs leading-relaxed text-gray-500">
+                {tier.for}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+
+        <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed text-gray-500">
+          Which tier applies depends on the scope agreed in your proposal, and
+          it can move as the system grows — a project often starts small and
+          steps up only when there is more to run.{" "}
+          <a
+            href="#contact"
+            className="text-[#FFB633] underline underline-offset-4 hover:text-[#e5a32e]"
+          >
+            Send a request
+          </a>{" "}
+          and you&apos;ll get a written proposal with the exact scope and price.
+        </p>
+      </div>
     </section>
   );
 }
@@ -1510,7 +1674,13 @@ function Footer({ profile }) {
 }
 
 // Login Modal Component
-function LoginModal({ isOpen, onClose, onLogin, onRegister, onForgotPassword }) {
+function LoginModal({
+  isOpen,
+  onClose,
+  onLogin,
+  onRegister,
+  onForgotPassword,
+}) {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [forgotMode, setForgotMode] = useState(false);
   const [formData, setFormData] = useState({
@@ -1621,98 +1791,101 @@ function LoginModal({ isOpen, onClose, onLogin, onRegister, onForgotPassword }) 
             </div>
           </>
         ) : (
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          {!isLoginMode && (
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            {!isLoginMode && (
+              <div>
+                <Label htmlFor="name" className="text-white">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  placeholder="Your name"
+                  required={!isLoginMode}
+                  className="bg-white/5 border-white/10 text-white mt-1"
+                />
+              </div>
+            )}
             <div>
-              <Label htmlFor="name" className="text-white">
-                Name
+              <Label htmlFor="loginEmail" className="text-white">
+                Email
               </Label>
               <Input
-                id="name"
-                type="text"
-                value={formData.name}
+                id="loginEmail"
+                type="email"
+                value={formData.email}
                 onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
+                  setFormData({ ...formData, email: e.target.value })
                 }
-                placeholder="Your name"
-                required={!isLoginMode}
+                placeholder="your@email.com"
+                required
                 className="bg-white/5 border-white/10 text-white mt-1"
               />
             </div>
-          )}
-          <div>
-            <Label htmlFor="loginEmail" className="text-white">
-              Email
-            </Label>
-            <Input
-              id="loginEmail"
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              placeholder="your@email.com"
-              required
-              className="bg-white/5 border-white/10 text-white mt-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="password" className="text-white">
-              Password
-            </Label>
-            <Input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              placeholder="••••••••"
-              required
-              className="bg-white/5 border-white/10 text-white mt-1"
-            />
-          </div>
-          {!isLoginMode && (
             <div>
-              <Label htmlFor="confirmPassword" className="text-white">
-                Confirm Password
+              <Label htmlFor="password" className="text-white">
+                Password
               </Label>
               <Input
-                id="confirmPassword"
+                id="password"
                 type="password"
-                value={formData.confirmPassword}
+                value={formData.password}
                 onChange={(e) =>
-                  setFormData({ ...formData, confirmPassword: e.target.value })
+                  setFormData({ ...formData, password: e.target.value })
                 }
                 placeholder="••••••••"
-                required={!isLoginMode}
+                required
                 className="bg-white/5 border-white/10 text-white mt-1"
               />
             </div>
-          )}
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#FFB633] text-black hover:bg-[#e5a32e] mt-6"
-          >
-            {loading
-              ? "Please wait..."
-              : isLoginMode
-                ? "Sign In"
-                : "Create Account"}
-          </Button>
-          {isLoginMode && (
-            <div className="text-right -mt-2">
-              <button
-                type="button"
-                onClick={() => setForgotMode(true)}
-                className="text-gray-400 hover:text-[#FFB633] text-xs"
-              >
-                Forgot password?
-              </button>
-            </div>
-          )}
-        </form>
+            {!isLoginMode && (
+              <div>
+                <Label htmlFor="confirmPassword" className="text-white">
+                  Confirm Password
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                  placeholder="••••••••"
+                  required={!isLoginMode}
+                  className="bg-white/5 border-white/10 text-white mt-1"
+                />
+              </div>
+            )}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#FFB633] text-black hover:bg-[#e5a32e] mt-6"
+            >
+              {loading
+                ? "Please wait..."
+                : isLoginMode
+                  ? "Sign In"
+                  : "Create Account"}
+            </Button>
+            {isLoginMode && (
+              <div className="text-right -mt-2">
+                <button
+                  type="button"
+                  onClick={() => setForgotMode(true)}
+                  className="text-gray-400 hover:text-[#FFB633] text-xs"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+          </form>
         )}
         {!forgotMode && (
           <div className="text-center mt-4">
@@ -1734,18 +1907,15 @@ function LoginModal({ isOpen, onClose, onLogin, onRegister, onForgotPassword }) 
 
 // Main Page Component
 export default function HomeClient({ initialServices }) {
-  const {
-    user,
-    login,
-    register,
-    logout,
-    forgotPassword,
-    loading: authLoading,
-  } = useAuth();
-  const { isLoading: servicesLoading } = useServices();
-  const { projects, isLoading: projectsLoading } = useProjects();
-  const { testimonials, isLoading: testimonialsLoading } = useTestimonials();
-  const { profile, isLoading: profileLoading } = useCompanyProfile();
+  const { user, login, register, logout, forgotPassword } = useAuth();
+  // The `isLoading` flags these hooks return are deliberately not read here
+  // any more: nothing on this page should wait for all of them. Each section
+  // renders from the data it has (projects/testimonials default to `[]`, every
+  // `profile` read is optional-chained) and fills in on hydration.
+  useServices();
+  const { projects } = useProjects();
+  const { testimonials } = useTestimonials();
+  const { profile } = useCompanyProfile();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const handleLogout = () => {
@@ -1753,16 +1923,14 @@ export default function HomeClient({ initialServices }) {
     toast.success("Logged out successfully");
   };
 
-  if (
-    authLoading ||
-    profileLoading ||
-    servicesLoading ||
-    projectsLoading ||
-    testimonialsLoading
-  ) {
-    return <Loader />;
-  }
-
+  // No all-or-nothing loading gate.
+  //
+  // This used to return <Loader/> ("Processing…") whenever ANY of five client
+  // queries was still in flight — which, on the server, is all of them. The
+  // rendered HTML therefore contained no hero, no services, no copy at all:
+  // exactly what the SEO audit saw, and why nothing but branded queries could
+  // rank. Every section now renders immediately from whatever it has, and the
+  // two data-driven ones handle their own empty state while loading.
   return (
     <div className="min-h-screen bg-[#0f0f10]">
       <Header
@@ -1771,6 +1939,7 @@ export default function HomeClient({ initialServices }) {
         onLogout={handleLogout}
       />
       <HeroSection profile={profile} />
+      <AboutSection />
       <ServicesSection services={initialServices} />
       <ProjectsSection projects={projects} />
       <TestimonialsSection testimonials={testimonials} />
