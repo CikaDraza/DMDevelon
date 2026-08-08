@@ -7,6 +7,12 @@ import GeoStructuredData from "@/components/geo/GeoStructuredData";
 
 export const viewport = {
   themeColor: "#0f0f10",
+  // Without this, Chrome on Android leaves `100dvh` at its full height when
+  // the on-screen keyboard opens and simply slides the page up — so the chat
+  // composer someone is typing into ends up under the keyboard. `resizes-content`
+  // makes the viewport (and therefore dvh) actually shrink, which is what the
+  // chat's flex column needs to keep the input on screen.
+  interactiveWidget: "resizes-content",
 };
 
 export async function generateMetadata({ params }) {

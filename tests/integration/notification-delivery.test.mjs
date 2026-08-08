@@ -178,6 +178,34 @@ describe("web push delivery", () => {
     expect(row.pushedAt).toBeNull();
   });
 
+  it("the test endpoint reports why a device is or is not reachable", async () => {
+    // "Push doesn't arrive on my phone" has at least five distinct causes and
+    // none are visible from outside. This turns it into an answer.
+    const withoutDevice = await client.post("push/test", {});
+    expect(withoutDevice.status).toBe(200);
+    expect(withoutDevice.body.subscriptions).toBe(0);
+    expect(withoutDevice.body.sent).toBe(0);
+    expect(withoutDevice.body.pushEnabledOnAccount).toBe(true);
+
+    await subscribeToPush(cast.client);
+    const withDevice = await client.post("push/test", {});
+    expect(withDevice.body.subscriptions).toBe(1);
+    expect(withDevice.body.sent).toBe(1);
+    // The host is returned on purpose — it is how you tell one device from
+    // another. The full endpoint is not: its path is a bearer credential for
+    // that browser, and anyone holding it can push to the device.
+    expect(withDevice.body.devices[0].host).toBe("push.test.local");
+    expect(JSON.stringify(withDevice.body)).not.toContain(
+      `push.test.local/${cast.client._id}`,
+    );
+  });
+
+  it("the test endpoint refuses an anonymous caller", async () => {
+    const { callApi } = await import("./harness.mjs");
+    const res = await callApi("POST", "push/test", { body: {} });
+    expect(res.status).toBe(401);
+  });
+
   it("push carries a per-conversation tag so banners replace rather than stack", async () => {
     await subscribeToPush(cast.collaborator);
 

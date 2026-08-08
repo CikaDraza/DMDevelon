@@ -212,7 +212,12 @@ export function ProjectChat({
   }
 
   return (
-    <div className="flex h-full min-h-[500px] bg-[#1a1a1b] border border-white/10 rounded-xl overflow-hidden">
+    // `min-h-0` below md, not a 500px floor. On a phone with the on-screen
+    // keyboard open the visible height drops to ~350px, and a hard floor made
+    // this box taller than the viewport — so the composer at its bottom sat
+    // below the fold and a growing textarea appeared to expand DOWNWARD off
+    // the screen. It never grew the wrong way; the whole column was overflowing.
+    <div className="flex h-full min-h-0 md:min-h-[500px] bg-[#1a1a1b] border border-white/10 rounded-xl overflow-hidden">
       <ChannelSidebar
         channels={channels}
         activeChannelId={activeChannelId}
@@ -224,7 +229,9 @@ export function ProjectChat({
       />
       <div
         className={cn(
-          "flex-1 flex-col min-w-0",
+          // `min-h-0` lets the thread pane give way when the composer grows,
+          // instead of the column pushing past its container.
+          "flex-1 flex-col min-w-0 min-h-0",
           mobileView === "list" ? "hidden md:flex" : "flex",
         )}
       >

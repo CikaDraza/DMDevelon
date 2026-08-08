@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Bell, BellRing, CheckCheck, Share } from "lucide-react";
+import axios from "axios";
+import { Bell, BellRing, CheckCheck, Share, Wifi } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import { usePush } from "@/hooks/usePush";
 import {
@@ -95,10 +97,15 @@ export default function NotificationBell({ variant = "client" }) {
     subscribe,
     iosNeedsInstall,
   } = usePush();
+  const { getAuthHeaders } = useAuth();
   const [open, setOpen] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   const showEnablePush =
     supported && (permission !== "granted" || !isSubscribed);
+  // Only worth offering once this device is actually set up — before that,
+  // "Enable push notifications" above is the useful button.
+  const showTestPush = supported && permission === "granted" && isSubscribed;
 
   const handleEnablePush = async () => {
     if (permission === "denied") {
@@ -122,6 +129,44 @@ export default function NotificationBell({ variant = "client" }) {
     } catch {
       // subscribe() never throws, but guard anyway so the dashboard never breaks
       toast.error("Couldn't enable push notifications.");
+    }
+  };
+
+  // Wiring test, run from the device that is supposedly not receiving pushes.
+  // It bypasses the delivery policy on purpose: the question it answers is
+  // "can the server reach this device at all", which is the one thing you
+  // cannot tell from the outside when a push simply never shows up.
+  const handleTestPush = async () => {
+    setTesting(true);
+    try {
+      const res = await axios.post(
+        "/api/push/test",
+        {},
+        { headers: getAuthHeaders() },
+      );
+      const { sent, subscriptions, vapidConfigured, pushEnabledOnAccount } =
+        res.data || {};
+      if (!vapidConfigured) {
+        toast.error("Server has no VAPID keys configured — push cannot work.");
+      } else if (!pushEnabledOnAccount) {
+        toast.error("Push is switched off for your account in settings.");
+      } else if (!subscriptions) {
+        toast.error(
+          "No device is subscribed on this account. Tap “Enable push notifications” first.",
+        );
+      } else if (sent > 0) {
+        toast.success(
+          `Sent to ${sent} device${sent === 1 ? "" : "s"} — if nothing appears, the OS is blocking it.`,
+        );
+      } else {
+        toast.error(
+          `${subscriptions} subscription${subscriptions === 1 ? "" : "s"} on file but none accepted the push — re-enable it on this device.`,
+        );
+      }
+    } catch {
+      toast.error("Couldn't reach the push test endpoint.");
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -251,6 +296,16 @@ export default function NotificationBell({ variant = "client" }) {
           >
             <BellRing className="w-4 h-4 shrink-0" />
             {busy ? "Enabling…" : "Enable push notifications"}
+          </button>
+        )}
+        {showTestPush && (
+          <button
+            onClick={handleTestPush}
+            disabled={testing}
+            className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-gray-300 hover:bg-white/5 transition-colors disabled:opacity-60"
+          >
+            <Wifi className="w-4 h-4 shrink-0" />
+            {testing ? "Sending…" : "Send a test push to this device"}
           </button>
         )}
         {iosNeedsInstall && (

@@ -27,6 +27,7 @@ import {
   notifyAdmins,
   resolveClientUserId,
 } from "@/lib/notify";
+import { sendPushToUser } from "@/lib/push";
 import { NOTIFICATION_THROTTLE_MS } from "@/lib/notification-policy.mjs";
 import {
   hashPassword,
@@ -1818,6 +1819,48 @@ export async function POST(request, context) {
   try {
     // Tolerate empty/no JSON body (e.g. cron/unsubscribe calls without a payload)
     const body = await request.json().catch(() => ({}));
+
+    // Push - send a test notification to the caller's own devices.
+    //
+    // "Push doesn't arrive on my phone" has at least five distinct causes
+    // (VAPID unset, no subscription saved, subscription expired, the delivery
+    // policy suppressing it, the OS silencing it) and none of them are visible
+    // from the outside. This answers which one it is, for the caller's own
+    // account only, and deliberately bypasses the delivery policy: it is a
+    // wiring test, not a notification.
+    if (pathStr === "push/test") {
+      const user = await requireAuthenticatedUser(request);
+      const subscriptions = await PushSubscription.find({ userId: user._id });
+      const result = await sendPushToUser(user._id, {
+        title: "DMDevelon test",
+        body: "Push notifications are working on this device.",
+        link: "/dashboard",
+      });
+      return NextResponse.json(
+        {
+          ...result,
+          vapidConfigured: Boolean(
+            process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY,
+          ),
+          subscriptions: subscriptions.length,
+          // Enough to tell one device from another without exposing the
+          // endpoint, which is a bearer credential for that browser.
+          devices: subscriptions.map((s) => ({
+            host: (() => {
+              try {
+                return new URL(s.endpoint).host;
+              } catch {
+                return "unknown";
+              }
+            })(),
+            userAgent: (s.userAgent || "").slice(0, 120),
+            createdAt: s.createdAt,
+          })),
+          pushEnabledOnAccount: user.pushNotifications !== false,
+        },
+        { headers: getCorsHeaders() },
+      );
+    }
 
     // Push - save a browser push subscription for the current user
     if (pathStr === "push/subscribe") {

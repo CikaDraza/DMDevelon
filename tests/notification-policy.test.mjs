@@ -30,13 +30,39 @@ test("in-app delivery is never suppressed, whatever the circumstances", () => {
   }
 });
 
-test("an online recipient gets no email or push for conversational types", () => {
+test("reading the conversation right now silences both loud channels", () => {
   const out = resolveDeliveryChannels({
     type: "chat_message",
     recipientOnline: true,
+    recipientViewingConversation: true,
     now: NOW,
   });
   assert.deepEqual(out, { inApp: true, email: false, push: false });
+});
+
+test("being online elsewhere silences the email but NOT the phone", () => {
+  // Presence is per account; push is per device. Treating "the dashboard is
+  // open on a laptop" as reason to skip push silenced the phone in the user's
+  // pocket — the one device push exists for. The bell covers the laptop, so
+  // the email is redundant; the push is not.
+  const out = resolveDeliveryChannels({
+    type: "chat_message",
+    recipientOnline: true,
+    recipientViewingConversation: false,
+    now: NOW,
+  });
+  assert.deepEqual(out, { inApp: true, email: false, push: true });
+});
+
+test("a push to an online recipient is still bounded by the throttle", () => {
+  const out = resolveDeliveryChannels({
+    type: "chat_message",
+    recipientOnline: true,
+    recipientViewingConversation: false,
+    lastPushedAt: minutesAgo(5),
+    now: NOW,
+  });
+  assert.equal(out.push, false, "one push per conversation per window");
 });
 
 test("an offline recipient with no prior delivery gets everything", () => {

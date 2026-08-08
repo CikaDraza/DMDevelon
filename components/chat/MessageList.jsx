@@ -11,24 +11,35 @@ import { ArrowDown, Loader2 } from "lucide-react";
 const NEAR_BOTTOM_PX = 100;
 // Scroll position that triggers loading the previous page.
 const LOAD_MORE_AT_PX = 80;
+// How long after a programmatic scroll to ignore scroll events for intent
+// detection. Smooth scrolling emits events for a while after the call, and
+// treating those as "the user scrolled" is what breaks stick-to-bottom.
+const PROGRAMMATIC_SCROLL_MS = 400;
 // Safety cap for the jump-to-message history walk: 20 pages × 50 = 1000
 // messages back. Past that, ask the reader to scroll rather than hammering
 // the API.
 const MAX_JUMP_PAGES = 20;
 
 /**
- * Scrolling thread with backward pagination: scrolling near the top loads
- * older history (useChatMessages' `before` cursor) and the scroll position is
- * preserved across that prepend, instead of jumping.
+ * Scrolling thread with backward pagination.
  *
- * Scroll contract (this is the part users actually notice):
- *  - Opening a channel lands on the LAST message, every time — including when
- *    the page was served from cache and when attachments finish loading after
- *    the first paint.
- *  - Sending a message always scrolls to the bottom, even if you had scrolled
- *    up to re-read something before typing.
- *  - Someone else's message while you are reading history does NOT yank you
- *    down; it raises the "New messages" pill instead.
+ * The scroll model is "stick to bottom until the reader says otherwise",
+ * not "scroll to the bottom once on load". The one-shot version had a race
+ * that put people in the middle of a long conversation, every time:
+ *
+ *   1. first paint consumes the one-shot flag and queues a scroll for the
+ *      next frame;
+ *   2. in that gap a scroll event fires with scrollTop still 0;
+ *   3. `scrollTop < 80` + `hasMoreHistory` reads as "reader scrolled up to
+ *      read history" and loads the previous page;
+ *   4. the prepend restores the position of the OLD top — the middle of the
+ *      thread — and the one-shot flag is already spent, so nothing pulls it
+ *      back down.
+ *
+ * It only bit channels with a full first page (50+ messages), which is why it
+ * looked intermittent. Two rules kill it: history never loads until the view
+ * has actually settled at the bottom, and only a scroll the READER performed
+ * can end stick-to-bottom mode (`programmaticUntilRef`).
  */
 export function MessageList({
   channelId,
@@ -68,10 +79,16 @@ export function MessageList({
   const endRef = useRef(null);
   const prevLengthRef = useRef(0);
   const prevLastMessageIdRef = useRef(null);
-  const isInitialLoadRef = useRef(true);
-  // While true, late layout changes (an image finishing, a font swapping) keep
-  // the view pinned to the newest message.
-  const isNearBottomRef = useRef(true);
+  // The reader is following the live end of the conversation. True until they
+  // scroll up themselves; nothing the component does to the scroll position
+  // may flip it.
+  const stickToBottomRef = useRef(true);
+  // False until the view has actually been pinned to the bottom at least once
+  // for this thread. Gates history loading — see the class comment.
+  const settledRef = useRef(false);
+  // Scroll events before this timestamp came from us, not from the reader.
+  const programmaticUntilRef = useRef(0);
+
   const [highlightedId, setHighlightedId] = useState(null);
   // Message to return to after jumping up to a quoted reply — cleared once
   // the user actually jumps back (or switches channels/reply targets again).
@@ -90,80 +107,85 @@ export function MessageList({
   pendingJumpRef.current =
     !!jumpRequest?.nonce && jumpRequest.nonce !== handledJumpNonceRef.current;
 
-  // ── channel / filter switch → reset everything ─────────────────────
-  // The filter and the search term are part of this: each produces a
-  // different React Query key, i.e. a different thread of messages, and the
-  // view must land at its bottom just like a channel switch does. Resetting
-  // prevLengthRef matters too — leaving a previous channel's 50 behind made
-  // the first genuinely-new message in a short channel look like a prepend.
+  // ── channel / filter switch → back to following the end ────────────
+  // The filter and the search term count as a switch: each is a different
+  // query, i.e. a different thread, and must open at its own bottom.
   useEffect(() => {
-    isInitialLoadRef.current = true;
-    isNearBottomRef.current = true;
+    stickToBottomRef.current = true;
+    settledRef.current = false;
+    programmaticUntilRef.current = 0;
     setShowScrollButton(false);
     setJumpBackId(null);
     prevLengthRef.current = 0;
     prevLastMessageIdRef.current = null;
   }, [channelId, flag, search]);
 
-  // ── scroll-to-bottom helper ────────────────────────────────────────
-  const scrollToBottom = useCallback((smooth = false) => {
+  // ── pin to bottom ──────────────────────────────────────────────────
+  const pinToBottom = useCallback((smooth = false) => {
+    // A smooth scroll keeps emitting scroll events for a few hundred ms after
+    // the call returns; reading intent out of those would flip stick-to-bottom
+    // off mid-animation. An INSTANT scroll lands in one go, so it needs no
+    // window at all — and must not have one, or a reader who scrolls up right
+    // after opening the channel would be ignored.
+    if (smooth) {
+      programmaticUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
+    }
     // Double rAF: the first waits for React's commit, the second for the
     // browser to finish layout. A single rAF often fires before the DOM is
-    // laid out, landing the "initial" scroll somewhere mid-thread.
+    // laid out, landing the scroll somewhere mid-thread.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const el = containerRef.current;
         if (!el) return;
         if (smooth) {
+          programmaticUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
           el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
         } else {
           el.scrollTop = el.scrollHeight;
+          programmaticUntilRef.current = 0;
         }
+        // Only now is history loading allowed: the view is where it belongs.
+        settledRef.current = true;
       });
     });
   }, []);
 
-  // ── smart auto-scroll ──────────────────────────────────────────────
-  // Compares both message count AND the last message id so a history prepend
-  // (more messages at the top, same last id) is not mistaken for a new
-  // message arriving at the bottom.
+  // ── follow the conversation ────────────────────────────────────────
   useEffect(() => {
     if (messages.length === 0) return;
-
-    // Don't consume the one-shot initial scroll while the query is still
-    // resolving — scrollHeight would reflect a half-rendered thread.
+    // Don't act while the query is still resolving — scrollHeight would
+    // reflect a half-rendered thread.
     if (isLoading) return;
 
     const lastMessage = messages[messages.length - 1];
     const lastId = lastMessage?._id;
     const lengthIncreased = messages.length > prevLengthRef.current;
     const isNewAtBottom = lastId !== prevLastMessageIdRef.current;
-    const isFirstPaint = isInitialLoadRef.current;
+    const isFirstPaint = !settledRef.current;
 
-    // Whether the newest message is the viewer's own. Sending must always win
-    // over the "don't yank someone who is reading history" rule: they just
-    // acted, so showing them the result is what they asked for. This also
-    // covers sending from a second device.
+    // Whether the newest message is the reader's own. Sending always wins over
+    // "don't yank someone who is reading history": they just acted, so showing
+    // them the result is what they asked for. Covers a second device too.
     const lastIsMine =
       !!currentUserId &&
       String(lastMessage?.authorUserId) === String(currentUserId);
 
     if (isFirstPaint) {
-      // …unless a jump is already queued for this commit. Clearing the header
-      // filters to reach a pinned/deep-linked message changes the query key,
-      // which counts as a fresh thread here — without this guard the two would
-      // race and the reader would be dropped at the bottom instead of on the
-      // message they clicked.
-      if (!pendingJumpRef.current) {
-        scrollToBottom(false);
-        isNearBottomRef.current = true;
+      // …unless a jump is queued for this commit. Clearing the header filters
+      // to reach a pinned/deep-linked message changes the query key, which
+      // counts as a fresh thread here; without this the two would race and the
+      // reader would land at the bottom instead of on the message they clicked.
+      if (pendingJumpRef.current) {
+        settledRef.current = true;
+      } else {
+        stickToBottomRef.current = true;
+        pinToBottom(false);
       }
-      isInitialLoadRef.current = false;
     } else if (lengthIncreased && isNewAtBottom) {
-      if (isNearBottomRef.current || lastIsMine) {
-        isNearBottomRef.current = true;
+      if (stickToBottomRef.current || lastIsMine) {
+        stickToBottomRef.current = true;
         setShowScrollButton(false);
-        scrollToBottom(true);
+        pinToBottom(true);
       } else {
         setShowScrollButton(true);
       }
@@ -171,31 +193,32 @@ export function MessageList({
 
     prevLengthRef.current = messages.length;
     prevLastMessageIdRef.current = lastId;
-  }, [messages, isLoading, currentUserId, scrollToBottom]);
+  }, [messages, isLoading, currentUserId, pinToBottom]);
 
-  // Explicit request from the composer. The effect above already handles the
+  // Explicit request from the composer. The effect above already covers the
   // usual case, but this fires the instant the mutation resolves rather than
   // waiting for the refetch, so the thread never appears to ignore a send.
   useEffect(() => {
     if (!scrollRequest) return;
-    isNearBottomRef.current = true;
+    stickToBottomRef.current = true;
     setShowScrollButton(false);
-    scrollToBottom(true);
-  }, [scrollRequest, scrollToBottom]);
+    pinToBottom(true);
+  }, [scrollRequest, pinToBottom]);
 
   // Late layout: attachments, images and embedded previews resolve AFTER the
   // first paint and grow the thread underneath the viewport, which is what
-  // made "open a channel with images" land halfway up. Re-pin to the bottom
-  // while the reader is still following along; the moment they scroll up,
-  // isNearBottomRef goes false and this stops touching their position.
+  // made "open a channel with images" land halfway up. Keep the end in view
+  // while the reader is still following; the moment they scroll up,
+  // stickToBottomRef goes false and this stops touching their position.
   useEffect(() => {
     const el = containerRef.current;
     const content = contentRef.current;
     if (!el || !content || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
-      if (isNearBottomRef.current) {
-        el.scrollTop = el.scrollHeight;
-      }
+      if (!stickToBottomRef.current) return;
+      // Instant, so no guard window: the echo event this causes lands at the
+      // bottom and simply re-confirms stick-to-bottom.
+      el.scrollTop = el.scrollHeight;
     });
     // One observation on the content wrapper, not one per message row: the
     // wrapper's identity is stable, so this hooks up once per mount instead of
@@ -253,28 +276,43 @@ export function MessageList({
     const el = containerRef.current;
     if (!el) return;
 
-    // ── near-bottom detection ────────────────────────────────────
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
     const nearBottom = dist < NEAR_BOTTOM_PX;
-    isNearBottomRef.current = nearBottom;
 
+    // Our own scrolling, echoing back. Reading intent out of it is exactly how
+    // stick-to-bottom used to be lost mid-animation.
+    if (Date.now() < programmaticUntilRef.current) {
+      if (nearBottom) setShowScrollButton(false);
+      return;
+    }
+
+    stickToBottomRef.current = nearBottom;
     if (nearBottom) {
-      setShowScrollButton(false); // user caught up → dismiss pill
+      setShowScrollButton(false); // reader caught up → dismiss pill
     }
 
     // ── infinite scroll upward ────────────────────────────────────
+    // Never before the view has settled at the bottom: on open, scrollTop is
+    // legitimately 0 for a frame or two, and treating that as "show me older
+    // messages" is what dropped people into the middle of the conversation.
     if (
+      settledRef.current &&
       !isLoadingMoreHistory &&
       hasMoreHistory &&
       el.scrollTop < LOAD_MORE_AT_PX
     ) {
       const prevHeight = el.scrollHeight;
+      const prevTop = el.scrollTop;
       loadMoreHistory().then(() => {
         requestAnimationFrame(() => {
-          if (containerRef.current) {
-            containerRef.current.scrollTop =
-              containerRef.current.scrollHeight - prevHeight;
-          }
+          const node = containerRef.current;
+          if (!node) return;
+          // Keep whatever the reader was looking at exactly where it was:
+          // the content grew above them by (new - old), so their offset moves
+          // by the same amount. Anchoring to 0 instead of prevTop drifted the
+          // view a little further up with every page.
+          programmaticUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
+          node.scrollTop = node.scrollHeight - prevHeight + prevTop;
         });
       });
     }
@@ -284,10 +322,12 @@ export function MessageList({
   const scrollToMessage = useCallback((id) => {
     const el = containerRef.current?.querySelector(`[data-message-id="${id}"]`);
     if (!el) return false;
+    programmaticUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Jumping away from the bottom means the reader is no longer following
-    // live; without this the ResizeObserver above would drag them back down.
-    isNearBottomRef.current = false;
+    // Jumping away from the end means the reader is no longer following live;
+    // without this the ResizeObserver would drag them back down.
+    stickToBottomRef.current = false;
+    settledRef.current = true;
     setHighlightedId(id);
     setTimeout(() => {
       setHighlightedId((current) => (current === id ? null : current));
@@ -319,8 +359,8 @@ export function MessageList({
   useEffect(() => {
     if (!jumpRequest?.messageId) return;
     const targetId = jumpRequest.messageId;
-    // Claim the nonce immediately: from here on the auto-scroll effect is free
-    // to behave normally again (a prepend never scrolls to the bottom anyway).
+    // Claim the nonce immediately: from here on the follow effect is free to
+    // behave normally again (a prepend never pins to the bottom anyway).
     handledJumpNonceRef.current = jumpRequest.nonce;
     let cancelled = false;
 
@@ -340,9 +380,8 @@ export function MessageList({
 
       setIsSeeking(true);
       try {
-        // Sit at the top so the loader below is the only thing moving the
-        // scroll position while we page back.
-        if (containerRef.current) containerRef.current.scrollTop = 0;
+        stickToBottomRef.current = false;
+        settledRef.current = true;
 
         let pages = 0;
         while (
@@ -381,10 +420,10 @@ export function MessageList({
   }, [jumpBackId, scrollToMessage]);
 
   const handleScrollToBottom = useCallback(() => {
-    isNearBottomRef.current = true;
-    scrollToBottom(true);
+    stickToBottomRef.current = true;
+    pinToBottom(true);
     setShowScrollButton(false);
-  }, [scrollToBottom]);
+  }, [pinToBottom]);
 
   // Stable handler identities — MessageBubble is memoized and a fresh closure
   // per row would defeat it. Each takes the message id as an argument instead
@@ -407,11 +446,14 @@ export function MessageList({
   );
 
   return (
-    <div className="relative flex-1 min-h-[200px] flex flex-col">
+    // min-h-0 (not a px floor) so this pane can actually shrink inside its
+    // flex column. With a floor, a growing composer pushed the column past the
+    // viewport and the input slid off the bottom of the screen on a phone.
+    <div className="relative flex-1 min-h-0 flex flex-col">
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto overscroll-contain"
       >
         <div ref={contentRef} className="px-4 py-4 space-y-3">
           {(isLoadingMoreHistory || isSeeking) && (

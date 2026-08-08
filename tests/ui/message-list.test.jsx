@@ -115,6 +115,74 @@ describe("opening a channel", () => {
     await waitFor(() => expect(box.scrollTop).toBe(1600));
   });
 
+  it("does not load older history before it has settled at the bottom", async () => {
+    // The regression that put people in the middle of a long conversation.
+    // On open, scrollTop is legitimately 0 for a frame or two while the
+    // scroll-to-bottom is queued. A scroll event in that window used to read
+    // as "the reader scrolled up to see history", load the previous page, and
+    // restore the position of the OLD top — i.e. the middle — with the
+    // one-shot scroll flag already spent, so nothing pulled it back down.
+    //
+    // It only bit channels with a full first page, which is why it looked
+    // intermittent.
+    hookState.messages = Array.from({ length: 50 }, (_, i) => message(`m-${i}`));
+    hookState.hasMoreHistory = true;
+
+    const { container } = renderThread();
+    const box = scrollBox(container);
+    giveContainerGeometry(box, { scrollHeight: 4000, clientHeight: 400 });
+
+    // A scroll event at the top, before the initial pin has run.
+    await act(async () => {
+      box.dispatchEvent(new Event("scroll"));
+    });
+    expect(loadMoreHistory).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(box.scrollTop).toBe(3600));
+  });
+
+  it("a smooth follow-scroll's own events don't count as scrolling away", async () => {
+    // A smooth scroll keeps emitting events after the call returns, with the
+    // position still mid-flight near the top. Reading intent out of those
+    // flipped stick-to-bottom off during the animation, so the message right
+    // after raised the pill instead of following. Instant scrolls get no such
+    // window — see the test above, where a reader scrolling up immediately
+    // after open must still be honoured.
+    hookState.messages = Array.from({ length: 20 }, (_, i) => message(`m-${i}`));
+    const { container, rerender } = renderThread();
+    const box = scrollBox(container);
+    giveContainerGeometry(box, { scrollHeight: 2000, clientHeight: 400 });
+    await waitFor(() => expect(box.scrollTop).toBe(1600));
+
+    // Someone else's message → smooth follow, which opens the guard window.
+    hookState.messages = [...hookState.messages, message("first", "them")];
+    const queryClient = new QueryClient();
+    await act(async () => {
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <MessageList channelId="chan-1" currentUserId="me" />
+        </QueryClientProvider>,
+      );
+    });
+
+    // Mid-animation echo, reported near the top.
+    await act(async () => {
+      box.scrollTop = 100;
+      box.dispatchEvent(new Event("scroll"));
+    });
+
+    hookState.messages = [...hookState.messages, message("second", "them")];
+    await act(async () => {
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <MessageList channelId="chan-1" currentUserId="me" />
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(screen.queryByText("New messages")).toBeNull();
+  });
+
   it("still lands at the bottom when the page came from cache", async () => {
     // The cached-data path is the one that regressed: `isLoading` is already
     // false on the very first render, so the effect has to handle a thread

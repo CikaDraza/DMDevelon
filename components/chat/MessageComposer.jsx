@@ -36,7 +36,13 @@ const FLAG_OPTIONS = [
   { value: "decision", label: "Decision" },
 ];
 
-const MAX_TEXTAREA_HEIGHT = 200;
+// How tall the input may grow before it starts scrolling internally. The
+// composer sits at the bottom of a flex column, so growth pushes the thread
+// up — but only as far as the column can give. On a phone with the keyboard
+// open there is far less to give, so the cap is lower there: past roughly six
+// lines the input would otherwise eat the entire conversation.
+const MAX_TEXTAREA_HEIGHT_DESKTOP = 200;
+const MAX_TEXTAREA_HEIGHT_MOBILE = 120;
 
 // File extensions the composer also accepts when the browser does not report
 // a MIME type (common on mobile, or for .doc/.docx on some OS configs).
@@ -74,20 +80,31 @@ export function MessageComposer({
   const textareaRef = useRef(null);
   const fileRef = useRef(null);
 
-  // Mobile gets 3 visible rows for easier typing; desktop keeps 1.
-  const [textareaRows, setTextareaRows] = useState(1);
+  // Mobile gets 2 visible rows for easier typing; desktop keeps 1. (Three rows
+  // plus a 200px growth cap left almost nothing of the conversation visible on
+  // a phone once the keyboard was up.)
+  const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    setTextareaRows(mq.matches ? 3 : 1);
-    const handler = (e) => setTextareaRows(e.matches ? 3 : 1);
+    setIsMobile(mq.matches);
+    const handler = (e) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
+  const textareaRows = isMobile ? 2 : 1;
+  const maxTextareaHeight = isMobile
+    ? MAX_TEXTAREA_HEIGHT_MOBILE
+    : MAX_TEXTAREA_HEIGHT_DESKTOP;
 
+  // The input grows upward because it is the LAST child of a bottom-anchored
+  // flex column: adding height here pushes the thread above it up rather than
+  // extending past the bottom edge. That only holds while the column is free
+  // to shrink — hence `min-h-0` on the thread pane and no fixed floor on the
+  // chat shell (ProjectChat.jsx).
   const autoGrow = (el) => {
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, maxTextareaHeight)}px`;
   };
 
   const handleChange = (e) => {
@@ -258,7 +275,9 @@ export function MessageComposer({
         </div>
       )}
 
-      <div className="flex items-center gap-2 px-3 md:px-4 py-3">
+      {/* items-end, not items-center: once the textarea grows past one line the
+          buttons belong on its baseline, not floating halfway up it. */}
+      <div className="flex items-end gap-2 px-3 md:px-4 py-3">
         <input
           ref={fileRef}
           type="file"
@@ -376,7 +395,7 @@ export function MessageComposer({
             placeholder="Type a message… (Enter for new line, Ctrl+Enter to send)"
             rows={textareaRows}
             className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#FFB633]/50 resize-none overflow-y-auto"
-            style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
+            style={{ maxHeight: maxTextareaHeight }}
           />
           {mentionCandidates.length > 0 && (
             <div className="absolute bottom-full mb-1 left-0 w-56 bg-[#1a1a1b] border border-white/10 rounded-lg shadow-lg overflow-hidden z-10">

@@ -67,7 +67,9 @@ function ChatPageInner() {
 
       {/* Chat fills the rest */}
       <main className="flex-1 min-h-0">
-        <div className="container mx-auto px-4 py-8 h-full">
+        {/* Tighter vertical padding on a phone: 64px of it was coming straight
+            out of the space the composer needs once the keyboard is up. */}
+        <div className="container mx-auto px-2 py-3 sm:px-4 md:py-8 h-full min-h-0">
           <ProjectChat
             viewerRole="client"
             initialChannelId={searchParams.get("channel")}

@@ -212,18 +212,68 @@ describe("delivery suppression", () => {
     expect(emailsToCollaborator()).toHaveLength(0);
   });
 
-  it("someone with the app open is not pushed for ordinary chatter", async () => {
+  it("someone reading THIS conversation is not pushed for ordinary chatter", async () => {
+    const { default: User } = await import("@/models/User");
+    const { default: ChatRead } = await import("@/models/ChatRead");
+    await User.updateOne(
+      { _id: cast.collaborator._id },
+      { $set: { lastActiveAt: new Date() } },
+    );
+    // A fresh read receipt on this channel is what "they are looking at it
+    // right now" actually means.
+    await ChatRead.updateOne(
+      { channelId, userId: cast.collaborator._id },
+      { $set: { lastReadAt: new Date() } },
+      { upsert: true },
+    );
+
+    await sendAndSettle("Are you seeing this?");
+
+    // The in-app record is always written — only the loud channels are cut.
+    expect(await notificationsFor(cast.collaborator)).toHaveLength(1);
+    expect(pushesToCollaborator()).toHaveLength(0);
+  });
+
+  it("someone online elsewhere still gets the push on their phone", async () => {
+    // Presence is per ACCOUNT; push is per DEVICE. Having the dashboard open
+    // on a laptop used to silence the phone in your pocket for a full hour —
+    // the reported "I stopped getting push on my phone". The email is still
+    // suppressed (the bell on the laptop covers that); the push is not.
     const { default: User } = await import("@/models/User");
     await User.updateOne(
       { _id: cast.collaborator._id },
       { $set: { lastActiveAt: new Date() } },
     );
+    // Deliberately no ChatRead row: active somewhere, but not in this channel.
 
-    await sendAndSettle("Are you seeing this?");
+    await sendAndSettle("Are you seeing this on your phone?");
 
-    // The in-app record is always written — only the loud channel is cut.
-    expect(await notificationsFor(cast.collaborator)).toHaveLength(1);
-    expect(pushesToCollaborator()).toHaveLength(0);
+    expect(pushesToCollaborator()).toHaveLength(1);
+    expect(emailsToCollaborator()).toHaveLength(0);
+  });
+
+  it("a stale read receipt does not count as reading it now", async () => {
+    const { default: User } = await import("@/models/User");
+    const { default: ChatRead } = await import("@/models/ChatRead");
+    await User.updateOne(
+      { _id: cast.collaborator._id },
+      { $set: { lastActiveAt: new Date() } },
+    );
+    await ChatRead.updateOne(
+      { channelId, userId: cast.collaborator._id },
+      {
+        $set: {
+          lastReadAt: new Date(
+            Date.now() - PRESENCE_ONLINE_THRESHOLD_MS - 5_000,
+          ),
+        },
+      },
+      { upsert: true },
+    );
+
+    await sendAndSettle("You read this channel a while ago");
+
+    expect(pushesToCollaborator()).toHaveLength(1);
   });
 
   it("someone last seen beyond the presence window is pushed", async () => {

@@ -6,7 +6,7 @@ Ovde se označava šta je urađeno, a šta nije.
 Legenda: `[ ]` nije urađeno · `[x]` urađeno · `[~]` u toku · `[-]` odloženo / preskočeno uz obrazloženje
 
 Status: **Faza 1 u toku — sekcije 1–12 kod-kompletne, plus 12b/12c/12d/12e i 12f (isporuka notifikacija, chat scroll, pin i optimizacija). Sledeća: Sekcija 13 (finalna verifikacija/regresija) — traži dva browsera i dozvolu za pisanje u pravu bazu.**
-Poslednje ažuriranje: 2026-08-08 · **354 testa, sve prolazi**: `npm test` 161 (čiste funkcije, `node --test`) + `npm run test:api` 175 (integracioni, pravi route handleri protiv jednokratne Mongo replike) + `npm run test:ui` 18 (jsdom, chat komponente). `npm run build` prolazi; `npx tsc --noEmit` čist; `pyright` čist. Sekcije 4, 5, 6 i 10 uživo testirane protiv produkcione baze sa jednorazno kreiranim, potom obrisanim test podacima (uz izričitu dozvolu pre svakog destruktivnog koraka)
+Poslednje ažuriranje: 2026-08-08 · **362 testa, sve prolazi**: `npm test` 163 (čiste funkcije, `node --test`) + `npm run test:api` 177 (integracioni, pravi route handleri protiv jednokratne Mongo replike) + `npm run test:ui` 20 (jsdom, chat komponente + zvono). `npm run build` prolazi; `npx tsc --noEmit` čist; `pyright` čist. Sekcije 4, 5, 6 i 10 uživo testirane protiv produkcione baze sa jednorazno kreiranim, potom obrisanim test podacima (uz izričitu dozvolu pre svakog destruktivnog koraka)
 
 v3 dopuna ugrađena pre Sekcije 4: **cross-cutting invarijante I1–I10** (sekcija 3A, razrada u planu 4A) i **životni ciklus projekta / preživljavanje istorije** (plan 5A). Modeli su već usklađeni sa I5 i I10 — `dmKey`, `ProjectMember.name/email`, `ChatRead.clearedAt`, `ClientProject.ownerAccountDeletedAt`.
 
@@ -593,6 +593,55 @@ Korisnikov izveštaj: „notifikacije i push kao PWA rade povremeno", „mejlovi
   - [-] `checkJs: true` namerno **nije** uključen: daje **~1374** nalaza kroz ceo kodbejz (uglavnom React Query mutation generici koji se izvode kao `void` i Radix `forwardRef` prop inference) — to je zaseban posao, ne nalaz ove runde. Jedini pravi nalaz u dodirnutim fajlovima (prefetch poziv bez `flag`/`q`) je ispravljen default vrednostima
 - [x] `pyright backend_test.py tests/__init__.py` — 0 errors, 0 warnings
 - [-] **Uživo u browseru nije testirano od strane asistenta** — scroll i push traže pravi uređaj/sesiju; ostaje na korisniku
+
+---
+
+## 12g. Druga runda posle korisnikovog testiranja (2026-08-08)
+
+Prijava: „ne dobijam push na telefonu", „scroll opet ne radi — otvori poruke na pola prepiski", „textarea na mobilnom ide ispod ekrana preko 6 redova".
+
+### Scroll — prava trka, ne podešavanje
+
+Prethodna runda je i dalje koristila **one-shot** flag (`isInitialLoadRef`). Lanac koji ga obara:
+
+1. prvi paint troši flag i **zakazuje** scroll za sledeći frejm;
+2. u toj rupi stigne scroll event sa `scrollTop` još uvek 0;
+3. `scrollTop < 80` + `hasMoreHistory` se čita kao „korisnik je skrolovao gore po istoriju" → učita se prethodna stranica;
+4. restore vraća poziciju **starog vrha** — sredinu prepiske — a flag je već potrošen, pa ništa ne vraća dole.
+
+Grizlo je samo kanale sa punom prvom stranicom (50+ poruka), zato je izgledalo povremeno.
+
+- [x] Model promenjen sa „skroluj dole jednom" na **„drži se dna dok korisnik ne kaže drugačije"** (`stickToBottomRef`)
+- [x] **Istorija se ne učitava dok se pogled nije slegao na dno** (`settledRef`) — `scrollTop` je legitimno 0 par frejmova pri otvaranju
+- [x] **Samo scroll koji je korisnik napravio** gasi praćenje (`programmaticUntilRef`). Smooth scroll emituje evente i posle poziva; instant ne dobija prozor uopšte, da korisnik koji odmah po otvaranju skroluje gore ne bi bio ignorisan
+- [x] Restore posle prepend-a koristi **stvarni prethodni `scrollTop`**, ne 0 — ranije je pogled odlutao naviše sa svakom stranicom
+
+### Layout — textarea nije rastao naopako, cela kolona je prelivala
+
+- [x] `ProjectChat` je imao **`min-h-[500px]`**. Sa otvorenom tastaturom na telefonu vidljiva visina padne na ~350px, pa je kutija bila viša od ekrana → composer na njenom dnu ispod preloma, a rast textarea izgleda kao širenje **nadole van ekrana**. Sad `min-h-0 md:min-h-[500px]`
+- [x] `MessageList` `min-h-[200px]` → `min-h-0`; unutrašnja kolona dobila `min-h-0` — bez toga thread ne može da ustupi mesto composeru
+- [x] `viewport.interactiveWidget = "resizes-content"` — bez toga Chrome na Androidu ne smanjuje `dvh` kad se tastatura otvori, nego samo gurne stranicu naviše
+- [x] Mobilni cap rasta 200px → **120px**, početni `rows` 3 → 2 (200px na telefonu je pojelo ceo razgovor); `items-center` → `items-end` u redu composera
+- [x] `py-8` → `py-3` na telefonu na `/dashboard/chat`
+
+### Push — presence je bio po NALOGU, a push je po UREĐAJU
+
+Uzrok „ne dobijam push na telefonu": `resolveDeliveryChannels` je gasio push čim je nalog bio „online". Otvoren dashboard na laptopu = **telefon ćuti sat vremena** — baš uređaj zbog kog push i postoji.
+
+- [x] Uvedena razlika: `recipientOnline` (nalog aktivan bilo gde) vs **`recipientViewingConversation`** (pročitao BAŠ ovaj kanal unutar prozora, iz postojećeg `ChatRead.lastReadAt` — bez novog state-a)
+  - čita razgovor → nema ni mejla ni push-a
+  - aktivan negde drugde → **nema mejla** (zvono na laptopu to pokriva), **push ide**, i dalje ograničen throttle-om na jedan po razgovoru na sat
+  - offline → oba, po throttle-u
+- [x] `POST /api/push/test` + dugme **„Send a test push to this device"** u zvonu — „push ne radi" ima najmanje pet različitih uzroka (nema VAPID ključeva · nijedna pretplata · istekla pretplata · politika isporuke · OS blokira) i nijedan se ne vidi spolja. Endpoint zaobilazi politiku namerno: to je provera ožičenja, ne notifikacija. Vraća `sent/failed/pruned`, broj pretplata, host i user-agent po uređaju — **nikad pun endpoint URL**, jer je njegova putanja bearer kredencijal za taj browser
+
+### Testovi
+
+- [x] `tests/ui/message-list.test.jsx` +2: istorija se NE učitava pre nego što se pogled slegao (regresija sredine prepiske); smooth follow-scroll ne broji svoje evente kao korisnikov scroll
+- [x] `tests/notification-policy.test.mjs` +2 / izmenjen 1: čitanje razgovora gasi oba kanala; online negde drugde gasi mejl ali **ne** push; push i tada poštuje throttle
+- [x] `tests/integration/chat-notifications.test.mjs`: „online negde drugde i dalje dobija push na telefon", „star read receipt ne znači da čita sada"
+- [x] `tests/integration/notification-delivery.test.mjs` +2: `push/test` izveštaj sa i bez uređaja, i 401 za anonimnog
+
+**Verifikacija:** 163 (`npm test`) + 199 (`vitest`: 177 API + 20 UI + smoke) = **362 testa, sve prolazi**. `npm run build` prolazi, `npx tsc --noEmit` čist, `pyright` čist. Scroll i push na pravom telefonu ostaju na korisniku — dugme „Send a test push to this device" je tu baš zato.
 
 ---
 
