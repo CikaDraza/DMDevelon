@@ -1,8 +1,55 @@
 'use client';
 
+import { useEffect, useMemo, useRef } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from './useAuth';
+
+// The server's page size. Kept here as the single source of truth: the
+// pagination cursor logic below and the prefetch helper both need it, and two
+// copies would drift.
+export const CHAT_PAGE_SIZE = 50;
+
+/**
+ * The exact React Query key `useChatMessages` uses. Exported so a prefetch
+ * writes into the same cache entry the mounted thread will read — a key that
+ * is merely "similar" would prefetch into a slot nothing ever looks at.
+ */
+export function chatMessagesQueryKey(channelId, { flag, q } = {}) {
+  return ['chat-messages', channelId, { flag: flag || 'all', q: q || '' }];
+}
+
+// One page fetch, shared by the hook and the prefetcher. `flag`/`q` default to
+// the unfiltered view — the prefetcher only ever primes that one.
+async function fetchChatMessagePage({
+  channelId,
+  pageParam = null,
+  flag = null,
+  q = "",
+  headers,
+}) {
+  const params = new URLSearchParams();
+  if (pageParam) params.set('before', pageParam);
+  if (flag && flag !== 'all') {
+    // "attachment:image"/"attachment:document" are the one filter value that
+    // isn't a message flag — translate to the server's separate attachmentType
+    // param (image|pdf) instead of sending it as `flag`.
+    if (flag.startsWith('attachment:')) {
+      params.set(
+        'attachmentType',
+        flag === 'attachment:image' ? 'image' : 'pdf',
+      );
+    } else {
+      params.set('flag', flag);
+    }
+  }
+  if (q) params.set('q', q);
+  const res = await axios.get(
+    `/api/chat/channels/${channelId}/messages?${params.toString()}`,
+    { headers },
+  );
+  return res.data; // oldest-first within this page
+}
 
 // Every channel visible to the caller, with unread count and a last-message
 // preview already attached (GET /api/chat/channels does the lazy group-
@@ -48,6 +95,57 @@ export function useChatChannels() {
   };
 }
 
+/**
+ * Warm the latest page of every visible channel once, so switching channels
+ * paints instantly instead of showing "Loading…" on each first visit.
+ *
+ * Deliberately narrow so this does not become a second polling budget (I8):
+ *  - each channel is prefetched AT MOST ONCE per session (`primedRef`),
+ *  - only the unfiltered view is primed, which is the one a channel opens in,
+ *  - `staleTime` keeps the mounted thread's own 4s poll as the only repeat
+ *    traffic — a prefetch never schedules anything of its own.
+ * `MAX_PREFETCH` bounds the burst for an operator whose sidebar lists every
+ * project on the platform.
+ */
+const MAX_PREFETCH = 12;
+
+export function usePrefetchChannelMessages(channels) {
+  const queryClient = useQueryClient();
+  const { getAuthHeaders, isAuthenticated } = useAuth();
+  const primedRef = useRef(new Set());
+
+  useEffect(() => {
+    if (!isAuthenticated || !Array.isArray(channels) || channels.length === 0) {
+      return;
+    }
+    const todo = channels
+      .filter((c) => c?._id && !primedRef.current.has(c._id))
+      .slice(0, MAX_PREFETCH);
+    if (todo.length === 0) return;
+
+    for (const channel of todo) {
+      primedRef.current.add(channel._id);
+      queryClient
+        .prefetchInfiniteQuery({
+          queryKey: chatMessagesQueryKey(channel._id),
+          initialPageParam: null,
+          staleTime: 4000,
+          queryFn: ({ pageParam }) =>
+            fetchChatMessagePage({
+              channelId: channel._id,
+              pageParam,
+              headers: getAuthHeaders(),
+            }),
+        })
+        .catch(() => {
+          // A channel that fails to prime just loads normally when opened;
+          // allow a later attempt rather than marking it done forever.
+          primedRef.current.delete(channel._id);
+        });
+    }
+  }, [channels, isAuthenticated, queryClient, getAuthHeaders]);
+}
+
 // Pinned messages for one channel — its own small query since the pinned bar
 // (Section 11) renders independently of the main scroll-back thread below.
 export function useChatPinned(channelId) {
@@ -87,39 +185,31 @@ export function useChatMessages(channelId, { flag, q } = {}) {
   };
 
   const messagesQuery = useInfiniteQuery({
-    queryKey: ['chat-messages', channelId, { flag: flag || 'all', q: q || '' }],
+    queryKey: chatMessagesQueryKey(channelId, { flag, q }),
     enabled: isAuthenticated && !!channelId,
     refetchInterval: 4000,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    // `staleTime: 0` + `refetchOnMount: 'always'` used to mean a prefetched or
+    // cached channel STILL showed "Loading…" on open. A short staleTime lets
+    // the primed page paint immediately while the 4s poll (and the
+    // notification poll's invalidation) keep it fresh — the freshness budget
+    // is unchanged, only the blank frame is gone.
+    staleTime: 3000,
+    refetchOnMount: true,
     initialPageParam: null,
-    queryFn: async ({ pageParam }) => {
-      const params = new URLSearchParams();
-      if (pageParam) params.set('before', pageParam);
-      if (flag && flag !== 'all') {
-        // "attachment:image"/"attachment:document" are the one filter value
-        // that isn't a message flag — translate to the server's separate
-        // attachmentType param (image|pdf) instead of sending it as `flag`.
-        if (flag.startsWith('attachment:')) {
-          params.set(
-            'attachmentType',
-            flag === 'attachment:image' ? 'image' : 'pdf',
-          );
-        } else {
-          params.set('flag', flag);
-        }
-      }
-      if (q) params.set('q', q);
-      const res = await axios.get(
-        `/api/chat/channels/${channelId}/messages?${params.toString()}`,
-        { headers: getAuthHeaders() },
-      );
-      return res.data; // oldest-first within this page
-    },
-    // A page shorter than the server's limit (50) means there is nothing
-    // older left to fetch.
+    queryFn: ({ pageParam }) =>
+      fetchChatMessagePage({
+        channelId,
+        pageParam,
+        flag,
+        q,
+        headers: getAuthHeaders(),
+      }),
+    // A page shorter than the server's limit means there is nothing older
+    // left to fetch.
     getNextPageParam: (lastPage) => {
-      if (!Array.isArray(lastPage) || lastPage.length < 50) return undefined;
+      if (!Array.isArray(lastPage) || lastPage.length < CHAT_PAGE_SIZE) {
+        return undefined;
+      }
       return lastPage[0]?.createdAt;
     },
   });
@@ -127,10 +217,18 @@ export function useChatMessages(channelId, { flag, q } = {}) {
   // pages[0] is the newest batch (fetched first), pages[N] the oldest
   // (fetched last via fetchNextPage) — reverse the page order, keep each
   // page's own oldest-first order, to get one chronological array.
-  const messages = (messagesQuery.data?.pages || [])
-    .slice()
-    .reverse()
-    .flat();
+  //
+  // Memoized on the pages array identity: React Query only replaces that
+  // identity when the data actually changed, so an unchanged 4s poll no longer
+  // hands MessageList a brand-new array and re-render every list item.
+  const messages = useMemo(
+    () =>
+      (messagesQuery.data?.pages || [])
+        .slice()
+        .reverse()
+        .flat(),
+    [messagesQuery.data?.pages],
+  );
 
   const sendMessage = useMutation({
     mutationFn: async (data) => {

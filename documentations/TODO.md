@@ -5,8 +5,8 @@ Ovde se označava šta je urađeno, a šta nije.
 
 Legenda: `[ ]` nije urađeno · `[x]` urađeno · `[~]` u toku · `[-]` odloženo / preskočeno uz obrazloženje
 
-Status: **Faza 1 u toku — sekcije 1–12 kod-kompletne, plus 12b/12c/12d (UX ispravke, odlučivanje o item-ima, handoff + auto-osvežavanje + politika notifikacija) posle korisnikovog uživo korišćenja. Sledeća: Sekcija 13 (finalna verifikacija/regresija) — traži dva browsera i dozvolu za pisanje u pravu bazu.**
-Poslednje ažuriranje: 2026-07-29 · `npm test` → **161 testa**, sve prolazi · Sekcije 4, 5, 6 i 10 uživo testirane protiv produkcione baze sa jednorazno kreiranim, potom obrisanim test podacima (uz izričitu dozvolu pre svakog destruktivnog koraka); Sekcije 7, 8, 9, 11 i 12 provereni kompajliranjem i montiranjem kroz dev server — puna interaktivna klik-provera ostaje na korisniku za sada
+Status: **Faza 1 u toku — sekcije 1–12 kod-kompletne, plus 12b/12c/12d/12e i 12f (isporuka notifikacija, chat scroll, pin i optimizacija). Sledeća: Sekcija 13 (finalna verifikacija/regresija) — traži dva browsera i dozvolu za pisanje u pravu bazu.**
+Poslednje ažuriranje: 2026-08-08 · **354 testa, sve prolazi**: `npm test` 161 (čiste funkcije, `node --test`) + `npm run test:api` 175 (integracioni, pravi route handleri protiv jednokratne Mongo replike) + `npm run test:ui` 18 (jsdom, chat komponente). `npm run build` prolazi; `npx tsc --noEmit` čist; `pyright` čist. Sekcije 4, 5, 6 i 10 uživo testirane protiv produkcione baze sa jednorazno kreiranim, potom obrisanim test podacima (uz izričitu dozvolu pre svakog destruktivnog koraka)
 
 v3 dopuna ugrađena pre Sekcije 4: **cross-cutting invarijante I1–I10** (sekcija 3A, razrada u planu 4A) i **životni ciklus projekta / preživljavanje istorije** (plan 5A). Modeli su već usklađeni sa I5 i I10 — `dmKey`, `ProjectMember.name/email`, `ChatRead.clearedAt`, `ClientProject.ownerAccountDeletedAt`.
 
@@ -524,6 +524,75 @@ Sintaksno provereno; `npm test` 161/161. **Uživo nije testirano — korisnik te
 - [x] Klikabilni linkovi u chatu — `MessageBubble.jsx` parsira URL-ove u telu poruke (`autolink` regex), renderuje ih kao `<a target="_blank" rel="noopener noreferrer">` sa bojom `rgb(0, 69, 156)` i underline. **BUG ispravljen 2026-07-29:** `renderBodyWithLinks` je vraćao sirov tekst kad je cela poruka samo URL (`parts.length <= 1 ? text : parts` ne razlikuje `[plainText]` od `[<a>]`); ispravljeno na `last > 0 ? parts : text` gde `last` napreduje samo kad je URL zaista pronađen
 - [x] Chat na zasebnoj stranici `/dashboard/chat` — izmešten iz taba u `app/dashboard/page.js` na svoju stranicu (novi `app/dashboard/chat/page.js`) sa `h-dvh flex flex-col` layoutom i back dugmetom u headeru, identičan obrazac kao admin stranica. Rešava problem gde je Danger Zone sekcija (brisanje naloga) završavala preklopljena ispod chat kontejnera pune visine. Navigacija sad koristi `<Link href="/dashboard/chat">` umesto `onClick` tab switcher-a; `totalUnreadChat` tačka ostaje na linku
 - [x] DM lista u sidebar-u filtrirana po `rosterProjectId` — **BUG ispravljen 2026-07-29:** adminu su se u Direct sekciji prikazivali DM-ovi iz SVIH projekata, a `members` roster je scope-ovan na jedan projekat, pa DM-ovi iz drugih projekata nisu mogli da razreše ime partnera (prikazivalo se "Direct message"). `dmChannels` sada filter dodaje `(!rosterProjectId || c.projectId === rosterProjectId)` — prikazuju se samo DM-ovi koji pripadaju trenutno aktivnom projektu
+
+---
+
+## 12f. Isporuka notifikacija, chat scroll i optimizacija (2026-08-08)
+
+Korisnikov izveštaj: „notifikacije i push kao PWA rade povremeno", „mejlovi za novi Proposal i izmene moraju raditi precizno", „scroll to bottom pri ulasku i pri slanju", „pinovana poruka da se učita i skroluje", „unpin ikonica u Pinned panelu", „klik na notifikaciju da vodi do akcije", plus provera pre-renderinga i nepotrebnih učitavanja u chatu.
+
+### Test infrastruktura — popravljena PRE svega ostalog
+
+- [x] **`fileParallelism: false` u `vitest.workspace.mjs` nije radilo.** To je root-only opcija; unutar `defineWorkspace` projekta se prihvata i **tiho ignoriše**. Posledica: svih 7 integracionih fajlova je radilo paralelno nad **istom** bazom, a `resetDb()` u jednom fajlu je brisao fixtures drugog → **143 lažna 401/404/E11000 pada** koji svi prolaze kad se fajl pusti sam. Rešeno novim root `vitest.config.mjs` (`workspace` + `fileParallelism`)
+- [x] `harness.mjs` `MODELS` proširen na **sve** kolekcije koje suite ume da PIŠE (`ProjectRequest`, `ProjectMessage`, `ProjectProposal`, `ProjectAuditLog`, `PushSubscription`) — konverzija pravi zahteve i poruke, pa je jedan test brojao šest tuđih `ProjectRequest` redova
+- [x] `subscribeToPush(user)` i `runDigestSweep()` helperi; `CRON_SECRET` u test env-u (digest ruta je bearer-gated)
+- [x] `tests/ui/setup.js` (nije postojao, a `chat-ui` projekat ga je referencirao) + `esbuild: { jsx: "automatic" }` — bez toga svaki render puca na `React is not defined`, jer projekat nigde nema `jsx` compiler opciju
+- [x] Skripte: `test:api`, `test:ui`, `test:all`, `typecheck`
+
+### Push i mejl — četiri prava bug-a
+
+- [x] **Push se nije čekao.** `notifyUser` je zvao `sendPushToUser(...).then(...)` bez `await`. Na serverless runtime-u instanca sme da se zamrzne čim odgovor ode, pa push u letu jednostavno nikad nije završen — **najverovatniji uzrok „radi povremeno"**. Sad je `await`-ovan
+- [x] **`pushedAt` se upisivao i kad nijedan uređaj nije primio poruku.** `sendPushToUser` sad vraća `{ sent, failed, pruned, skipped }`, a stamp ide samo uz `sent > 0`. Ranije je istekla pretplata izgledala kao uspešna isporuka i **gušila sledećih sat vremena pravih push-eva**
+- [x] **Throttle je čitao oba vremena sa JEDNOG dokumenta.** Uzimao je najskoriji red koji ima `emailedAt` ILI `pushedAt` i sa njega čitao oba polja — red koji je push-ovan a nije mejlovan prijavljivao je „nikad mejlovano". Sad dva nezavisna, scope-ovana upita
+- [x] **`resolveClientUserId` je bio case-sensitive.** `User.email` se upisuje kako ga klijent otkuca, `ClientProject.clientEmail` kako ga operator otkuca — jedno veliko slovo i ponuda nije stizala ni u zvono ni na mejl, **bez ijednog traga u logu**. Dodat case-insensitive fallback; `notifyUser` sad i loguje kad primalac ne postoji umesto da tiho izađe
+- [x] `runEmailDigest`: per-user throttle sužen na `DIGEST_TYPES` — ranije je **bilo koji** inline mejl (npr. „Proposal ready") držao digest poruka sat vremena; i `emailedAt` se sad upisuje **tek posle uspešnog slanja**, pa ispad mejl provajdera više ne „pojede" batch
+- [x] `lib/push.js`: truncate body na 300 znakova (push servisi odbijaju prevelik payload), `tag` po razgovoru
+- [x] `public/sw.js`: `notificationclick` bira tab koji je **već na cilju** (fokus bez re-navigacije), inače fokusira pa navigira — oba `await`-ovana unutar `waitUntil`; ranije `navigate()` nije bio čekan pa je klik znao da samo fokusira staru stranicu
+
+### Notifikacija vodi do akcije
+
+- [x] Chat notifikacije nose i **poruku**, ne samo kanal: `?channel=…&m=<messageId>`; `ProjectChat` prima `initialMessageId`, čisti filtere i skroluje do te poruke (učitavajući stariju istoriju ako treba)
+- [x] `initialMessageId` se **latch-uje u state**, ne čita iz props-a uživo — URL sync efekat prepisuje adresu na `?channel=…` i oduzeo bi `m` pre nego što se pročita (isti obrazac kao `useSearchParams` bug na invite stranici, 12b)
+- [x] `/dashboard?tab=chat` legacy redirect prosleđuje i `m`
+- [x] `NotificationBell`: `fallbackLinkFor(n, variant)` — red bez `link`-a više nije mrtav klik; preskače se samo navigacija na **identičan** URL (isti kanal na istoj stranici), dok promena query-ja i dalje ide kroz `router.push`
+- [x] `/dashboard/chat` dobio **`NotificationBell` i `PushManager`** — bila je jedina autentifikovana stranica bez oba, a to je stranica na kojoj se najduže sedi (bez zvona nema ni „Enable push notifications" ponude, bez `PushManager`-a se pretplata ne osvežava)
+
+### Chat scroll i pin
+
+- [x] Ulazak u kanal uvek sleti na **poslednju poruku** — dupli `rAF` + `ResizeObserver` na omotaču sadržaja, pa slika koja se učita posle prvog paint-a ne ostavi pogled na pola threada
+- [x] **Slanje poruke uvek skroluje dole**, i kad je korisnik pre toga skrolovao gore: `MessageComposer` javlja `onSent`, plus pravilo „poslednja poruka je moja → prati je" (pokriva i slanje sa drugog uređaja). Tuđa poruka dok čitaš istoriju i dalje daje „New messages" pilulu umesto trzaja
+- [x] Reset scroll stanja i na promenu **filtera/pretrage**, ne samo kanala (svaki je zaseban query — zaseban thread); `prevLengthRef` se sad takođe resetuje
+- [x] Klik na pinovanu poruku **stranica po stranicu učitava istoriju** dok je ne nađe (do 20 stranica), i čeka da se prva stranica uopšte razreši pre nego što zaključi da poruke nema — ranije je deep-link uvek završavao na toastu
+- [x] Skok **čisti aktivni filter/pretragu** — sa filterom „Problem" ciljna poruka nije ni u upitu, pa bi pretraga istorije došla do kraja i ništa ne našla
+- [x] `pendingJumpRef` (računat u renderu) sprečava trku između „prvi paint → skroluj dole" i „skoči na poruku", pošto čišćenje filtera menja query ključ i broji se kao svež thread
+- [x] **Unpin ikonica skroz desno** u `PinnedBar`-u, uslovljena serverskim `canPin`-om
+- [x] `['chat-pinned']` dodat u invalidaciju `useNotifications` poll-a — tuđ pin se sad pojavi bez refreša (pinned lista nema sopstveni polling)
+
+### Pre-render, re-render, nepotrebna učitavanja
+
+- [x] **Prefetch prve stranice svakog kanala** (`usePrefetchChannelMessages`, max 12, jednom po kanalu po sesiji) — prvi klik na bilo koji kanal se sad iscrta iz keša umesto „Loading…"
+- [x] `staleTime: 3000` + `refetchOnMount: true` umesto `staleTime: 0` + `'always'` — prefetch-ovan kanal se prikazuje odmah; budžet svežine je nepromenjen (4s poll + invalidacija iz notifikacionog poll-a), nestao je samo prazan frejm
+- [x] `messages` niz **memoizovan** na identitet `pages` — nepromenjen 4s poll više ne pravi nov niz i ne re-renderuje svaku poruku
+- [x] `MessageBubble` u `React.memo`, sa **stabilnim** handler identitetima iz `MessageList`-a (`onJumpToReply` prima izvorni id kao drugi argument umesto da se zatvara po redu — inače memo ne radi ništa)
+- [x] `ProjectChat`: `activeChannel` kroz `useMemo`, svi handleri kroz `useCallback`, URL sync čuvan ref-om da `router.replace` ne okida sam sebe
+- [x] `markRead` vezan za **id poslednje poruke**, ne na `messages.length` — svaki prepend istorije je ranije slao dva upisa i dve invalidacije za thread u kom se ništa novo nije desilo; dodat `visibilitychange` listener da povratak u tab ipak označi pročitano
+- [x] **Filter i pretraga se resetuju pri promeni kanala** — zaostao filter iz prethodnog kanala je najverovatnije objašnjenje za „poruke se ne učitaju": kanal je izgledao prazan jer se gledala filtrirana projekcija
+
+### Novi testovi
+
+- [x] `tests/integration/notification-delivery.test.mjs` (12) — ceo lanac isporuke: proposal sent/changes-requested notifikacija i mejl, mejl i kad je klijent online, case-insensitive pronalaženje klijenta, push završen **pre** povratka odgovora, `pushedAt` NIJE upisan bez uređaja, `tag` po razgovoru, nezavisni email/push throttle, digest (inline mejl ne blokira, throttle po primaocu, batch preživi pad provajdera)
+- [x] `tests/ui/message-list.test.jsx` (6) — sleti na poslednju poruku, sleti i iz keša, prati sopstvenu poruku dole i kad si skrolovao gore, pilula za tuđu, `scrollRequest` iz composera, skok učitava istoriju unazad
+- [x] `tests/ui/pinned-bar.test.jsx` (4) — unpin po redu i šta zove, sakriven bez `canPin`, klik traži skok
+- [x] `tests/ui/notification-bell.test.jsx` (8) — klik navigira na poruku, označava ceo kanal pročitanim, fallback link, bez duplog history unosa za istu stranicu, drugi kanal na istoj stranici JESTE navigacija
+- [x] `chat-notifications.test.mjs` ažuriran na novi ugovor linka i na pravu push pretplatu (stub sad broji stvarne `PushSubscription` redove umesto da uvek vraća `sent: 1` — inače bi sakrio baš bug koji čuva)
+
+### Health check
+
+- [x] `npm run build` — prolazi (Next 16.2.10, 14 stranica)
+- [x] `npx tsc --noEmit` — čist. Dodat `tsconfig.json` (`allowJs`, `checkJs: false`) i `typescript` u devDependencies; TypeScript ranije nije bio ni instaliran, pa `npx tsc` nije mogao da se pokrene
+  - [-] `checkJs: true` namerno **nije** uključen: daje **~1374** nalaza kroz ceo kodbejz (uglavnom React Query mutation generici koji se izvode kao `void` i Radix `forwardRef` prop inference) — to je zaseban posao, ne nalaz ove runde. Jedini pravi nalaz u dodirnutim fajlovima (prefetch poziv bez `flag`/`q`) je ispravljen default vrednostima
+- [x] `pyright backend_test.py tests/__init__.py` — 0 errors, 0 warnings
+- [-] **Uživo u browseru nije testirano od strane asistenta** — scroll i push traže pravi uređaj/sesiju; ostaje na korisniku
 
 ---
 

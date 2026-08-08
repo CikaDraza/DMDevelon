@@ -114,11 +114,16 @@ function DashboardInner() {
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab === "chat") {
+      // Carry the deep-link params across the redirect. Dropping `m` here
+      // would turn "take me to this message" into "take me to this channel"
+      // for anyone whose notification predates the dedicated chat page.
+      const forwarded = new URLSearchParams();
       const channel = searchParams.get("channel");
-      const dest = channel
-        ? `/dashboard/chat?channel=${channel}`
-        : "/dashboard/chat";
-      router.replace(dest);
+      const messageId = searchParams.get("m");
+      if (channel) forwarded.set("channel", channel);
+      if (messageId) forwarded.set("m", messageId);
+      const qs = forwarded.toString();
+      router.replace(qs ? `/dashboard/chat?${qs}` : "/dashboard/chat");
       return;
     }
     if (DASHBOARD_TABS.includes(tab)) {

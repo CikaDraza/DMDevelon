@@ -70,6 +70,11 @@ export function useNotifications() {
     if (!query.dataUpdatedAt) return;
     queryClient.invalidateQueries({ queryKey: ['project-messages'] });
     queryClient.invalidateQueries({ queryKey: ['chat-messages'] });
+    // The pinned list has no poll of its own — it is only invalidated when YOU
+    // pin something. Piggybacking here is what makes a teammate's pin show up
+    // without a page refresh, and costs nothing: an unmounted key is not
+    // refetched.
+    queryClient.invalidateQueries({ queryKey: ['chat-pinned'] });
     queryClient.invalidateQueries({ queryKey: ['client-projects'] });
     queryClient.invalidateQueries({ queryKey: ['project-proposals'] });
     queryClient.invalidateQueries({ queryKey: ['project-items'] });

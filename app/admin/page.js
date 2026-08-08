@@ -2541,6 +2541,7 @@ function AdminPageInner() {
               <ProjectChat
                 viewerRole="admin"
                 initialChannelId={searchParams.get("channel")}
+                initialMessageId={searchParams.get("m")}
               />
             </div>
           ) : (

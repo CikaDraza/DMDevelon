@@ -56,6 +56,9 @@ export function MessageComposer({
   search,
   replyTo,
   onCancelReply,
+  // Fired after the server accepted a message, so the thread can scroll to
+  // the bottom immediately instead of waiting for the next refetch to notice.
+  onSent,
 }) {
   const { sendMessage, uploadAttachment } = useChatMessages(channelId, {
     flag,
@@ -192,6 +195,9 @@ export function MessageComposer({
       setMessageFlag("none");
       onCancelReply?.();
       if (textareaRef.current) textareaRef.current.style.height = "auto";
+      // Only after the server accepted it: a failed send must not scroll the
+      // reader away from whatever they were looking at.
+      onSent?.();
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to send");
     }

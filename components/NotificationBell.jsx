@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Bell, BellRing, CheckCheck, Share } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -47,8 +47,45 @@ function categoryOf(n, variant) {
   return "My Projects"; // request + project
 }
 
+/**
+ * Where a notification points when it carries no `link` of its own.
+ *
+ * Older rows (and any future emitter that forgets a link) would otherwise be
+ * unclickable, which reads as a broken bell. Derived from the fields the row
+ * definitely has — channel, entity type, entity id — and split by audience,
+ * because the same project lives at two different URLs for an operator and a
+ * client.
+ */
+export function fallbackLinkFor(n, variant = "client") {
+  if (!n) return "";
+  if (n.channelId) {
+    return variant === "admin"
+      ? `/admin?tab=chat&channel=${n.channelId}`
+      : `/dashboard/chat?channel=${n.channelId}`;
+  }
+  if (variant === "admin") {
+    if (n.entityType === "contact") return "/admin?tab=messages";
+    if (n.entityType === "testimonial") return "/admin?tab=testimonials";
+    if (n.entityType === "request") {
+      return n.entityId
+        ? `/admin?tab=project-requests&id=${n.entityId}`
+        : "/admin?tab=project-requests";
+    }
+    return n.entityId
+      ? `/admin?tab=client-projects&id=${n.entityId}`
+      : "/admin?tab=client-projects";
+  }
+  if (n.entityType === "testimonial") return "/dashboard?tab=testimonials";
+  if (n.entityType === "request") {
+    return n.entityId ? `/dashboard/requests/${n.entityId}` : "/dashboard";
+  }
+  return n.entityId ? `/dashboard/projects/${n.entityId}` : "/dashboard";
+}
+
 export default function NotificationBell({ variant = "client" }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { items, unreadCount, markRead } = useNotifications();
   const {
     supported,
@@ -99,7 +136,22 @@ export default function NotificationBell({ variant = "client" }) {
       }
     }
     setOpen(false);
-    if (n.link) router.push(n.link);
+
+    // Every notification has to go SOMEWHERE. A row with no link used to be a
+    // dead click; send those to the entity's natural home instead.
+    const destination = n.link || fallbackLinkFor(n, variant);
+    if (!destination) return;
+
+    // Re-clicking a notification for the page you are already on is a no-op
+    // for the router, which is right — except when only the query differs
+    // (another channel, another proposal on the same project page). Those are
+    // real navigations, and `push` handles them; the explicit compare is only
+    // to skip the pointless history entry when nothing at all changes.
+    const current = `${pathname}${
+      searchParams?.toString() ? `?${searchParams}` : ""
+    }`;
+    if (destination === current) return;
+    router.push(destination);
   };
 
   // Group items by category, preserving the (recency-sorted) item order.

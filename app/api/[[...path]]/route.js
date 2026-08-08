@@ -913,8 +913,14 @@ async function runEmailDigest() {
     // The cron runs every 15 minutes, but a conversation should only email
     // once an hour. Anything still inside that window is left pending for a
     // later sweep rather than consumed.
+    //
+    // Scoped to DIGEST_TYPES: without that clause any inline email counted —
+    // so a client who had just been emailed "Proposal ready" (an actionable
+    // type that deliberately bypasses the digest) had their unread MESSAGES
+    // held back for an hour by an unrelated notification.
     const lastDigest = await Notification.findOne({
       userId,
+      type: { $in: [...DIGEST_TYPES] },
       emailedAt: { $ne: null },
     })
       .sort({ emailedAt: -1 })
@@ -926,8 +932,6 @@ async function runEmailDigest() {
     ) {
       continue;
     }
-
-    processedIds.push(...notes.map((n) => n.id ?? n._id));
 
     const convMap = new Map();
     for (const n of notes) {
@@ -960,6 +964,11 @@ async function runEmailDigest() {
       });
       await sendEmail({ to: recipient.email, ...tpl, type: "project" });
       sent += 1;
+      // Consumed only on a successful send. Marking them processed before the
+      // call meant a Resend outage silently burned the notifications: they got
+      // `emailedAt` set, so the next sweep skipped them and the messages were
+      // never emailed to anyone.
+      processedIds.push(...notes.map((n) => n.id ?? n._id));
     } catch (e) {
       console.error("digest email failed for", userId, e);
     }
@@ -3180,6 +3189,17 @@ export async function POST(request, context) {
         : "(attachment)";
       const mentionedIds = new Set((sanitized.mentions || []).map(String));
 
+      // Deep link down to the MESSAGE, not just the channel. `?channel=` alone
+      // dropped the reader at the bottom of a thread and left them to find
+      // what the notification was about; `&m=` makes the chat scroll to and
+      // highlight it (loading older pages first if it has scrolled out of the
+      // first page). Two link shapes because the operator's chat lives in the
+      // admin panel and everyone else's on the client dashboard.
+      const chatLinkFor = (isAdminUser) =>
+        isAdminUser
+          ? `/admin?tab=chat&channel=${channel._id}&m=${message._id}`
+          : `/dashboard/chat?channel=${channel._id}&m=${message._id}`;
+
       if (channel.kind === "dm") {
         const otherUserId = (channel.memberUserIds || []).find(
           (uid) => uid !== String(user._id),
@@ -3195,9 +3215,7 @@ export async function POST(request, context) {
               ? `${message.authorName} mentioned you`
               : `New direct message from ${message.authorName}`,
             body: preview,
-            link: otherUser?.isAdmin
-              ? `/admin?tab=chat&channel=${channel._id}`
-              : `/dashboard/chat?channel=${channel._id}`,
+            link: chatLinkFor(otherUser?.isAdmin),
             entityType: "project",
             entityId: project._id,
             channelId: channel._id,
@@ -3228,9 +3246,7 @@ export async function POST(request, context) {
                   ? `${message.authorName} mentioned you in ${project.title}`
                   : `New message in ${project.title}`,
                 body: preview,
-                link: isAdminUser
-                  ? `/admin?tab=chat&channel=${channel._id}`
-                  : `/dashboard/chat?channel=${channel._id}`,
+                link: chatLinkFor(isAdminUser),
                 entityType: "project",
                 entityId: project._id,
                 channelId: channel._id,
@@ -3258,7 +3274,7 @@ export async function POST(request, context) {
                   type: "chat_message",
                   title: `New message in ${project.title}`,
                   body: `${message.authorName}: ${preview}`,
-                  link: `/admin?tab=chat&channel=${channel._id}`,
+                  link: chatLinkFor(true),
                   entityType: "project",
                   entityId: project._id,
                   channelId: channel._id,

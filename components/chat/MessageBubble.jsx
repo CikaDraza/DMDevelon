@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, memo, useState } from "react";
 import { cn, downloadFileToDevice } from "@/lib/utils";
 import { ConvertMessageDialog } from "./ConvertMessageDialog";
 import { AttachmentPreview } from "./AttachmentPreview";
@@ -96,7 +96,7 @@ export const FLAG_META = {
  * booleans as `canPin` — a collaborator can save an idea/decision but only
  * owner/admin can turn a message into a request, task, or milestone comment.
  */
-export function MessageBubble({
+function MessageBubbleImpl({
   message,
   isMine,
   canModerate = false,
@@ -180,7 +180,9 @@ export function MessageBubble({
         {message.replyToPreview && (
           <button
             type="button"
-            onClick={() => onJumpToReply?.(message.replyToMessageId)}
+            onClick={() =>
+              onJumpToReply?.(message.replyToMessageId, message._id)
+            }
             className={cn(
               "mb-1.5 border-l-2 pl-2 text-[11px] opacity-70 block w-full text-left hover:opacity-100 transition-opacity",
               isMine ? "border-black/30" : "border-white/30",
@@ -380,5 +382,15 @@ export function MessageBubble({
     </div>
   );
 }
+
+/**
+ * Memoized on purpose. The thread re-renders on every 4s poll and on every
+ * keystroke in the composer's shared query; without this each of up to 50
+ * bubbles re-ran its markdown/autolink pass and rebuilt its dropdown for
+ * nothing. Callers must pass STABLE handler identities (MessageList does —
+ * that is why `onJumpToReply` takes the source id as a second argument
+ * instead of being closed over per row) or the memo is defeated.
+ */
+export const MessageBubble = memo(MessageBubbleImpl);
 
 export default MessageBubble;

@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useChatMessages, useChatPinned } from "@/hooks/useProjectChat";
 import { FLAG_META } from "./MessageBubble";
 import { ConvertMessageDialog } from "./ConvertMessageDialog";
-import { ArrowRightCircle, ChevronDown, ChevronUp, Pin } from "lucide-react";
+import {
+  ArrowRightCircle,
+  ChevronDown,
+  ChevronUp,
+  Pin,
+  PinOff,
+} from "lucide-react";
 
 /** Pinned messages as a collapsible TODO-style list right under the header. */
 export function PinnedBar({
@@ -14,12 +20,16 @@ export function PinnedBar({
   // differently-filtered 4s poll for the same channel.
   flag,
   search,
+  canPin = false,
   canConvertToItem = false,
   canConvertToFormal = false,
   onJumpToMessage,
 }) {
   const { pinned } = useChatPinned(channelId);
-  const { convertMessage } = useChatMessages(channelId, { flag, q: search });
+  const { convertMessage, togglePin } = useChatMessages(channelId, {
+    flag,
+    q: search,
+  });
   const [collapsed, setCollapsed] = useState(false);
   const [convertTarget, setConvertTarget] = useState(null);
 
@@ -94,6 +104,26 @@ export function PinnedBar({
                   <span className="shrink-0 text-[10px] italic text-gray-500">
                     {m.convertedTo[0].ref || "converted"}
                   </span>
+                )}
+
+                {/* Unpin, hard right — taking something off the list belongs
+                    where the list is, not buried in the message's own "⋯"
+                    menu further down the thread. Gated on the same server-
+                    supplied `pin` permission the bubble menu uses, so a viewer
+                    never sees a control that would 403. */}
+                {canPin && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      togglePin.mutate({ messageId: m._id, pinned: false })
+                    }
+                    disabled={togglePin.isPending}
+                    title="Unpin this message"
+                    aria-label={`Unpin message from ${m.authorName}`}
+                    className="ml-auto shrink-0 rounded p-1 text-gray-500 transition-colors hover:text-[#FFB633] disabled:opacity-50"
+                  >
+                    <PinOff className="h-3.5 w-3.5" />
+                  </button>
                 )}
               </div>
             );
