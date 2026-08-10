@@ -215,10 +215,18 @@ describe("clearing the bell in bulk", () => {
   const openBell = () =>
     userEvent.click(screen.getByRole("button", { name: "Notifications" }));
 
+  // The footer button only ASKS; the AlertDialog's action is what sends. The
+  // dialog is rendered as a sibling of the popover rather than inside it —
+  // a Radix modal mounted within an open popover fights it for focus — so
+  // these two clicks are the whole interaction under test.
+  const clickFooter = async (name) =>
+    userEvent.click(await screen.findByRole("button", { name }));
+  const confirmWith = async (name) =>
+    userEvent.click(await screen.findByRole("button", { name }));
+
   beforeEach(() => {
     notificationState.items = [notification()];
     notificationState.unreadCount = 1;
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("is offered to the operator only", async () => {
@@ -252,13 +260,25 @@ describe("clearing the bell in bulk", () => {
     expect(screen.queryByRole("button", { name: /Delete all/i })).toBeNull();
   });
 
-  it("sends scope all after the confirmation", async () => {
+  it("asks for confirmation before deleting anything", async () => {
     authState.isAdmin = true;
     render(<NotificationBell variant="admin" />);
     await openBell();
-    await userEvent.click(
-      await screen.findByRole("button", { name: /Delete all/i }),
-    );
+    await clickFooter(/Delete all/i);
+
+    expect(purgeMutateAsync).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/Delete every notification\?/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument();
+  });
+
+  it("sends scope all once the dialog is confirmed", async () => {
+    authState.isAdmin = true;
+    render(<NotificationBell variant="admin" />);
+    await openBell();
+    await clickFooter(/Delete all/i);
+    await confirmWith(/Delete everything/i);
 
     expect(purgeMutateAsync).toHaveBeenCalledWith({ scope: "all" });
     expect(toast.success).toHaveBeenCalledWith("Deleted 4 notifications");
@@ -268,9 +288,12 @@ describe("clearing the bell in bulk", () => {
     authState.isAdmin = true;
     render(<NotificationBell variant="admin" />);
     await openBell();
-    await userEvent.click(
-      await screen.findByRole("button", { name: /Older than 30d/i }),
-    );
+    await clickFooter(/Older than 30d/i);
+
+    expect(
+      await screen.findByText(/older than 30 days\?/i),
+    ).toBeInTheDocument();
+    await confirmWith(/Delete older notifications/i);
 
     expect(purgeMutateAsync).toHaveBeenCalledWith({
       scope: "older_than",
@@ -278,16 +301,15 @@ describe("clearing the bell in bulk", () => {
     });
   });
 
-  it("declining the confirmation sends nothing", async () => {
+  it("cancelling sends nothing", async () => {
     authState.isAdmin = true;
-    window.confirm.mockReturnValue(false);
     render(<NotificationBell variant="admin" />);
     await openBell();
-    await userEvent.click(
-      await screen.findByRole("button", { name: /Delete all/i }),
-    );
+    await clickFooter(/Delete all/i);
+    await confirmWith(/^Cancel$/i);
 
     expect(purgeMutateAsync).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Delete every notification\?/i)).toBeNull();
   });
 
   it("reports a failure instead of implying the bell was cleared", async () => {
@@ -297,9 +319,8 @@ describe("clearing the bell in bulk", () => {
     });
     render(<NotificationBell variant="admin" />);
     await openBell();
-    await userEvent.click(
-      await screen.findByRole("button", { name: /Delete all/i }),
-    );
+    await clickFooter(/Delete all/i);
+    await confirmWith(/Delete everything/i);
 
     expect(toast.error).toHaveBeenCalledWith("Nope");
     expect(toast.success).not.toHaveBeenCalled();

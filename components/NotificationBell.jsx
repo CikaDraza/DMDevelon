@@ -8,6 +8,7 @@ import {
   BellRing,
   CalendarClock,
   CheckCheck,
+  Loader2,
   Share,
   Trash2,
   Wifi,
@@ -17,6 +18,16 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import { usePush } from "@/hooks/usePush";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Popover,
   PopoverTrigger,
@@ -37,6 +48,26 @@ function timeAgo(d) {
 // Must match PURGE_DEFAULT_DAYS in lib/chat-domain.mjs, which is what the
 // /notifications/purge endpoint validates against.
 const PURGE_OLDER_THAN_DAYS = 30;
+
+// The two bulk deletes, so the footer button, the confirmation copy and the
+// request body all come from one place — the same shape ChannelPurgeMenu uses
+// for the chat-history purge, and deliberately the same wording, because they
+// are the same promise made about two different piles of rows.
+const PURGE_ACTIONS = {
+  older_than: {
+    title: `Delete notifications older than ${PURGE_OLDER_THAN_DAYS} days?`,
+    description: `Every notification in your bell older than ${PURGE_OLDER_THAN_DAYS} days is permanently removed. The last ${PURGE_OLDER_THAN_DAYS} days stay, and nobody else's bell is affected.`,
+    confirm: "Delete older notifications",
+    payload: { scope: "older_than", days: PURGE_OLDER_THAN_DAYS },
+  },
+  all: {
+    title: "Delete every notification?",
+    description:
+      "Your whole bell is emptied, read and unread alike. It does not delete the messages or projects behind them, and nobody else's bell is affected.",
+    confirm: "Delete everything",
+    payload: { scope: "all" },
+  },
+};
 
 // Ordered categories per audience; maps a notification's entityType to a label.
 const CATEGORY_ORDER = {
@@ -115,6 +146,8 @@ export default function NotificationBell({ variant = "client" }) {
   const { getAuthHeaders, isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [testing, setTesting] = useState(false);
+  // Which purge confirmation is open, keyed by PURGE_ACTIONS — null when none.
+  const [pendingPurge, setPendingPurge] = useState(null);
 
   // The operator's own bell fills up with every project's traffic, so only they
   // are offered the broom. Gated on `isAdmin` — the same fact the endpoint
@@ -230,23 +263,20 @@ export default function NotificationBell({ variant = "client" }) {
     }
   };
 
-  // `window.confirm`, as everywhere else a destructive action is confirmed in
-  // this app. Deliberately not the AlertDialog used by the chat purge: this
-  // lives inside a Popover, and a Radix modal opened from within one fights the
-  // popover for focus — and the stakes are lower anyway, since these are the
-  // caller's own notification rows, not a shared conversation.
-  const handlePurge = async (scope) => {
-    const question =
-      scope === "all"
-        ? "Delete every notification in your bell? This cannot be undone."
-        : `Delete notifications older than ${PURGE_OLDER_THAN_DAYS} days? This cannot be undone.`;
-    if (!window.confirm(question)) return;
+  // Closing the popover is what makes the confirmation safe to render: the
+  // dialog is a SIBLING of the Popover below, not a child of its content. A
+  // Radix modal mounted inside an open popover fights it for focus, and the
+  // popover's own outside-click handler treats the dialog as an outside click.
+  const askToPurge = (scope) => {
+    setOpen(false);
+    setPendingPurge(scope);
+  };
+
+  const runPurge = async () => {
+    const action = PURGE_ACTIONS[pendingPurge];
+    if (!action) return;
     try {
-      const result = await purgeNotifications.mutateAsync(
-        scope === "all"
-          ? { scope: "all" }
-          : { scope: "older_than", days: PURGE_OLDER_THAN_DAYS },
-      );
+      const result = await purgeNotifications.mutateAsync(action.payload);
       if (result.deletedCount === 0) {
         toast.success("Nothing to delete");
       } else {
@@ -256,6 +286,8 @@ export default function NotificationBell({ variant = "client" }) {
       toast.error(
         err.response?.data?.error || "Couldn't delete the notifications",
       );
+    } finally {
+      setPendingPurge(null);
     }
   };
 
@@ -323,122 +355,169 @@ export default function NotificationBell({ variant = "client" }) {
     </button>
   );
 
+  const purgeAction = pendingPurge ? PURGE_ACTIONS[pendingPurge] : null;
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          className="relative p-2 text-gray-400 hover:text-white transition-colors"
-          aria-label="Notifications"
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            className="relative p-2 text-gray-400 hover:text-white transition-colors"
+            aria-label="Notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          className="w-80 p-0 bg-[#1a1a1b] border-white/10 text-white"
         >
-          <Bell className="w-5 h-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="w-80 p-0 bg-[#1a1a1b] border-white/10 text-white"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <span className="font-semibold">Notifications</span>
-          {unreadCount > 0 && (
-            <button
-              onClick={() => markRead.mutate({})}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#FFB633]"
-            >
-              <CheckCheck className="w-4 h-4" />
-              Mark all read
-            </button>
-          )}
-        </div>
-        <div className="max-h-96 overflow-y-auto">
-          {items.length === 0 ? (
-            <p className="text-gray-500 text-sm text-center py-8">
-              No notifications yet.
-            </p>
-          ) : (
-            categories
-              .filter((cat) => grouped[cat]?.length)
-              .sort((a, b) => {
-                const dA = new Date(grouped[a][0]?.createdAt || 0);
-                const dB = new Date(grouped[b][0]?.createdAt || 0);
-                return dB - dA;
-              })
-              .map((cat) => (
-                <div key={cat}>
-                  <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                    {cat}
-                  </p>
-                  {grouped[cat].map(renderItem)}
-                </div>
-              ))
-          )}
-        </div>
-        {canPurge && items.length > 0 && (
-          // One split row rather than two more full-width footer buttons: this
-          // footer can already stack three of those, and housekeeping should
-          // not outweigh the push controls below it.
-          <div className="flex border-t border-white/10 text-xs">
-            <button
-              onClick={() => handlePurge("older_than")}
-              disabled={purgeNotifications.isPending}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-gray-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-60"
-            >
-              <CalendarClock className="w-3.5 h-3.5 shrink-0" />
-              Older than {PURGE_OLDER_THAN_DAYS}d
-            </button>
-            <button
-              onClick={() => handlePurge("all")}
-              disabled={purgeNotifications.isPending}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-3 border-l border-white/10 text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors disabled:opacity-60"
-            >
-              <Trash2 className="w-3.5 h-3.5 shrink-0" />
-              Delete all
-            </button>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <span className="font-semibold">Notifications</span>
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markRead.mutate({})}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#FFB633]"
+              >
+                <CheckCheck className="w-4 h-4" />
+                Mark all read
+              </button>
+            )}
           </div>
-        )}
-        {showEnablePush && (
-          <button
-            onClick={handleEnablePush}
-            disabled={busy}
-            className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-[#FFB633] hover:bg-white/5 transition-colors disabled:opacity-60"
-          >
-            <BellRing className="w-4 h-4 shrink-0" />
-            {busy ? "Enabling…" : "Enable push notifications"}
-          </button>
-        )}
-        {showTestPush && (
-          <button
-            onClick={handleTestPush}
-            disabled={testing}
-            className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-left text-sm text-gray-300 hover:bg-white/5 transition-colors disabled:opacity-60"
-          >
-            <Wifi className="w-4 h-4 shrink-0" />
-            {testing
-              ? "Sending…"
-              : unavailableMessage
-                ? "Why can't I get notifications?"
-                : "Send a test push to this device"}
-          </button>
-        )}
-        {iosNeedsInstall && (
-          <button
-            onClick={() =>
-              toast(
-                "Add to your home screen: Share → “Add to Home Screen”, then open the app from there for push.",
-                { icon: "📲", duration: 6000 },
-              )
-            }
-            className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-gray-300 hover:bg-white/5 transition-colors text-left"
-          >
-            <Share className="w-4 h-4 shrink-0" />
-            Install app for push notifications
-          </button>
-        )}
-      </PopoverContent>
-    </Popover>
+          <div className="max-h-96 overflow-y-auto">
+            {items.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-8">
+                No notifications yet.
+              </p>
+            ) : (
+              categories
+                .filter((cat) => grouped[cat]?.length)
+                .sort((a, b) => {
+                  const dA = new Date(grouped[a][0]?.createdAt || 0);
+                  const dB = new Date(grouped[b][0]?.createdAt || 0);
+                  return dB - dA;
+                })
+                .map((cat) => (
+                  <div key={cat}>
+                    <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      {cat}
+                    </p>
+                    {grouped[cat].map(renderItem)}
+                  </div>
+                ))
+            )}
+          </div>
+          {canPurge && items.length > 0 && (
+            // One split row rather than two more full-width footer buttons: this
+            // footer can already stack three of those, and housekeeping should
+            // not outweigh the push controls below it.
+            <div className="flex border-t border-white/10 text-xs">
+              <button
+                onClick={() => askToPurge("older_than")}
+                disabled={purgeNotifications.isPending}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-gray-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-60"
+              >
+                <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                Older than {PURGE_OLDER_THAN_DAYS}d
+              </button>
+              <button
+                onClick={() => askToPurge("all")}
+                disabled={purgeNotifications.isPending}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-3 border-l border-white/10 text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors disabled:opacity-60"
+              >
+                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                Delete all
+              </button>
+            </div>
+          )}
+          {showEnablePush && (
+            <button
+              onClick={handleEnablePush}
+              disabled={busy}
+              className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-[#FFB633] hover:bg-white/5 transition-colors disabled:opacity-60"
+            >
+              <BellRing className="w-4 h-4 shrink-0" />
+              {busy ? "Enabling…" : "Enable push notifications"}
+            </button>
+          )}
+          {showTestPush && (
+            <button
+              onClick={handleTestPush}
+              disabled={testing}
+              className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-left text-sm text-gray-300 hover:bg-white/5 transition-colors disabled:opacity-60"
+            >
+              <Wifi className="w-4 h-4 shrink-0" />
+              {testing
+                ? "Sending…"
+                : unavailableMessage
+                  ? "Why can't I get notifications?"
+                  : "Send a test push to this device"}
+            </button>
+          )}
+          {iosNeedsInstall && (
+            <button
+              onClick={() =>
+                toast(
+                  "Add to your home screen: Share → “Add to Home Screen”, then open the app from there for push.",
+                  { icon: "📲", duration: 6000 },
+                )
+              }
+              className="w-full flex items-center gap-2 px-4 py-3 border-t border-white/10 text-sm text-gray-300 hover:bg-white/5 transition-colors text-left"
+            >
+              <Share className="w-4 h-4 shrink-0" />
+              Install app for push notifications
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
+
+      <AlertDialog
+        open={!!pendingPurge}
+        // Radix reports both a cancel and an outside click here; while the
+        // request is in flight neither should drop the dialog out from under
+        // the spinner.
+        onOpenChange={(next) => {
+          if (!next && !purgeNotifications.isPending) setPendingPurge(null);
+        }}
+      >
+        <AlertDialogContent className="bg-[#1a1a1b] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{purgeAction?.title}</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              {purgeAction?.description} This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={purgeNotifications.isPending}
+              className="bg-transparent border-white/10 text-white hover:bg-white/5 hover:text-white"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={purgeNotifications.isPending}
+              // Radix closes on Action by default; the dialog has to stay up
+              // while the delete runs so the spinner is visible and a failure
+              // can be reported against the thing that failed.
+              onClick={(event) => {
+                event.preventDefault();
+                runPurge();
+              }}
+              className="bg-red-600 text-white hover:bg-red-500 gap-2"
+            >
+              {purgeNotifications.isPending && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              )}
+              {purgeAction?.confirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
