@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
-import { Bell, BellRing, CheckCheck, Share, Wifi } from "lucide-react";
+import {
+  Bell,
+  BellRing,
+  CalendarClock,
+  CheckCheck,
+  Share,
+  Trash2,
+  Wifi,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,6 +33,10 @@ function timeAgo(d) {
   const days = Math.floor(h / 24);
   return `${days}d ago`;
 }
+
+// Must match PURGE_DEFAULT_DAYS in lib/chat-domain.mjs, which is what the
+// /notifications/purge endpoint validates against.
+const PURGE_OLDER_THAN_DAYS = 30;
 
 // Ordered categories per audience; maps a notification's entityType to a label.
 const CATEGORY_ORDER = {
@@ -88,7 +100,8 @@ export default function NotificationBell({ variant = "client" }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { items, unreadCount, markRead } = useNotifications();
+  const { items, unreadCount, markRead, purgeNotifications } =
+    useNotifications();
   const {
     supported,
     permission,
@@ -99,9 +112,15 @@ export default function NotificationBell({ variant = "client" }) {
     unavailableMessage,
     lastErrorMessage,
   } = usePush();
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [testing, setTesting] = useState(false);
+
+  // The operator's own bell fills up with every project's traffic, so only they
+  // are offered the broom. Gated on `isAdmin` — the same fact the endpoint
+  // checks — rather than on the `variant` prop, so a hidden control and a 403
+  // can never disagree about who may do this.
+  const canPurge = Boolean(isAdmin);
 
   const showEnablePush =
     supported && (permission !== "granted" || !isSubscribed);
@@ -208,6 +227,35 @@ export default function NotificationBell({ variant = "client" }) {
       toast.error("Couldn't reach the push test endpoint.");
     } finally {
       setTesting(false);
+    }
+  };
+
+  // `window.confirm`, as everywhere else a destructive action is confirmed in
+  // this app. Deliberately not the AlertDialog used by the chat purge: this
+  // lives inside a Popover, and a Radix modal opened from within one fights the
+  // popover for focus — and the stakes are lower anyway, since these are the
+  // caller's own notification rows, not a shared conversation.
+  const handlePurge = async (scope) => {
+    const question =
+      scope === "all"
+        ? "Delete every notification in your bell? This cannot be undone."
+        : `Delete notifications older than ${PURGE_OLDER_THAN_DAYS} days? This cannot be undone.`;
+    if (!window.confirm(question)) return;
+    try {
+      const result = await purgeNotifications.mutateAsync(
+        scope === "all"
+          ? { scope: "all" }
+          : { scope: "older_than", days: PURGE_OLDER_THAN_DAYS },
+      );
+      if (result.deletedCount === 0) {
+        toast.success("Nothing to delete");
+      } else {
+        toast.success(result.message);
+      }
+    } catch (err) {
+      toast.error(
+        err.response?.data?.error || "Couldn't delete the notifications",
+      );
     }
   };
 
@@ -329,6 +377,29 @@ export default function NotificationBell({ variant = "client" }) {
               ))
           )}
         </div>
+        {canPurge && items.length > 0 && (
+          // One split row rather than two more full-width footer buttons: this
+          // footer can already stack three of those, and housekeeping should
+          // not outweigh the push controls below it.
+          <div className="flex border-t border-white/10 text-xs">
+            <button
+              onClick={() => handlePurge("older_than")}
+              disabled={purgeNotifications.isPending}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-gray-400 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-60"
+            >
+              <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+              Older than {PURGE_OLDER_THAN_DAYS}d
+            </button>
+            <button
+              onClick={() => handlePurge("all")}
+              disabled={purgeNotifications.isPending}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-3 border-l border-white/10 text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors disabled:opacity-60"
+            >
+              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+              Delete all
+            </button>
+          </div>
+        )}
         {showEnablePush && (
           <button
             onClick={handleEnablePush}

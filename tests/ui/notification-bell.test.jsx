@@ -8,8 +8,10 @@ import userEvent from "@testing-library/user-event";
 
 const push = vi.fn();
 const markReadMutate = vi.fn();
+const purgeMutateAsync = vi.fn();
 const notificationState = { items: [], unreadCount: 0 };
 const routeState = { pathname: "/dashboard", search: "" };
+const authState = { isAdmin: false };
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace: vi.fn() }),
@@ -22,6 +24,10 @@ vi.mock("@/hooks/useNotifications", () => ({
     items: notificationState.items,
     unreadCount: notificationState.unreadCount,
     markRead: { mutate: markReadMutate },
+    purgeNotifications: {
+      mutateAsync: purgeMutateAsync,
+      isPending: false,
+    },
   }),
 }));
 
@@ -39,12 +45,23 @@ vi.mock("@/hooks/usePush", () => ({
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({ getAuthHeaders: () => ({}) }),
+  useAuth: () => ({
+    getAuthHeaders: () => ({}),
+    isAdmin: authState.isAdmin,
+  }),
 }));
+
+vi.mock("react-hot-toast", () => {
+  const toast = vi.fn();
+  toast.success = vi.fn();
+  toast.error = vi.fn();
+  return { default: toast };
+});
 
 const bellModule = await import("@/components/NotificationBell");
 const NotificationBell = bellModule.default;
 const { fallbackLinkFor } = bellModule;
+const toast = (await import("react-hot-toast")).default;
 
 const notification = (overrides = {}) => ({
   _id: "n-1",
@@ -66,6 +83,15 @@ async function openBellAndClickFirst() {
 beforeEach(() => {
   push.mockClear();
   markReadMutate.mockClear();
+  purgeMutateAsync.mockReset();
+  purgeMutateAsync.mockResolvedValue({
+    message: "Deleted 4 notifications",
+    deletedCount: 4,
+  });
+  toast.mockClear();
+  toast.success.mockClear();
+  toast.error.mockClear();
+  authState.isAdmin = false;
   notificationState.items = [];
   notificationState.unreadCount = 0;
   routeState.pathname = "/dashboard";
@@ -182,6 +208,101 @@ describe("the push diagnostic", () => {
     expect(
       await screen.findByRole("button", { name: /Send a test push/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("clearing the bell in bulk", () => {
+  const openBell = () =>
+    userEvent.click(screen.getByRole("button", { name: "Notifications" }));
+
+  beforeEach(() => {
+    notificationState.items = [notification()];
+    notificationState.unreadCount = 1;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  it("is offered to the operator only", async () => {
+    authState.isAdmin = true;
+    render(<NotificationBell variant="admin" />);
+    await openBell();
+
+    expect(
+      await screen.findByRole("button", { name: /Delete all/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Older than 30d/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("is hidden from a client", async () => {
+    authState.isAdmin = false;
+    render(<NotificationBell />);
+    await openBell();
+
+    expect(screen.queryByRole("button", { name: /Delete all/i })).toBeNull();
+  });
+
+  it("is hidden when there is nothing to delete", async () => {
+    authState.isAdmin = true;
+    notificationState.items = [];
+    notificationState.unreadCount = 0;
+    render(<NotificationBell variant="admin" />);
+    await openBell();
+
+    expect(screen.queryByRole("button", { name: /Delete all/i })).toBeNull();
+  });
+
+  it("sends scope all after the confirmation", async () => {
+    authState.isAdmin = true;
+    render(<NotificationBell variant="admin" />);
+    await openBell();
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Delete all/i }),
+    );
+
+    expect(purgeMutateAsync).toHaveBeenCalledWith({ scope: "all" });
+    expect(toast.success).toHaveBeenCalledWith("Deleted 4 notifications");
+  });
+
+  it("sends the 30-day window for the older-than button", async () => {
+    authState.isAdmin = true;
+    render(<NotificationBell variant="admin" />);
+    await openBell();
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Older than 30d/i }),
+    );
+
+    expect(purgeMutateAsync).toHaveBeenCalledWith({
+      scope: "older_than",
+      days: 30,
+    });
+  });
+
+  it("declining the confirmation sends nothing", async () => {
+    authState.isAdmin = true;
+    window.confirm.mockReturnValue(false);
+    render(<NotificationBell variant="admin" />);
+    await openBell();
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Delete all/i }),
+    );
+
+    expect(purgeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("reports a failure instead of implying the bell was cleared", async () => {
+    authState.isAdmin = true;
+    purgeMutateAsync.mockRejectedValue({
+      response: { data: { error: "Nope" } },
+    });
+    render(<NotificationBell variant="admin" />);
+    await openBell();
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Delete all/i }),
+    );
+
+    expect(toast.error).toHaveBeenCalledWith("Nope");
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });
 

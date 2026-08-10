@@ -35,6 +35,7 @@ import {
   parseMentions,
   permissionsForRole,
   resolveInvitationAction,
+  resolvePurgeWindow,
   resolveRoleFromFacts,
   sanitizeChatMessagePayload,
   sanitizeConvertPayload,
@@ -929,6 +930,29 @@ test("sanitizePurgePayload — an explicit day count is honoured", () => {
 test("sanitizePurgePayload — an unknown scope is rejected", () => {
   assert.throws(
     () => sanitizePurgePayload({ scope: "everything" }, accessFor("admin")),
+    ChatValidationError,
+  );
+});
+
+test("resolvePurgeWindow — the same window rules with no permission check of its own", () => {
+  // The notification purge reuses this directly, gating on isAdmin instead of
+  // on a project access object. It must therefore never require one.
+  const now = new Date("2026-03-01T12:00:00.000Z");
+  assert.deepEqual(resolvePurgeWindow({}, { now }), {
+    scope: "all",
+    days: null,
+    before: null,
+  });
+  const window = resolvePurgeWindow({ scope: "older_than" }, { now });
+  assert.equal(window.days, PURGE_DEFAULT_DAYS);
+  assert.equal(window.before.toISOString(), "2026-01-30T12:00:00.000Z");
+
+  assert.throws(
+    () => resolvePurgeWindow({ scope: "whenever" }),
+    ChatValidationError,
+  );
+  assert.throws(
+    () => resolvePurgeWindow({ scope: "older_than", days: 0 }),
     ChatValidationError,
   );
 });

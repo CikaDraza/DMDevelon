@@ -154,6 +154,7 @@ import {
   normalizeEmail,
   PROJECT_ITEM_KINDS,
   resolveInvitationAction,
+  resolvePurgeWindow,
   sanitizeChatMessagePayload,
   sanitizeConvertPayload,
   sanitizeInvitationPayload,
@@ -4452,6 +4453,42 @@ export async function POST(request, context) {
       await Notification.updateMany(filter, { $set: { read: true } });
       return NextResponse.json(
         { success: true },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // POST /api/notifications/purge — { scope: "all" | "older_than", days? }
+    // (default 30). Deletes the CALLER'S OWN notification rows; there is no
+    // parameter for whose bell to empty, so this can never reach anyone else's.
+    //
+    // Operator-only, matching where the control is offered. Nothing about the
+    // query needs that restriction — the rows are the caller's — so if the
+    // client bell should get the same broom later, drop this check and the
+    // `user.isAdmin` gate in NotificationBell together.
+    if (pathStr === "notifications/purge") {
+      const user = await requireAuthenticatedUser(request);
+      if (!user.isAdmin) {
+        return forbiddenResponse("You cannot clear notifications in bulk");
+      }
+      // Same validation and the same "older than a month" default as a chat
+      // purge — one vocabulary for every bulk delete in the app.
+      const purge = resolvePurgeWindow(body);
+
+      const filter = { userId: user._id };
+      if (purge.before) filter.createdAt = { $lt: purge.before };
+      const { deletedCount } = await Notification.deleteMany(filter);
+
+      return NextResponse.json(
+        {
+          message:
+            purge.scope === "all"
+              ? `Deleted ${deletedCount} notifications`
+              : `Deleted ${deletedCount} notifications older than ${purge.days} days`,
+          scope: purge.scope,
+          days: purge.days,
+          before: purge.before,
+          deletedCount,
+        },
         { headers: getCorsHeaders() },
       );
     }

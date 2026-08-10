@@ -643,6 +643,7 @@ Registracija kroz poziv: `POST /api/auth/register` prima opcioni `inviteToken`. 
 | `PATCH /api/chat/messages/:id` | edit; **samo autor** (bez admin override-a, za razliku od delete-a); `editedAt`; obrisana poruka se ne može editovati (409) |
 | `DELETE /api/chat/messages/:id` | soft delete; autor ili admin (`canModerateMessage`) |
 | `GET /api/project-items?projectId=&kind=&status=` | **implementirano u Sekciji 12** ✓ — permission `projectRead`, svaka rola koja vidi projekat vidi i log |
+| `POST /api/notifications/purge` | **hard delete zvona** `{ scope: "all" \| "older_than", days? }` (default `days: 30`) — briše ISKLJUČIVO redove pozivaoca (`userId: user._id`; ne postoji parametar za tuđe zvono). Deli `resolvePurgeWindow` sa chat purge-om, pa „starije od mesec dana" znači isto i odbija istu besmislicu na oba mesta. Gate je `user.isAdmin` — proizvodna, ne bezbednosna odluka (redovi su ionako pozivaočevi): kad klijentsko zvono treba istu metlu, skida se ova provera zajedno sa `isAdmin` gate-om u `NotificationBell` |
 
 Sve grane idu kroz `requireProjectPermission` (preko deljenih `loadChannelWithAccess`/`loadMessageWithAccess` helpera u route.js). Validacija: `body` max 10000 kroz `cleanString` · `flag` iz enuma · `replyToMessageId` iz istog kanala · `mentions` presečeni sa članstvom · `admin_only` kanal odbija non-admin sa 403 — sve ovo je već pokriveno postojećom `sanitizeChatMessagePayload` (Sekcija 2), Sekcija 6 je samo poziva.
 

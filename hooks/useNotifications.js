@@ -56,6 +56,30 @@ export function useNotifications() {
       queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
+  // Permanently delete the caller's own notification rows — all of them, or
+  // everything older than `days` (default 30). Operator-only server-side.
+  //
+  // Unlike markRead this destroys rows, so the announce-set has to forget them
+  // too: `announcedIds` is what stops the poll from re-toasting a notification
+  // it has already shown, and an id that no longer exists in any future poll is
+  // just a leak. Rebuilding from the next poll (null) also means a row that
+  // survived the purge and is still unread does not get re-announced, because
+  // the first poll after a reset only records.
+  const purgeNotifications = useMutation({
+    mutationFn: async ({ scope = 'all', days } = {}) => {
+      const res = await axios.post(
+        '/api/notifications/purge',
+        days === undefined ? { scope } : { scope, days },
+        { headers: getAuthHeaders() },
+      );
+      return res.data; // { message, scope, days, deletedCount }
+    },
+    onSuccess: () => {
+      announcedIds = null;
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
   // Each time the notifications poll lands, refresh the data behind whatever
   // it just told us about, so the page agrees with the bell.
   //
@@ -148,6 +172,7 @@ export function useNotifications() {
     unreadCount: query.data?.unreadCount || 0,
     isLoading: query.isLoading,
     markRead,
+    purgeNotifications,
     unreadEntityIds,
     unreadMilestoneIds,
     unreadByMilestone,
