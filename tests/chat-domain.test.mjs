@@ -10,6 +10,8 @@ import {
   MESSAGE_FLAGS,
   PERMISSION_KEYS,
   PRESENCE_ONLINE_THRESHOLD_MS,
+  PURGE_DEFAULT_DAYS,
+  PURGE_MAX_DAYS,
   ROLE_PERMISSIONS,
   assertInvitationAcceptable,
   buildReplyPreview,
@@ -18,6 +20,7 @@ import {
   canManageMembers,
   canModerateMessage,
   canPostToChannel,
+  canPurgeChannel,
   canViewAttachment,
   displayRoleLabel,
   isUserOnline,
@@ -37,6 +40,7 @@ import {
   sanitizeConvertPayload,
   sanitizeInvitationPayload,
   sanitizeProjectItemUpdate,
+  sanitizePurgePayload,
 } from "../lib/chat-domain.mjs";
 
 function accessFor(role, userId = "u-actor") {
@@ -864,6 +868,89 @@ test("internal_team is admin-only", () => {
   assert.equal(canViewAttachment("admin", "internal_team"), true);
   assert.equal(canViewAttachment("owner", "internal_team"), false);
   assert.equal(canViewAttachment("collaborator", "internal_team"), false);
+});
+
+// --- Purging a channel -------------------------------------------------------
+
+test("only a moderator may purge a channel — not the owner of the project", () => {
+  assert.equal(canPurgeChannel(accessFor("admin")), true);
+  assert.equal(canPurgeChannel(accessFor("owner")), false);
+  assert.equal(canPurgeChannel(accessFor("project_admin")), false);
+  assert.equal(canPurgeChannel(accessFor("collaborator")), false);
+  assert.equal(canPurgeChannel(accessFor("viewer")), false);
+  assert.equal(canPurgeChannel(null), false);
+});
+
+test("sanitizePurgePayload — the permission check runs before any validation", () => {
+  assert.throws(
+    () => sanitizePurgePayload({ scope: "all" }, accessFor("owner")),
+    ChatPermissionError,
+  );
+  // Even a payload that would fail validation is rejected as forbidden first,
+  // so a malformed request never reveals which scopes exist.
+  assert.throws(
+    () => sanitizePurgePayload({ scope: "nonsense" }, accessFor("viewer")),
+    ChatPermissionError,
+  );
+});
+
+test("sanitizePurgePayload — scope defaults to all and carries no cutoff", () => {
+  const out = sanitizePurgePayload({}, accessFor("admin"));
+  assert.equal(out.scope, "all");
+  assert.equal(out.days, null);
+  // null, not "the epoch" — this is what tells the caller to drop the createdAt
+  // filter instead of building a range that would match nothing.
+  assert.equal(out.before, null);
+});
+
+test("sanitizePurgePayload — older_than defaults to a 30-day window", () => {
+  const now = new Date("2026-03-01T12:00:00.000Z");
+  const out = sanitizePurgePayload(
+    { scope: "older_than" },
+    accessFor("admin"),
+    { now },
+  );
+  assert.equal(out.scope, "older_than");
+  assert.equal(out.days, PURGE_DEFAULT_DAYS);
+  assert.equal(out.before.toISOString(), "2026-01-30T12:00:00.000Z");
+});
+
+test("sanitizePurgePayload — an explicit day count is honoured", () => {
+  const now = new Date("2026-03-01T12:00:00.000Z");
+  const out = sanitizePurgePayload(
+    { scope: "older_than", days: 7 },
+    accessFor("admin"),
+    { now },
+  );
+  assert.equal(out.days, 7);
+  assert.equal(out.before.toISOString(), "2026-02-22T12:00:00.000Z");
+});
+
+test("sanitizePurgePayload — an unknown scope is rejected", () => {
+  assert.throws(
+    () => sanitizePurgePayload({ scope: "everything" }, accessFor("admin")),
+    ChatValidationError,
+  );
+});
+
+test("sanitizePurgePayload — days must be a whole number in range", () => {
+  for (const days of [0, -1, 1.5, "soon", Number.NaN, PURGE_MAX_DAYS + 1]) {
+    assert.throws(
+      () =>
+        sanitizePurgePayload(
+          { scope: "older_than", days },
+          accessFor("admin"),
+        ),
+      ChatValidationError,
+      `days=${String(days)} should be rejected`,
+    );
+  }
+  // A numeric string is a normal shape off the wire and converts cleanly.
+  assert.equal(
+    sanitizePurgePayload({ scope: "older_than", days: "14" }, accessFor("admin"))
+      .days,
+    14,
+  );
 });
 
 // --- Search input escaping ---------------------------------------------------

@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
-// Append-only trail for invitation and membership changes. Answers, months
-// later: who invited this person, who changed their rights, when they gained
-// access, who removed them, and whether they had access at a given moment.
-// Admin-visible only.
+// Append-only trail for invitation, membership and history-destroying changes.
+// Answers, months later: who invited this person, who changed their rights,
+// when they gained access, who removed them, whether they had access at a given
+// moment — and who wiped a channel's messages, since after a purge this row is
+// the only remaining evidence that they existed. Admin-visible only.
 const ProjectAuditLogSchema = new mongoose.Schema(
   {
     _id: { type: String, default: () => uuidv4() },
@@ -25,6 +26,7 @@ const ProjectAuditLogSchema = new mongoose.Schema(
         'member.suspended',
         'member.removed',
         'member.left',
+        'chat.purged',
       ],
       required: true,
     },

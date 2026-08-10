@@ -158,6 +158,7 @@ import {
   sanitizeConvertPayload,
   sanitizeInvitationPayload,
   sanitizeProjectItemUpdate,
+  sanitizePurgePayload,
 } from "@/lib/chat-domain.mjs";
 import {
   serializeChannelDetail,
@@ -3377,6 +3378,111 @@ export async function POST(request, context) {
       );
       return NextResponse.json(
         { message: "Conversation cleared" },
+        { headers: getCorsHeaders() },
+      );
+    }
+
+    // POST /api/chat/channels/:id/purge — { scope: "all" | "older_than",
+    // days? } — HARD delete of a channel's history, for everyone, with no undo.
+    //
+    // The third and only destructive delete verb in the chat (see
+    // canPurgeChannel): `/clear` above is a per-viewer watermark, DELETE
+    // /chat/messages/:id soft-deletes one row. This one calls deleteMany.
+    // Works on any channel the caller can reach — the project group channel and
+    // a DM alike; loadChannelWithAccess already 404s a DM the caller isn't in.
+    if (pathStr.startsWith("chat/channels/") && path[3] === "purge") {
+      const user = await requireAuthenticatedUser(request);
+      const { channel, project, access } = await loadChannelWithAccess(
+        path[2],
+        user,
+        "chatRead",
+      );
+      // Throws ChatPermissionError (403) unless the caller can moderate, and
+      // resolves `days` into one absolute cutoff used by every query below.
+      const purge = sanitizePurgePayload(body, access);
+
+      const query = { channelId: channel._id };
+      if (purge.before) query.createdAt = { $lt: purge.before };
+
+      // Counted BEFORE the delete, while the rows still exist. A message that
+      // was converted into a request or a decision is the one thing a purge
+      // cannot leave intact — the formal record's sourceMessageId will dangle —
+      // so the operator gets told how many links they just broke.
+      const convertedCount = await ChatMessage.countDocuments({
+        ...query,
+        "convertedTo.0": { $exists: true },
+      });
+      const { deletedCount } = await ChatMessage.deleteMany(query);
+
+      // Deep delete reaches the bell too. A chat notification carries a
+      // 140-character copy of the message body and an `?m=` link to a row that
+      // no longer exists; leaving those behind would keep quoting text that was
+      // just deleted everywhere else. Notification and message are written in
+      // the same request, so the message cutoff selects the right ones.
+      const notificationQuery = {
+        channelId: channel._id,
+        type: { $in: ["chat_message", "chat_mention"] },
+      };
+      if (purge.before) notificationQuery.createdAt = { $lt: purge.before };
+      const purgedNotifications =
+        await Notification.deleteMany(notificationQuery);
+
+      // Why the channel emptied, in the channel itself. Without it a purge
+      // reads to every other participant as the chat having lost their history.
+      // Posted after the delete so it survives its own purge.
+      //
+      // Best-effort from here down, like the post-commit side effects on
+      // invitation acceptance: the messages are already gone, so throwing now
+      // would answer "failed to delete" to a request that did delete.
+      const actorName = user.name || user.email || "The operator";
+      if (deletedCount > 0) {
+        try {
+          await postSystemMessage(
+            channel,
+            purge.scope === "all"
+              ? `${actorName} permanently deleted all ${deletedCount} messages in this conversation.`
+              : `${actorName} permanently deleted ${deletedCount} messages older than ${purge.days} days.`,
+          );
+        } catch (e) {
+          console.error("purge notice failed to post:", e);
+        }
+      }
+
+      // The only remaining record that those messages ever existed.
+      try {
+        await ProjectAuditLog.create({
+          _id: uuidv4(),
+          projectId: project._id,
+          actorUserId: user._id,
+          actorName: user.name || user.email || "",
+          eventType: "chat.purged",
+          metadata: {
+            channelId: channel._id,
+            channelKind: channel.kind,
+            scope: purge.scope,
+            days: purge.days,
+            before: purge.before,
+            deletedCount,
+            convertedCount,
+            notificationsDeleted: purgedNotifications.deletedCount || 0,
+          },
+        });
+      } catch (e) {
+        console.error("audit insert failed (chat purged):", e);
+      }
+
+      return NextResponse.json(
+        {
+          message:
+            purge.scope === "all"
+              ? `Deleted ${deletedCount} messages`
+              : `Deleted ${deletedCount} messages older than ${purge.days} days`,
+          scope: purge.scope,
+          days: purge.days,
+          before: purge.before,
+          deletedCount,
+          convertedCount,
+        },
         { headers: getCorsHeaders() },
       );
     }

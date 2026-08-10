@@ -146,6 +146,42 @@ export function usePrefetchChannelMessages(channels) {
   }, [channels, isAuthenticated, queryClient, getAuthHeaders]);
 }
 
+/**
+ * Permanently delete a channel's message history — everything, or everything
+ * older than `days`. Server-side this is `deleteMany`, not the per-viewer
+ * `clear` below and not the redacting soft delete behind a single message's
+ * Delete; there is no undo.
+ *
+ * Its own hook rather than another member of `useChatMessages`: the purge menu
+ * lives in the header, which has no reason to subscribe to (and 4s-poll) a
+ * message thread just to reach one mutation.
+ */
+export function usePurgeChannel(channelId) {
+  const queryClient = useQueryClient();
+  const { getAuthHeaders } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ scope = 'all', days } = {}) => {
+      const res = await axios.post(
+        `/api/chat/channels/${channelId}/purge`,
+        days === undefined ? { scope } : { scope, days },
+        { headers: getAuthHeaders() },
+      );
+      return res.data; // { message, scope, days, deletedCount, convertedCount }
+    },
+    onSuccess: () => {
+      // Every {flag, q} variant of this channel, plus everything downstream of
+      // the rows that just vanished: the pinned bar, the sidebar's unread
+      // counts and last-message previews, and the bell (the endpoint deletes
+      // this channel's chat notifications along with the messages).
+      queryClient.invalidateQueries({ queryKey: ['chat-messages', channelId] });
+      queryClient.invalidateQueries({ queryKey: ['chat-pinned', channelId] });
+      queryClient.invalidateQueries({ queryKey: ['chat-channels'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
 // Pinned messages for one channel — its own small query since the pinned bar
 // (Section 11) renders independently of the main scroll-back thread below.
 export function useChatPinned(channelId) {

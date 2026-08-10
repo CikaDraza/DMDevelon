@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ChannelPurgeMenu } from "./ChannelPurgeMenu";
 import { ChevronLeft, Hash, ListTodo, MessageCircle, Search } from "lucide-react";
 
 // "attachment:image"/"attachment:document" are a distinct filter dimension
@@ -117,6 +118,9 @@ export function ChatHeader({
             <ListTodo className="w-4 h-4" />
           </button>
         )}
+
+        {/* Renders nothing unless the viewer may moderate this channel. */}
+        <ChannelPurgeMenu channel={channel} />
       </div>
     </div>
   );
