@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { cn, readAsDataURL } from "@/lib/utils";
+import { cn, readAsDataURL, getApiErrorMessage } from "@/lib/utils";
+import { uploadSizeError } from "@/lib/upload-limits.mjs";
 import toast from "react-hot-toast";
 import { Send, Paperclip, FileText, X, Loader2 } from "lucide-react";
 
@@ -51,8 +52,9 @@ export function RequestConversation({
           toast.error("Only images and PDF files are allowed");
           continue;
         }
-        if (file.size > 10 * 1024 * 1024) {
-          toast.error(`${file.name} is larger than 10MB`);
+        const tooBig = uploadSizeError(file.size, file.name);
+        if (tooBig) {
+          toast.error(tooBig);
           continue;
         }
         const dataUri = await readAsDataURL(file);
@@ -63,7 +65,7 @@ export function RequestConversation({
         setPending((prev) => [...prev, result]);
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || "Upload failed");
+      toast.error(getApiErrorMessage(err, "Upload failed"));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

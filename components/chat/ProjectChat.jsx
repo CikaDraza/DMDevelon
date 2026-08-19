@@ -137,6 +137,15 @@ export function ProjectChat({
     router.replace(next, { scroll: false });
   }, [activeChannelId, pathname, router]);
 
+  // Opening the conversation on a phone is the same event as opening the
+  // thread. Until the tap, that pane is `display:none` beside the channel
+  // list, and a box with no layout cannot be scrolled — so whatever the thread
+  // did to reach its last message while hidden did nothing at all. Ask it to
+  // pin again now that it has a size.
+  useEffect(() => {
+    if (mobileView === "chat") setScrollRequest((n) => n + 1);
+  }, [mobileView]);
+
   // Switching conversations abandons any in-progress reply — replying across
   // channels makes no sense (the quoted message wouldn't even be there) — and
   // resets the header filters. A "Problem"-only filter or a stale search term

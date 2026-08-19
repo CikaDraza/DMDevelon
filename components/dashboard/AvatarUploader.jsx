@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { getApiErrorMessage } from "@/lib/utils";
 import { User, Camera, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -26,7 +27,7 @@ export function AvatarUploader({ user, uploadAvatar, size = 80, className = "" }
       toast.success("Profile picture updated");
     } catch (err) {
       toast.error(
-        err.response?.data?.error || err.message || "Failed to upload picture",
+        getApiErrorMessage(err, err.message || "Failed to upload picture"),
       );
     } finally {
       setUploading(false);

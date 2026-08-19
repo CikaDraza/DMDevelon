@@ -32,16 +32,40 @@ if (!Element.prototype.scrollTo) {
 globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
 globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
-// ResizeObserver drives the "re-pin to bottom when an image loads" behaviour.
-// jsdom never fires layout, so a no-op double keeps the component mountable;
-// the initial-scroll assertions do not depend on it.
-if (typeof globalThis.ResizeObserver === "undefined") {
-  globalThis.ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
+// ResizeObserver drives "keep the end in view when the box changes size" —
+// an image finishing, the composer growing under the thread, a hidden pane
+// getting a size. jsdom never lays anything out, so this double records WHICH
+// elements each observer watches and lets a test fire the callback for one of
+// them, exactly as the browser would. Observing the wrong element then shows
+// up as a test failure rather than as silence.
+class FakeResizeObserver {
+  constructor(callback) {
+    this.callback = callback;
+    this.elements = new Set();
+    FakeResizeObserver.instances.add(this);
+  }
+  observe(el) {
+    this.elements.add(el);
+  }
+  unobserve(el) {
+    this.elements.delete(el);
+  }
+  disconnect() {
+    this.elements.clear();
+    FakeResizeObserver.instances.delete(this);
+  }
 }
+FakeResizeObserver.instances = new Set();
+globalThis.ResizeObserver = FakeResizeObserver;
+
+// Report that `el`'s box changed size, to whoever is actually watching it.
+globalThis.fireResize = (el) => {
+  for (const observer of FakeResizeObserver.instances) {
+    if (observer.elements.has(el)) {
+      observer.callback([{ target: el }], observer);
+    }
+  }
+};
 
 if (typeof globalThis.matchMedia === "undefined") {
   globalThis.matchMedia = (query) => ({

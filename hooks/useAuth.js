@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { readAsDataURL } from "@/lib/utils";
+import { uploadSizeError } from "@/lib/upload-limits.mjs";
 
 const SESSION_CHANGED_EVENT = "dmdevelon:session-changed";
 const SESSION_CLEARED_EVENT = "dmdevelon:session-cleared";
@@ -206,8 +207,9 @@ export function useAuth() {
     if (!file.type?.startsWith("image/")) {
       throw new Error("Please choose an image file");
     }
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error("Image must be smaller than 5MB");
+    const tooBig = uploadSizeError(file.size, file.name);
+    if (tooBig) {
+      throw new Error(tooBig);
     }
     const currentToken = localStorage.getItem("token");
     const headers = currentToken

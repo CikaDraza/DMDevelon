@@ -11,10 +11,33 @@ import { ArrowDown, Loader2 } from "lucide-react";
 const NEAR_BOTTOM_PX = 100;
 // Scroll position that triggers loading the previous page.
 const LOAD_MORE_AT_PX = 80;
-// How long after a programmatic scroll to ignore scroll events for intent
-// detection. Smooth scrolling emits events for a while after the call, and
-// treating those as "the user scrolled" is what breaks stick-to-bottom.
-const PROGRAMMATIC_SCROLL_MS = 400;
+// How long after a real input event the reader still counts as the one
+// driving the scroll.
+const USER_GESTURE_MS = 700;
+// How long a pin-to-bottom keeps re-asserting itself. Long enough to cover
+// everything that grows the thread just after the scroll lands: an image
+// decoding, the web font swapping in, the conversation pane getting a size
+// for the first time on a phone, and the refetch that delivers the message
+// the reader has just sent.
+const PIN_SETTLE_MS = 800;
+// A send has to outlast a network round trip: the pin runs the moment the
+// POST resolves, but the message itself only appears when the refetch behind
+// it lands, which on a phone is well past the window above.
+const PIN_SETTLE_SEND_MS = 2500;
+// Hard cap on waiting for a smooth scroll to come to rest, in case it is
+// interrupted in a way that never produces a stable position.
+const AUTO_SCROLL_MAX_MS = 2500;
+// Keys that scroll a focused container. Needed because a keyboard scroll
+// produces no wheel or touch event.
+const SCROLL_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+  " ",
+]);
 // Safety cap for the jump-to-message history walk: 20 pages × 50 = 1000
 // messages back. Past that, ask the reader to scroll rather than hammering
 // the API.
@@ -39,7 +62,23 @@ const MAX_JUMP_PAGES = 20;
  * It only bit channels with a full first page (50+ messages), which is why it
  * looked intermittent. Two rules kill it: history never loads until the view
  * has actually settled at the bottom, and only a scroll the READER performed
- * can end stick-to-bottom mode (`programmaticUntilRef`).
+ * can end stick-to-bottom mode.
+ *
+ * Who performed a scroll is the hard part, and guessing it from a timer is
+ * what made "it never shows me the last message" reproducible rather than
+ * rare. A `scroll` event carries no attribution, so the old code declared a
+ * 400ms window after each programmatic scroll and treated anything later as
+ * the reader. A smooth scroll across a long thread outlives that window —
+ * so its own mid-flight events came back as "the reader scrolled to the
+ * top", which switched stick-to-bottom off AND tripped the load-older-history
+ * branch, whose position restore then cancelled the very animation that was
+ * still running. Opening a channel, following a send, and jumping to a
+ * notification's message all failed the same way, for that one reason.
+ *
+ * So intent is read from events only a person can produce — wheel, touch,
+ * scroll keys, and a pointer held down on the scrollbar — and a pin to the
+ * bottom re-asserts itself every frame for a moment instead of being written
+ * once and hoped for.
  */
 export function MessageList({
   channelId,
@@ -86,8 +125,16 @@ export function MessageList({
   // False until the view has actually been pinned to the bottom at least once
   // for this thread. Gates history loading — see the class comment.
   const settledRef = useRef(false);
-  // Scroll events before this timestamp came from us, not from the reader.
-  const programmaticUntilRef = useRef(0);
+  // True while WE are moving the scroll position. Nothing that infers reader
+  // intent may act while it is set — above all the load-older-history branch,
+  // whose position restore used to cancel a scroll still in flight.
+  const autoScrollingRef = useRef(false);
+  // When the reader last did something that only a person can do. This, not a
+  // timer around our own calls, is what attributes a scroll event.
+  const lastGestureAtRef = useRef(0);
+  // A scrollbar drag emits no wheel or touch event at all, so the button being
+  // held counts as a gesture for its whole duration.
+  const pointerDownRef = useRef(false);
 
   const [highlightedId, setHighlightedId] = useState(null);
   // Message to return to after jumping up to a quoted reply — cleared once
@@ -113,41 +160,165 @@ export function MessageList({
   useEffect(() => {
     stickToBottomRef.current = true;
     settledRef.current = false;
-    programmaticUntilRef.current = 0;
+    autoScrollingRef.current = false;
+    lastGestureAtRef.current = 0;
     setShowScrollButton(false);
     setJumpBackId(null);
     prevLengthRef.current = 0;
     prevLastMessageIdRef.current = null;
   }, [channelId, flag, search]);
 
+  // ── who is scrolling ───────────────────────────────────────────────
+  // Every event below is one a person has to perform. `scroll` is deliberately
+  // NOT among them: the browser fires it identically for a flick of the wrist
+  // and for an assignment to scrollTop, and telling those apart is the whole
+  // problem this component had.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const note = () => {
+      lastGestureAtRef.current = Date.now();
+    };
+    const onPointerDown = () => {
+      pointerDownRef.current = true;
+      note();
+    };
+    const onPointerUp = () => {
+      // Only the release of a press that STARTED in the thread. Listening on
+      // the window is what lets a scrollbar drag ending off-target still
+      // count — but taken unconditionally it also made every tap on Send, on
+      // a channel, on any button anywhere read as "the reader is scrolling",
+      // which then called off the very pin that tap had just asked for.
+      if (!pointerDownRef.current) return;
+      pointerDownRef.current = false;
+      note();
+    };
+    const onKeyDown = (event) => {
+      if (SCROLL_KEYS.has(event.key)) note();
+    };
+
+    el.addEventListener("wheel", note, { passive: true });
+    el.addEventListener("touchstart", note, { passive: true });
+    el.addEventListener("touchmove", note, { passive: true });
+    el.addEventListener("pointerdown", onPointerDown, { passive: true });
+    el.addEventListener("keydown", onKeyDown);
+    // The release of a scrollbar drag routinely lands outside the thread, so
+    // it is watched on the window rather than on the container.
+    window.addEventListener("pointerup", onPointerUp, { passive: true });
+    window.addEventListener("pointercancel", onPointerUp, { passive: true });
+    return () => {
+      el.removeEventListener("wheel", note);
+      el.removeEventListener("touchstart", note);
+      el.removeEventListener("touchmove", note);
+      el.removeEventListener("pointerdown", onPointerDown);
+      el.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, []);
+
+  const readerIsDriving = useCallback(
+    () =>
+      pointerDownRef.current ||
+      Date.now() - lastGestureAtRef.current < USER_GESTURE_MS,
+    [],
+  );
+
   // ── pin to bottom ──────────────────────────────────────────────────
-  const pinToBottom = useCallback((smooth = false) => {
-    // A smooth scroll keeps emitting scroll events for a few hundred ms after
-    // the call returns; reading intent out of those would flip stick-to-bottom
-    // off mid-animation. An INSTANT scroll lands in one go, so it needs no
-    // window at all — and must not have one, or a reader who scrolls up right
-    // after opening the channel would be ignored.
-    if (smooth) {
-      programmaticUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
-    }
-    // Double rAF: the first waits for React's commit, the second for the
-    // browser to finish layout. A single rAF often fires before the DOM is
-    // laid out, landing the scroll somewhere mid-thread.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
+  //
+  // `force` is for scrolls the reader explicitly asked for — sending a
+  // message, tapping "New messages", opening a channel. Those must land even
+  // if the reader was scrolling a moment ago; only a gesture made AFTER the
+  // pin started calls them off.
+  const pinToBottom = useCallback(
+    ({ force = false, durationMs = PIN_SETTLE_MS } = {}) => {
+      const startedAt = Date.now();
+      const abortOnGestureAfter = force
+        ? startedAt
+        : startedAt - USER_GESTURE_MS;
+      const deadline = startedAt + durationMs;
+      autoScrollingRef.current = true;
+
+      // Re-asserted every frame rather than written once. The thread keeps
+      // growing after the scroll lands — an image decodes, the font swaps, the
+      // refetch delivers the message just sent — and a single write leaves the
+      // reader exactly that far short of the end. Writing a scrollTop that is
+      // already correct costs nothing.
+      const step = () => {
         const el = containerRef.current;
-        if (!el) return;
-        if (smooth) {
-          programmaticUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
-          el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-        } else {
-          el.scrollTop = el.scrollHeight;
-          programmaticUntilRef.current = 0;
+        if (!el) {
+          autoScrollingRef.current = false;
+          return;
         }
-        // Only now is history loading allowed: the view is where it belongs.
-        settledRef.current = true;
-      });
-    });
+        // The reader took over. Never fight a person's own scroll.
+        if (
+          pointerDownRef.current ||
+          lastGestureAtRef.current > abortOnGestureAfter
+        ) {
+          autoScrollingRef.current = false;
+          return;
+        }
+        // A pane that is still display:none — the phone layout opens on the
+        // channel list, with the conversation hidden beside it — reports zero
+        // height, and "scroll to the end" of a box with no height is a no-op.
+        // Keep waiting rather than declare the thread settled at a position it
+        // never actually took.
+        if (el.clientHeight > 0) {
+          el.scrollTop = el.scrollHeight;
+          // "Settled" has to mean the thread genuinely reached its end, not that
+          // a write was attempted. Content still arriving clamps the write short
+          // of the bottom, and calling that settled is how a channel came up
+          // parked in the middle of its own history with nothing left to pull it
+          // down. It also gates history loading.
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 2) {
+            settledRef.current = true;
+          }
+        }
+        if (Date.now() < deadline) {
+          requestAnimationFrame(step);
+        } else {
+          autoScrollingRef.current = false;
+        }
+      };
+      // The first frame waits for React's commit, the rest for layout.
+      requestAnimationFrame(step);
+    },
+    [],
+  );
+
+  // Hold `autoScrollingRef` until a smooth scroll actually comes to rest.
+  // The old code guessed 400ms. A smooth scroll across a long thread takes
+  // longer, and the moment the guess expired its own in-flight events were
+  // read as "the reader jumped to the top" — which loaded older history and
+  // yanked the view off the message it was travelling to.
+  const holdUntilScrollSettles = useCallback(() => {
+    const startedAt = Date.now();
+    autoScrollingRef.current = true;
+    let previousTop = null;
+    let stableFrames = 0;
+    const tick = () => {
+      const el = containerRef.current;
+      if (
+        !el ||
+        pointerDownRef.current ||
+        lastGestureAtRef.current > startedAt ||
+        Date.now() - startedAt > AUTO_SCROLL_MAX_MS
+      ) {
+        autoScrollingRef.current = false;
+        return;
+      }
+      stableFrames = el.scrollTop === previousTop ? stableFrames + 1 : 0;
+      previousTop = el.scrollTop;
+      // Three identical frames means the animation has finished rather than
+      // merely paused between steps.
+      if (stableFrames >= 3) {
+        autoScrollingRef.current = false;
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }, []);
 
   // ── follow the conversation ────────────────────────────────────────
@@ -179,13 +350,18 @@ export function MessageList({
         settledRef.current = true;
       } else {
         stickToBottomRef.current = true;
-        pinToBottom(false);
+        // Forced: opening a thread must land at its end even if the reader
+        // was still scrolling the channel list a moment ago.
+        pinToBottom({ force: true });
       }
     } else if (lengthIncreased && isNewAtBottom) {
       if (stickToBottomRef.current || lastIsMine) {
         stickToBottomRef.current = true;
         setShowScrollButton(false);
-        pinToBottom(true);
+        pinToBottom({
+          force: lastIsMine,
+          durationMs: lastIsMine ? PIN_SETTLE_SEND_MS : PIN_SETTLE_MS,
+        });
       } else {
         setShowScrollButton(true);
       }
@@ -202,29 +378,74 @@ export function MessageList({
     if (!scrollRequest) return;
     stickToBottomRef.current = true;
     setShowScrollButton(false);
-    pinToBottom(true);
+    pinToBottom({ force: true, durationMs: PIN_SETTLE_SEND_MS });
   }, [scrollRequest, pinToBottom]);
 
-  // Late layout: attachments, images and embedded previews resolve AFTER the
-  // first paint and grow the thread underneath the viewport, which is what
-  // made "open a channel with images" land halfway up. Keep the end in view
-  // while the reader is still following; the moment they scroll up,
-  // stickToBottomRef goes false and this stops touching their position.
+  // Late layout, in both directions.
+  //
+  // Content growing: attachments, images and embedded previews resolve AFTER
+  // the first paint and push the end of the thread below the viewport — that
+  // is what made "open a channel with images" land halfway up.
+  //
+  // The viewport SHRINKING does the same damage and was the half this missed.
+  // The composer is `shrink-0`, so every line the textarea gains, every
+  // attachment chip, every reply banner takes its height out of the thread
+  // below it. The content is anchored at scrollTop, so the last message slides
+  // out of sight behind the input — "the message I just sent stays under the
+  // input field". Nothing about the CONTENT changed there, which is why
+  // watching only the rows never noticed.
+  //
+  // Watching the scroll box itself also covers the phone layout, where the
+  // conversation is display:none beside the channel list until it is tapped:
+  // a box with no height cannot be scrolled, so whatever the thread did while
+  // hidden did nothing, and this is the moment it gets a size.
   useEffect(() => {
     const el = containerRef.current;
     const content = contentRef.current;
     if (!el || !content || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
+      const node = containerRef.current;
+      if (!node) return;
+      // The thread has never actually reached its end for this channel. Try
+      // again now that something has a size — this is the safety net that
+      // makes "opens on the last message" unconditional rather than dependent
+      // on one frame having landed at the right moment.
+      if (!settledRef.current) {
+        pinToBottom({ force: true });
+        return;
+      }
       if (!stickToBottomRef.current) return;
+      // Not mid-drag: pinning under a finger that is actively scrolling fights
+      // the person holding it. A gesture that has already ended is fine — they
+      // let go at the bottom, so keeping them there is what they asked for.
+      if (pointerDownRef.current) return;
       // Instant, so no guard window: the echo event this causes lands at the
       // bottom and simply re-confirms stick-to-bottom.
-      el.scrollTop = el.scrollHeight;
+      node.scrollTop = node.scrollHeight;
     });
     // One observation on the content wrapper, not one per message row: the
     // wrapper's identity is stable, so this hooks up once per mount instead of
     // re-registering 50 observations every time a message arrives.
     observer.observe(content);
+    observer.observe(el);
     return () => observer.disconnect();
+  }, [pinToBottom]);
+
+  // The on-screen keyboard does not resize anything the observer above can
+  // see: on iOS the layout viewport keeps its full height and the keyboard is
+  // simply drawn over the bottom of it, thread and composer included. The
+  // visual viewport is the only thing that reports it.
+  useEffect(() => {
+    const viewport =
+      typeof window !== "undefined" ? window.visualViewport : null;
+    if (!viewport) return;
+    const onResize = () => {
+      const el = containerRef.current;
+      if (!el || !stickToBottomRef.current || pointerDownRef.current) return;
+      el.scrollTop = el.scrollHeight;
+    };
+    viewport.addEventListener("resize", onResize);
+    return () => viewport.removeEventListener("resize", onResize);
   }, []);
 
   // Viewing the thread marks it read. Two separate systems get cleared here:
@@ -279,24 +500,31 @@ export function MessageList({
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
     const nearBottom = dist < NEAR_BOTTOM_PX;
 
-    // Our own scrolling, echoing back. Reading intent out of it is exactly how
-    // stick-to-bottom used to be lost mid-animation.
-    if (Date.now() < programmaticUntilRef.current) {
-      if (nearBottom) setShowScrollButton(false);
-      return;
-    }
-
-    stickToBottomRef.current = nearBottom;
     if (nearBottom) {
+      // Arriving at the end always means "following", whoever caused it.
+      stickToBottomRef.current = true;
       setShowScrollButton(false); // reader caught up → dismiss pill
+    } else if (readerIsDriving()) {
+      // Only a scroll the READER performed ends stick-to-bottom. Our own —
+      // a pin, a jump, the anchor restore after a prepend — must not, however
+      // long it takes to finish.
+      stickToBottomRef.current = false;
     }
 
     // ── infinite scroll upward ────────────────────────────────────
-    // Never before the view has settled at the bottom: on open, scrollTop is
-    // legitimately 0 for a frame or two, and treating that as "show me older
-    // messages" is what dropped people into the middle of the conversation.
+    // Three conditions, each of which was a bug on its own:
+    //  - settled: on open scrollTop is legitimately 0 for a frame or two, and
+    //    treating that as "show me older messages" dropped people into the
+    //    middle of the conversation;
+    //  - not auto-scrolling: a scroll of ours still travelling past the top is
+    //    not a request for history, and the position restore below would
+    //    cancel it;
+    //  - reader driving: history is loaded because a person scrolled up to
+    //    look for it, never because a number happened to be small.
     if (
       settledRef.current &&
+      !autoScrollingRef.current &&
+      readerIsDriving() &&
       !isLoadingMoreHistory &&
       hasMoreHistory &&
       el.scrollTop < LOAD_MORE_AT_PX
@@ -311,29 +539,43 @@ export function MessageList({
           // the content grew above them by (new - old), so their offset moves
           // by the same amount. Anchoring to 0 instead of prevTop drifted the
           // view a little further up with every page.
-          programmaticUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
+          autoScrollingRef.current = true;
           node.scrollTop = node.scrollHeight - prevHeight + prevTop;
+          // The scroll event this causes is dispatched before the next frame's
+          // callbacks, so one frame of cover is exactly enough.
+          requestAnimationFrame(() => {
+            autoScrollingRef.current = false;
+          });
         });
       });
     }
-  }, [hasMoreHistory, isLoadingMoreHistory, loadMoreHistory]);
+  }, [hasMoreHistory, isLoadingMoreHistory, loadMoreHistory, readerIsDriving]);
 
   // Scrolls to a message already rendered in the current page of history.
-  const scrollToMessage = useCallback((id) => {
-    const el = containerRef.current?.querySelector(`[data-message-id="${id}"]`);
-    if (!el) return false;
-    programmaticUntilRef.current = Date.now() + PROGRAMMATIC_SCROLL_MS;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Jumping away from the end means the reader is no longer following live;
-    // without this the ResizeObserver would drag them back down.
-    stickToBottomRef.current = false;
-    settledRef.current = true;
-    setHighlightedId(id);
-    setTimeout(() => {
-      setHighlightedId((current) => (current === id ? null : current));
-    }, 1500);
-    return true;
-  }, []);
+  const scrollToMessage = useCallback(
+    (id) => {
+      const el = containerRef.current?.querySelector(
+        `[data-message-id="${id}"]`,
+      );
+      if (!el) return false;
+      // Jumping away from the end means the reader is no longer following live;
+      // without this the ResizeObserver would drag them back down.
+      stickToBottomRef.current = false;
+      settledRef.current = true;
+      // Held for as long as the animation actually runs. This is the guard a
+      // notification deep-link was missing: the jump travels a long way, and
+      // the old fixed window expired mid-flight, at which point the thread
+      // loaded older history and threw the reader off the target.
+      holdUntilScrollSettles();
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedId(id);
+      setTimeout(() => {
+        setHighlightedId((current) => (current === id ? null : current));
+      }, 1500);
+      return true;
+    },
+    [holdUntilScrollSettles],
+  );
 
   const handleJumpToReply = useCallback(
     (targetMessageId, fromMessageId) => {
@@ -421,7 +663,7 @@ export function MessageList({
 
   const handleScrollToBottom = useCallback(() => {
     stickToBottomRef.current = true;
-    pinToBottom(true);
+    pinToBottom({ force: true });
     setShowScrollButton(false);
   }, [pinToBottom]);
 

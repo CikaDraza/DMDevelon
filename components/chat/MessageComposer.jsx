@@ -4,7 +4,8 @@ import { useRef, useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useChatMessages } from "@/hooks/useProjectChat";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
-import { cn, readAsDataURL } from "@/lib/utils";
+import { cn, readAsDataURL, getApiErrorMessage } from "@/lib/utils";
+import { MAX_UPLOAD_LABEL, uploadSizeError } from "@/lib/upload-limits.mjs";
 import {
   ChevronDown,
   FileText,
@@ -158,8 +159,9 @@ export function MessageComposer({
           toast.error("Only images, PDF, DOC/DOCX, and TXT files are allowed");
           continue;
         }
-        if (file.size > 10 * 1024 * 1024) {
-          toast.error(`${file.name} is larger than 10MB`);
+        const tooBig = uploadSizeError(file.size, file.name);
+        if (tooBig) {
+          toast.error(tooBig);
           continue;
         }
         // Derive attachment `type` from MIME when available; fall back to
@@ -191,7 +193,7 @@ export function MessageComposer({
         setPending((prev) => [...prev, { ...result, type: uploadType }]);
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || "Upload failed");
+      toast.error(getApiErrorMessage(err, "Upload failed"));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -316,7 +318,8 @@ export function MessageComposer({
               disabled={uploading}
               className="gap-2 cursor-pointer"
             >
-              <Paperclip className="w-3.5 h-3.5" /> Attach file
+              <Paperclip className="w-3.5 h-3.5" /> Attach file (max{" "}
+              {MAX_UPLOAD_LABEL})
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="gap-2 cursor-pointer">
@@ -352,7 +355,7 @@ export function MessageComposer({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           className="hidden md:block p-2 text-gray-400 hover:text-[#FFB633] transition-colors shrink-0"
-          title="Attach file"
+          title={`Attach file (max ${MAX_UPLOAD_LABEL})`}
         >
           {uploading ? (
             <Loader2 className="w-5 h-5 animate-spin" />

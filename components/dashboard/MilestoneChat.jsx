@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useProjectMessages } from "@/hooks/useClientProjects";
-import { cn, readAsDataURL } from "@/lib/utils";
+import { cn, readAsDataURL, getApiErrorMessage } from "@/lib/utils";
+import { uploadSizeError } from "@/lib/upload-limits.mjs";
 import toast from "react-hot-toast";
 import {
   Send,
@@ -59,8 +60,9 @@ export function MilestoneChat({
           toast.error("Only images, PDF, DOC/DOCX, and TXT files are allowed");
           continue;
         }
-        if (file.size > 10 * 1024 * 1024) {
-          toast.error(`${file.name} is larger than 10MB`);
+        const tooBig = uploadSizeError(file.size, file.name);
+        if (tooBig) {
+          toast.error(tooBig);
           continue;
         }
         // Derive attachment `type` from MIME when available; fall back to
@@ -91,7 +93,7 @@ export function MilestoneChat({
         setPending((prev) => [...prev, { ...result, type: uploadType }]);
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || "Upload failed");
+      toast.error(getApiErrorMessage(err, "Upload failed"));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

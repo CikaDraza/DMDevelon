@@ -30,6 +30,12 @@ import {
 import { sendPushToUser } from "@/lib/push";
 import { NOTIFICATION_THROTTLE_MS } from "@/lib/notification-policy.mjs";
 import {
+  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_LABEL,
+  dataUriByteLength,
+  formatFileSize,
+} from "@/lib/upload-limits.mjs";
+import {
   hashPassword,
   comparePassword,
   generateAccessToken,
@@ -4501,6 +4507,21 @@ export async function POST(request, context) {
         return NextResponse.json(
           { error: "No file provided" },
           { status: 400, headers: getCorsHeaders() },
+        );
+      }
+      // Second line of defence behind the browser-side check. A body big
+      // enough to exceed the platform's own 4.5MB function limit never gets
+      // here at all (Vercel answers with its HTML error page first), so this
+      // catches the band between our limit and that wall — and any caller
+      // that skips the UI. See lib/upload-limits.mjs.
+      const fileBytes = dataUriByteLength(file);
+      if (fileBytes > MAX_UPLOAD_BYTES) {
+        return NextResponse.json(
+          {
+            error: `File is ${formatFileSize(fileBytes)} — the upload limit is ${MAX_UPLOAD_LABEL}.`,
+            maxBytes: MAX_UPLOAD_BYTES,
+          },
+          { status: 413, headers: getCorsHeaders() },
         );
       }
       // Determine attachment type for the response and decide whether this
