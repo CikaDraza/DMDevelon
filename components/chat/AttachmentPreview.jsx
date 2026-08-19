@@ -1,14 +1,8 @@
 "use client";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { downloadFileToDevice } from "@/lib/utils";
-import { Download, FileText, MoreVertical } from "lucide-react";
+import { downloadFileToDevice, shortenFileName } from "@/lib/utils";
+import { Download, FileText } from "lucide-react";
 
 /**
  * Full attachment preview.
@@ -23,39 +17,42 @@ import { Download, FileText, MoreVertical } from "lucide-react";
 export function AttachmentPreview({ attachment, open, onOpenChange }) {
   if (!attachment) return null;
   const { url, type, name } = attachment;
+  const label =
+    shortenFileName(name) || (type === "pdf" ? "Document" : "Image");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1a1a1b] border-white/10 text-white max-w-3xl p-0 overflow-hidden">
-        {/* pr-12 keeps the ⋯ trigger clear of DialogContent's own close button,
-            which is absolutely positioned at right-4 — they overlapped, and on
-            touch the close button won every tap. */}
+      <DialogContent className="bg-[#1a1a1b] border-white/10 text-white w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-3xl p-0 overflow-hidden">
+        {/* pr-12 keeps the download button clear of DialogContent's own close
+            button, which is absolutely positioned at right-4 — they overlapped,
+            and on touch the close button won every tap. */}
         <div className="flex items-center justify-between gap-2 px-4 py-2 pr-12 border-b border-white/10">
-          <DialogTitle className="text-sm truncate">
-            {name || (type === "pdf" ? "Document" : "Image")}
+          <DialogTitle className="min-w-0 flex-1 text-sm truncate" title={name}>
+            {label}
           </DialogTitle>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white shrink-0">
-              <MoreVertical className="w-4 h-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="bg-[#1a1a1b] border-white/10 text-gray-200"
-            >
-              <DropdownMenuItem
-                onClick={() => downloadFileToDevice(url, name)}
-                className="gap-2 cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" /> Download
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* One tap saves the file. This used to be a ⋯ menu holding a single
+              Download item, which made saving a picture a two-tap affair for
+              no reason. */}
+          <button
+            type="button"
+            onClick={() => downloadFileToDevice(url, name)}
+            aria-label={name ? `Download ${name}` : "Download"}
+            title={name ? `Download ${name}` : "Download"}
+            className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white shrink-0"
+          >
+            <Download className="w-4 h-4" />
+          </button>
         </div>
         <div className="max-h-[80vh] overflow-auto bg-black/40 flex items-center justify-center">
           {type === "pdf" ? (
             <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
               <FileText className="w-12 h-12 text-gray-500" />
-              <p className="text-sm text-gray-300">{name || "Document.pdf"}</p>
+              <p
+                className="max-w-full break-all text-sm text-gray-300"
+                title={name}
+              >
+                {shortenFileName(name) || "Document.pdf"}
+              </p>
               <p className="max-w-xs text-xs text-gray-500">
                 Documents open in whatever your device uses for PDFs.
               </p>

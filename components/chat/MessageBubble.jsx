@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, memo, useState } from "react";
-import { cn, downloadFileToDevice } from "@/lib/utils";
+import { cn, downloadFileToDevice, shortenFileName } from "@/lib/utils";
 import { ConvertMessageDialog } from "./ConvertMessageDialog";
 import { AttachmentPreview } from "./AttachmentPreview";
 import {
@@ -279,14 +279,16 @@ function MessageBubbleImpl({
                   key={idx}
                   type="button"
                   onClick={() => downloadFileToDevice(a.url, a.name)}
-                  title="Download this document"
+                  title={
+                    a.name ? `Download ${a.name}` : "Download this document"
+                  }
                   className={cn(
-                    "flex items-center gap-2 text-xs underline",
+                    "flex max-w-full items-center gap-2 text-xs underline",
                     isMine ? "text-black" : "text-[#FFB633]",
                   )}
                 >
-                  <Download className="w-4 h-4" />
-                  {a.name || "Document.pdf"}
+                  <Download className="w-4 h-4 shrink-0" />
+                  {shortenFileName(a.name) || "Document.pdf"}
                 </button>
               ),
             )}
