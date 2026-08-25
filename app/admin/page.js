@@ -53,6 +53,7 @@ import {
   Store,
   MapPinHouse,
   Handshake,
+  SearchCode,
   AlertTriangle,
   RefreshCw,
   Inbox,
@@ -123,6 +124,7 @@ const iconMap = {
   Store,
   MapPinHouse,
   Handshake,
+  SearchCode,
   HandshakeIcon: Cog,
 };
 
@@ -150,6 +152,7 @@ const iconOptions = [
   "Store",
   "MapPinHouse",
   "Handshake",
+  "SearchCode",
 ];
 const colorOptions = [
   "blue",

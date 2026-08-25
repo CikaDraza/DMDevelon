@@ -54,6 +54,7 @@ import {
   Store,
   MapPinHouse,
   Handshake,
+  SearchCode,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,7 @@ const iconMap = {
   Store,
   MapPinHouse,
   Handshake,
+  SearchCode,
   // Backward compatibility for the old admin option. Existing Engineering
   // service records render with the new engine icon without a data migration.
   HandshakeIcon: Cog,
@@ -139,6 +141,17 @@ const colorMap = {
   red: "bg-red-500",
   indigo: "bg-indigo-500",
   teal: "bg-teal-500",
+  sky: "bg-sky-500",
+  violet: "bg-violet-600",
+  emerald: "bg-emerald-800",
+  black: "bg-gray-950",
+};
+
+// Services whose card links to a dedicated block further down the page.
+// Keyed by the service category exactly as typed in the admin, lowercased —
+// every new category needs one line here plus the section it points at.
+const SERVICE_SECTION_ANCHORS = {
+  "code review": "code-review",
 };
 
 // Animation variants
@@ -663,6 +676,220 @@ function AboutSection() {
   );
 }
 
+// Extra service: repository code review, sold on its own subscription and
+// independent of a build. Plain data for the same reason PRICING_TIERS is:
+// the prices belong in the server-rendered HTML, not behind hydration.
+const CODE_REVIEW_PLANS = [
+  {
+    name: "Starter Plan",
+    price: 19,
+    summary:
+      "Ideal for smaller projects, solopreneurs and early-stage startups.",
+    volume: "160 messages or 5M tokens per month",
+    groups: [
+      {
+        title: "What you get from the AI agents",
+        items: [
+          "Automatic PR review of basic changes on main / dev branches.",
+          "Detection of syntax errors, types (TypeScript / Pydantic) and potential bugs in Express and FastAPI routes.",
+          "Checks for basic security vulnerabilities — raw queries, JWT structure.",
+        ],
+      },
+      {
+        title: "What you get from my control",
+        items: [
+          "Validation of the AI findings and a short QA report for every reviewed PR.",
+          "A check that the fixes follow good practice for the React / Node or Python stack.",
+        ],
+      },
+    ],
+  },
+  {
+    name: "Pro Plan",
+    price: 49,
+    summary:
+      "For teams and growing products that need fast delivery without losing quality.",
+    volume: "500 messages or 15M tokens per month",
+    groups: [
+      {
+        title: "What you get from the AI agents",
+        items: [
+          "In-depth architectural analysis of entire modules, up to 200k of context.",
+          "Automatic N+1 query detection (Postgres joinedload / Mongo $lookup) and async event-loop blocking detection in FastAPI.",
+          "Ready-to-use refactored code proposals on GitHub pull requests, in real time.",
+          "CI/CD pipeline integration (GitHub Actions) for continuous review.",
+        ],
+      },
+      {
+        title: "What you get from my control",
+        items: [
+          "Architectural review of how services and databases relate to each other.",
+          "Checks on edge-case scenarios, race conditions and data consistency under load.",
+          "Advice on design patterns and error-handling strategy.",
+        ],
+      },
+    ],
+  },
+  {
+    name: "Extraordinary Plan",
+    price: 249,
+    summary:
+      "Full guarantee and commitment for scalable systems, enterprise and complex monorepo / microservice architectures.",
+    volume: "Unlimited",
+    groups: [
+      {
+        title: "What you get from the AI agents",
+        items: [
+          "Continuous deep research and auto-monitoring of your repository, 24/7.",
+          "Complete penetration and security check — OAuth2 flows, RBAC / scope validation, Pydantic and Mongoose edge cases.",
+          "Full AI integration into your CI/CD pipeline, with dedicated agents automating testing and refactoring.",
+          "Refactoring proposals for complicated functions at senior / architect level.",
+        ],
+      },
+      {
+        title: "What you get from my control",
+        items: [
+          "An elite architect, security expert and senior QA engineer working directly inside your team.",
+          "Full understanding and protection of your business model through the code.",
+          "A detailed technical walkthrough of every segment: React frontend, Node / Python API, coupled databases (Postgres + MongoDB).",
+        ],
+      },
+      {
+        title: "And on top of that",
+        items: [
+          "Priority support and direct consultation on architecture and scaling.",
+        ],
+      },
+    ],
+  },
+];
+
+/**
+ * Extra services — code review.
+ *
+ * Deliberately mirrors the financing block above it: same eyebrow, headline
+ * and card language, because it is the same kind of promise (a monthly price,
+ * stated up front) for a service that is bought separately from a build.
+ *
+ * The id is what the "Code Review" card in Services links to — see
+ * SERVICE_SECTION_ANCHORS.
+ */
+function CodeReviewSection() {
+  return (
+    <section id="code-review" className="scroll-mt-24 py-20 relative">
+      <div className="container mx-auto px-4">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={fadeInUp}
+          className="text-center"
+        >
+          <span className="text-[#FFB633] text-sm font-semibold tracking-widest">
+            NEW EXTRA SERVICES
+          </span>
+          <h2 className="mt-4 text-3xl font-bold text-white lg:text-4xl">
+            Code review that reads the architecture, not just the syntax
+          </h2>
+          <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-gray-400">
+            Most AI code review tools give you superficial linter remarks. I
+            offer something completely different: elite architectural, security
+            and QA review of the code in your repository — AI agents do the deep
+            analysis, and I personally control, test and verify every pull
+            request.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          variants={fadeInUp}
+          className="mx-auto mt-10 grid max-w-6xl gap-x-10 gap-y-6 md:grid-cols-2"
+        >
+          <p className="text-base leading-relaxed text-gray-400">
+            You don&apos;t just get typos fixed. You get a guarantee that the
+            system holds at the level of architecture, security and performance
+            — specialised agents, a diagnostics engine and deep research do the
+            analysis, and every finding then goes through my own verification,
+            where I validate the proposal, test the edge cases and make sure the
+            refactored code still fits your business model.
+          </p>
+          <p className="text-base leading-relaxed text-gray-400">
+            All I need is access to your remote repository on GitHub or GitLab.
+            There is no documentation to write for me — the agents map the
+            structure, modules, dependencies and business logic themselves,
+            across React, Node / Express, PHP / Laravel, Python / FastAPI,
+            Postgres and MongoDB, down to auth, CI/CD and the notification
+            layer.
+          </p>
+        </motion.div>
+
+        <div className="mx-auto mt-12 grid max-w-6xl gap-6 lg:grid-cols-3">
+          {CODE_REVIEW_PLANS.map((plan) => (
+            <motion.div
+              key={plan.name}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-80px" }}
+              variants={fadeInUp}
+              className="flex flex-col rounded-2xl border border-white/10 bg-[#1a1a1b] p-8 transition-colors hover:border-[#FFB633]/40"
+            >
+              <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
+              <p className="mt-3 flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-[#FFB633]">
+                  ${plan.price}
+                </span>
+                <span className="text-sm text-gray-500">/ month</span>
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-gray-300">
+                {plan.summary}
+              </p>
+              <p className="mt-3 text-xs leading-relaxed text-gray-500">
+                AI volume: {plan.volume}
+              </p>
+
+              {plan.groups.map((group) => (
+                <div key={group.title} className="mt-6">
+                  <h4 className="text-xs font-semibold uppercase tracking-widest text-[#FFB633]">
+                    {group.title}
+                  </h4>
+                  <ul className="mt-3 space-y-2.5">
+                    {group.items.map((item) => (
+                      <li key={item} className="flex gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#FFB633]"
+                        />
+                        <span className="text-sm leading-relaxed text-gray-400">
+                          {item}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </motion.div>
+          ))}
+        </div>
+
+        <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed text-gray-500">
+          Ready to raise the quality of your code to the level of a secure,
+          scalable enterprise system?{" "}
+          <a
+            href="#contact"
+            className="text-[#FFB633] underline underline-offset-4 hover:text-[#e5a32e]"
+          >
+            Send me
+          </a>{" "}
+          a request with a link to your repository and together we will agree on
+          the plan that suits you best.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 // Services Section Component
 function ServicesSection({ services }) {
   const displayServices = services?.length > 0 ? services : [];
@@ -699,10 +926,18 @@ function ServicesSection({ services }) {
             const IconComponent = iconMap[service.icon] || Code;
             const bgColor = colorMap[service.color] || "bg-blue-500";
             const gridSpan = service.gridSpan || 1;
+            // A category listed in SERVICE_SECTION_ANCHORS has its own block
+            // further down the page, so the whole card becomes a link to it.
+            const anchor =
+              SERVICE_SECTION_ANCHORS[
+                service.category?.trim().toLowerCase()
+              ] || null;
+            const Card = anchor ? motion.a : motion.div;
 
             return (
-              <motion.div
+              <Card
                 key={service._id}
+                {...(anchor ? { href: `#${anchor}` } : {})}
                 variants={{
                   hidden: { opacity: 0, x: index % 2 === 0 ? -50 : 50, y: 30 },
                   visible: {
@@ -713,7 +948,7 @@ function ServicesSection({ services }) {
                   },
                 }}
                 whileHover={{ scale: 1.03, y: -5 }}
-                className={`${bgColor} rounded-2xl p-6 lg:col-span-${Math.min(gridSpan, 7)} transition-all duration-300 cursor-pointer group`}
+                className={`${bgColor} block rounded-2xl p-6 lg:col-span-${Math.min(gridSpan, 7)} transition-all duration-300 cursor-pointer group`}
               >
                 <div className="flex items-start gap-4 h-44">
                   <div className="p-3 bg-white/20 rounded-xl group-hover:bg-white/30 transition-colors">
@@ -726,9 +961,15 @@ function ServicesSection({ services }) {
                     <p className="text-white/80 text-sm">
                       {service.description}
                     </p>
+                    {anchor && (
+                      <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-white">
+                        See plans
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                      </span>
+                    )}
                   </div>
                 </div>
-              </motion.div>
+              </Card>
             );
           })}
         </motion.div>
@@ -1940,6 +2181,7 @@ export default function HomeClient({ initialServices }) {
       />
       <HeroSection profile={profile} />
       <AboutSection />
+      <CodeReviewSection />
       <ServicesSection services={initialServices} />
       <ProjectsSection projects={projects} />
       <TestimonialsSection testimonials={testimonials} />
