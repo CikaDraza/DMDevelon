@@ -1,0 +1,98 @@
+schema_version: "1.0"
+kind: dmd.design_handoff
+handoff_id: "DHP-EXAMPLE-001"
+design_job_id: "DES-EXAMPLE-001"
+
+project:
+  name: "Example Professional Center"
+  description: >
+    Digitalni prostor koji jasno predstavlja profesionalnu uslugu,
+    vodi posetioca ka odgovarajućem intake-u i omogućava zakazivanje.
+  business_goal: >
+    Pretvoriti interesovanje u strukturisan klijentski tok uz manje
+    ručnog dogovaranja.
+  design_goal: >
+    Moderan, premium i pristupačan identitet koji uliva poverenje.
+
+target:
+  product_route: "pdc"
+  product_manifest_version: "2026.09-draft"
+
+strategy:
+  id: "DS-EXAMPLE"
+  version: 1
+  design_system:
+    id: "DS_SOFT_PROFESSIONAL"
+    version: 1
+  rules:
+    DMD_DESIGN_RULES: 1
+    PDC_DESIGN_GRAMMAR: 1
+    MOBILE_FIRST_RULES: 1
+    CTA_STRATEGY_RULES: 1
+    ACCESSIBILITY_RULES: 1
+    SEO_PAGE_STRUCTURE: 1
+
+capabilities:
+  required:
+    - booking.request
+    - intake.form
+    - cms.pages
+  allowed:
+    - survey
+    - client_account
+  forbidden:
+    - ecommerce.checkout
+    - beauty.loyalty
+
+pages:
+  - id: home
+    route: /
+    purpose: explain_value_and_convert
+    desired_sections:
+      - hero
+      - trust
+      - services
+      - process
+      - testimonials
+      - booking_cta
+
+assets:
+  - id: asset_hero_01
+    role: hero
+    source: client_upload
+    title: "Founder portrait"
+    description: "Professional founder portrait intended for homepage hero."
+    intended_placement: "home.hero.primary"
+    url: "<signed-or-public-cloudinary-url>"
+
+media_slots:
+  - id: home.hero.primary
+    role: hero
+    editable_by_client: true
+    preferred_aspect_ratio: "4:5"
+    description: "Primary founder image beside the homepage value proposition."
+
+references:
+  existing_website:
+    url: "https://example-old-site.test"
+    design_relevant_findings:
+      - "Primary CTA is unclear"
+      - "Mobile hero is too tall"
+  design_references:
+    - url: "https://example-reference.test"
+      likes:
+        - "editorial typography"
+        - "spacing"
+      dislikes:
+        - "dark dominant palette"
+
+executor_contract:
+  priorities:
+    - business_outcome
+    - user_clarity
+    - conversion_strategy
+    - product_compatibility
+    - accessibility
+    - visual_quality
+    - implementation_feasibility
+  must_not_invent_capabilities: true
