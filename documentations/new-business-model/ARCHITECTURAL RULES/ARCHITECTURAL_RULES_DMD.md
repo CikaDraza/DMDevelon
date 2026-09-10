@@ -5,7 +5,7 @@
 **Date:** 2026-09-09  
 **Applies to:** DMD Next.js application, Route Handlers, React UI, server modules, tests, scripts and all AI coding agents  
 **Primary architecture:** Next.js 16+ App Router + React 19.2+ + JavaScript + MongoDB/Mongoose  
-**Language rule:** JavaScript only. Do not introduce TypeScript files or TypeScript-only architecture.
+**Language rule:** DMD source is `.js`, `.jsx` and `.mjs` only. Do not introduce TypeScript files, TypeScript syntax, TypeScript-only architecture or a typed-JavaScript migration.
 
 ---
 
@@ -172,7 +172,7 @@ Use:
 
 - Next.js 16+, App Router only for new work;
 - React 19.2+;
-- JavaScript (`.js` / `.mjs`) only;
+- JavaScript (`.js` / `.jsx` / `.mjs`) only;
 - Tailwind according to the existing project setup;
 - MongoDB/Mongoose through server-side modules;
 - Zod or equivalent runtime validation at untrusted boundaries when already available/approved;
@@ -182,6 +182,10 @@ Use:
 Do not add `.ts` or `.tsx` files.
 
 Do not migrate the project to TypeScript as part of unrelated work.
+
+Do not reinterpret JavaScript-only as a requirement to migrate the repository to typed JavaScript through JSDoc. JSDoc typing is optional and reserved for non-trivial exported application/server boundaries where it materially clarifies the contract. Do not add type annotations to local variables, ordinary component props or routine helpers merely to increase type coverage.
+
+Zod and JSON Schema provide runtime validation. They do not authorize generated TypeScript types or TypeScript syntax. Existing `typescript`, `tsconfig.json` and `typecheck` tooling are JavaScript build/module-resolution checks and do not authorize TypeScript source or a JSDoc typing campaign.
 
 ### 3.1 JavaScript contract discipline
 
@@ -196,7 +200,7 @@ Mandatory for untrusted input:
 - normalize identifiers before use;
 - reject unknown state-machine values.
 
-Use JSDoc for non-trivial exported application/server functions when it materially improves the contract.
+JSDoc may be used for non-trivial exported application/server functions when it materially improves the contract; it is not a repository-wide typing requirement.
 
 Example:
 

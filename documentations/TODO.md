@@ -24,7 +24,7 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 **Binding architecture:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
 
-**Language decision:** DMD remains JavaScript/JSX. TypeScript examples were copied from a different project and have been removed from the active expansion guidance. Do not add .ts or .tsx source files; use runtime schemas and JSDoc where they clarify JavaScript contracts. The existing tsconfig.json with allowJs/checkJs settings and npm run typecheck remain JavaScript build/module-resolution checks; they do not authorize TypeScript source.
+**Language decision:** DMD source remains `.js`, `.jsx` and `.mjs` only. TypeScript examples were copied from a different project and have been removed from the active expansion guidance. Do not add TypeScript files or syntax, and do not perform a typed-JavaScript/JSDoc migration: JSDoc is optional only for non-trivial exported boundaries, not local variables, ordinary props or routine helpers. Zod/JSON Schema are runtime validation, while the existing typescript/tsconfig/typecheck tooling remains a JavaScript build/module-resolution check; neither authorizes TypeScript source or generated TS types.
 
 **Historical evidence:** The Project Communication Hub record beginning at section 0 remains unchanged below. Completion in that historical work never means a new-business milestone is complete.
 
