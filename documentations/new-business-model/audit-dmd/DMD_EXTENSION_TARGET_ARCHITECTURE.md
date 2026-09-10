@@ -131,7 +131,7 @@ Owns:
 - provider adapters;
 - provisioning run;
 - verification/reconciliation;
-- ProductInstance.
+- ProductInstanceReference (the DMD-side reference to the provider-owned instance).
 
 ### 3.6 Project Intelligence
 
@@ -165,7 +165,7 @@ Owns:
 
 ## 4. Recommended code organization
 
-Do not reorganize the entire repository first. Create the new structure around the extension and migrate legacy code only when touched.
+Do not reorganize the entire repository first. Create the canonical structure around each implemented slice and migrate legacy code only when touched.
 
 ```text
 app/
@@ -180,47 +180,22 @@ app/
       github/
     [[...path]]/route.js        # legacy endpoints remain
 
-lib/
-  application/
-    discovery/
-    product/
-    design/
-    commercial/
-    provisioning/
-    project/
-    evidence/
-
-  domain/
-    discovery/
-    capability/
-    routing/
-    blueprint/
-    design/
-    commercial/
-    provisioning/
-    project-intelligence/
-    evidence/
-
-  ai/
-    orchestrator/
-    policies/
-    providers/
-      openai/
-      anthropic/
-      deepseek/
-    schemas/
-
+server/
+  http/
+  auth/
+  db/
+  modules/
+    <domain>/
+      application/
+      domain/
+      repositories/
+      validation/
   integrations/
-    github/
-    marysoll/
-    pdc/
-    storage/
+  jobs/
+  diagnostics/
 
-  infrastructure/
-    jobs/
-    outbox/
-    locks/
-    metering/
+lib/
+  genuinely shared non-domain utilities only
 ```
 
 Existing pure-domain files can stay in place until moved safely.
@@ -327,7 +302,7 @@ LLM
 
 `CommandProposal` example:
 
-```ts
+```text
 {
   commandType: "create_project_item",
   projectId: "...",
@@ -442,16 +417,16 @@ Use aggregates according to lifecycle/change rate:
 
 ```text
 DiscoverySession
-BusinessStateRevision
+VerifiedBusinessState
 ProductRouteDecision
-SolutionBlueprintRevision
-DesignGenerationJob
+SolutionBlueprint
+DesignJob
 DesignCandidate
-DesignSelection
+ApprovedDesignRevision
 CommercialConfiguration
 OnboardingRequirement
 ProvisioningRun
-ProductInstance
+ProductInstanceReference
 AgentRun
 ChangeAssessment
 ProjectEvidence

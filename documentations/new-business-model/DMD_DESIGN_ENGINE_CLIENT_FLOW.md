@@ -64,7 +64,7 @@ Design može menjati:
 
 Predloženi object:
 
-```ts
+```text
 DesignStrategy {
   id
   solutionBlueprintId
@@ -122,7 +122,7 @@ Cilj nije kopiranje template-a, već izvlačenje:
 
 ## 5. Design Candidate
 
-```ts
+```text
 DesignCandidate {
   id
   designStrategyId
@@ -239,10 +239,10 @@ Ova granica sprečava da se business-model promena sakrije u dizajnerskom feedba
 
 ---
 
-## 9. ClientDesignSelection
+## 9. ApprovedDesignRevision
 
-```ts
-ClientDesignSelection {
+```text
+ApprovedDesignRevision {
   id
   candidateId
   candidateRevision
@@ -255,7 +255,7 @@ ClientDesignSelection {
 }
 ```
 
-Selected revision treba da bude stabilan input Commercial/Provisioning sloju.
+Approved revision je immutable snapshot i stabilan input Commercial/Provisioning sloju.
 
 ---
 

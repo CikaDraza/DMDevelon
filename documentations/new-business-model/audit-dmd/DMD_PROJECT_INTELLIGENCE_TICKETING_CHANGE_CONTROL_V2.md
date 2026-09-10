@@ -52,7 +52,7 @@ ProjectItem / Task / Proposal / Answer / OnboardingRequirement
 
 Machine classification should include:
 
-```ts
+```text
 ProjectMessageIntent {
   primary:
     | "question"
@@ -191,7 +191,7 @@ AI supplies structured mapped deltas; it does not select the commercial conseque
 
 ## 6. ChangeAssessment model
 
-```ts
+```text
 ChangeAssessment {
   id
   projectId
@@ -230,7 +230,7 @@ A task must explicitly know prerequisites.
 
 Extend tasks with:
 
-```ts
+```text
 {
   dependsOnTaskIds: [],
   dependencyMode: "all" | "any",

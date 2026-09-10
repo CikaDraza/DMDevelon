@@ -53,7 +53,7 @@ Cards pomažu korisniku, ali ne predstavljaju route decision.
 
 Predloženi domain object:
 
-```ts
+```text
 DiscoverySession {
   id
   actorRef?
@@ -260,7 +260,7 @@ Primer:
 
 Predlog:
 
-```ts
+```text
 VerifiedBusinessState {
   id
   discoverySessionId

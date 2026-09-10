@@ -110,7 +110,7 @@ DMD can normalize all three behind one agent contract instead of hardcoding prod
 
 Use configuration, not one giant system prompt.
 
-```ts
+```text
 AgentDefinition {
   key
   purpose
@@ -160,7 +160,7 @@ VerifiedBusinessState
 CapabilityModel
 ProductRouteDecision
 SolutionBlueprint
-SelectedDesignRevision
+ApprovedDesignRevision
 AcceptedProjectProposal
 ClientProject projection
 ```
@@ -207,7 +207,7 @@ Schema-valid does not mean business-valid.
 
 Model selection should depend on task, not brand preference.
 
-```ts
+```text
 ModelRoutePolicy {
   agentKey
   requiredCapabilities[]
@@ -245,12 +245,12 @@ Final models/prices remain config, not architecture.
 
 ## 9. Provider adapter
 
-Canonical interface example:
+Canonical provider-adapter contract:
 
-```ts
-interface AiProviderAdapter {
-  generateStructured<T>(request: StructuredRequest<T>): Promise<StructuredResult<T>>
-  streamConversation(request: ConversationRequest): AsyncIterable<AiEvent>
+```text
+AiProviderAdapter {
+  generateStructured(request) -> StructuredResult
+  streamConversation(request) -> async stream of AiEvent
 }
 ```
 
@@ -272,7 +272,7 @@ Domain owns none of these.
 
 Every API-model run should produce an operational record.
 
-```ts
+```text
 AgentRun {
   id
   agentKey

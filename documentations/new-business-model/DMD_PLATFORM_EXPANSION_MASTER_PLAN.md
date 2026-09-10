@@ -350,8 +350,8 @@ ProductDefinition
 ProductRouteDecision
 SolutionBlueprint
 DesignStrategy
-DesignCandidateSet
-ClientDesignSelection
+DesignCandidate
+ApprovedDesignRevision
 CommercialConfiguration
 ProvisioningPlan
 ProductInstanceReference

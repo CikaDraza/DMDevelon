@@ -308,7 +308,7 @@ It outputs a structured `DesignSpec`.
 
 Example shape:
 
-```ts
+```text
 DesignSpec {
   productFamily
   productVersion

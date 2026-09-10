@@ -59,7 +59,7 @@ Ne određuje product feature entitlement.
 
 ## 3. CommercialConfiguration
 
-```ts
+```text
 CommercialConfiguration {
   id
   solutionBlueprintId
@@ -134,7 +134,7 @@ Onboarding ne treba da bude statična duga lista.
 
 Requirement nastaje kada ga Solution/Provisioning plan zaista zahteva.
 
-```ts
+```text
 OnboardingRequirement {
   id
   projectId
@@ -304,7 +304,7 @@ Ne menjati target schema samo zato što source DB ima loš model.
 
 ## 10. ProvisioningPlan
 
-```ts
+```text
 ProvisioningPlan {
   id
   solutionBlueprintId
@@ -362,7 +362,7 @@ To smanjuje provisioning greške i neželjene resurse.
 
 Contract:
 
-```ts
+```text
 ProvisioningAdapter {
   plan()
   validate()
@@ -388,7 +388,7 @@ DMD zna adapter contract, ali ne preuzima unutrašnju poslovnu logiku proizvoda.
 
 DMD čuva referencu, ne kopiju product domena.
 
-```ts
+```text
 ProductInstanceReference {
   id
   productKey

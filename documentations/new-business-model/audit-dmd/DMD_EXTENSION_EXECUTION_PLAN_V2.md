@@ -9,15 +9,30 @@
 
 The conceptual M0–M12 roadmap remains valid, but the repo audit changes the implementation order.
 
+`documentations/TODO.md` is the canonical execution index. The active foundation order before any new-business implementation is:
+
+```text
+DMD-FND-0 complete
+→ DMD-FND-1 isolated staging
+→ DMD-FND-2 fresh baseline
+→ DMD-FND-2A React 19.2 compatibility
+→ DMD-FND-3 endpoint/page inventory
+→ DMD-FND-4 security/architecture shell
+```
+
+After DMD-FND-4, the Business Intelligence branch may begin while DMD-FND-5 through DMD-FND-8 migrate legacy endpoints sequentially on the parallel cleanup branch.
+
 The existing project/chat/proposal core is stronger than expected, so Project Intelligence can be developed earlier in parallel, while discovery/product/design still form the primary new client vertical.
 
 Do not start with AI providers.
 
-Start with contracts, state, security and one end-to-end vertical slice.
+Overall implementation starts with DMD-FND-1 isolated staging. After the foundation sequence reaches DMD-FND-4, the new-business branch starts with contracts, state, security and one end-to-end vertical slice.
 
 ---
 
 ## 2. Phase A — Baseline hardening and architecture shell
+
+This is a conceptual grouping, not permission to collapse or reorder DMD-FND-1 through DMD-FND-4. Execute these concerns only through the bounded milestones in `documentations/TODO.md`; do not combine staging isolation, baseline capture, React compatibility or catch-all inventory into one change.
 
 ### A1 Documentation reconciliation
 
@@ -38,7 +53,8 @@ Start with contracts, state, security and one end-to-end vertical slice.
 ### A3 New API/application structure
 
 - dedicated routes for expansion;
-- `lib/application` / `lib/domain` / `lib/ai` conventions;
+- canonical `server/http`, `server/auth`, `server/db`, `server/modules/<domain>`, `server/integrations`, `server/jobs` and `server/diagnostics` boundaries;
+- application/domain/repository/validation separation inside `server/modules/<domain>` where needed; `lib/` is reserved for genuinely shared non-domain utilities;
 - no new extension branches in catch-all API;
 - standard error/response/idempotency utilities.
 
@@ -320,13 +336,13 @@ Do not start with:
 
 ---
 
-## 12. First implementation epic recommendation
+## 12. First new-business/product epic recommendation
 
-The first real epic should be:
+After DMD-FND-1 through DMD-FND-4 are complete, the first new-business/product epic should be:
 
 > **DMD-E1 — Guided Discovery → Verified Business State**
 
-It proves the differentiating product concept without requiring Design Engine, provisioning or GitHub automation yet.
+It proves the differentiating product concept without requiring Design Engine, provisioning or GitHub automation yet. It is not the first implementation work overall: DMD-FND-1 isolated staging is the next implementation milestone.
 
 ### E1 tasks
 
@@ -335,7 +351,7 @@ It proves the differentiating product concept without requiring Design Engine, p
 3. DiscoverySession model/API;
 4. message persistence;
 5. AgentRun/provider adapter v1;
-6. BusinessState schema;
+6. VerifiedBusinessState schema;
 7. extraction + missing fields;
 8. Understanding Gate;
 9. client summary/correction;

@@ -324,9 +324,9 @@ Exact route shape may adjust during implementation, but bounded ownership must r
 
 ```text
 DiscoverySession
-BusinessStateRevision
+VerifiedBusinessState
 ProductRouteDecision
-SolutionBlueprintRevision
+SolutionBlueprint
 ```
 
 Capability/Product registry can begin as versioned code/config before persistence is needed.
@@ -334,9 +334,9 @@ Capability/Product registry can begin as versioned code/config before persistenc
 ### Design
 
 ```text
-DesignGenerationJob
+DesignJob
 DesignCandidate
-DesignSelection
+ApprovedDesignRevision
 ```
 
 ### AI
@@ -358,7 +358,7 @@ Extend existing task/project models with dependency/evidence references carefull
 ```text
 OnboardingRequirement
 ProvisioningRun
-ProductInstance
+ProductInstanceReference
 ```
 
 ### Evidence
@@ -435,7 +435,7 @@ validate plan
 → execute adapter steps
 → verify
 → reconcile if partial
-→ activate ProductInstance
+→ record the active ProductInstanceReference after provider verification
 ```
 
 ---

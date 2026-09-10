@@ -50,10 +50,10 @@ When a proposal/phase is accepted:
 ```text
 Accepted ProjectProposal
 + Solution Blueprint
-+ Selected Design
++ Approved Design Revision
 + known decisions
        ↓
-EngineeringWorkOrder vN
+WorkOrder vN
        ↓
 DMD API / CLI pull
        ↓
@@ -324,7 +324,7 @@ Do not rewrite accepted proposal from repo events.
 
 Create a derived projection:
 
-```ts
+```text
 EngineeringProjection {
   projectId
   workOrderVersion

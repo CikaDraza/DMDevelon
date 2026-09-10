@@ -86,17 +86,21 @@ The primary product path is DiscoverySession → Verified Business State → Cap
 
 **Tasks:**
 
-- [ ] Provision separate staging frontend/deployment, Mongo database/credentials, environment variables, auth/session origins and CORS allowlist.
-- [ ] Establish separate Cloudinary namespace/folder and private-delivery policy; never use production portfolio/default storage for new private assets.
-- [ ] Establish safe staging email/push recipients, webhook targets/secrets, cron/job behavior and AI provider environment tag/budget.
-- [ ] Protect or disable unauthenticated POST /api/seed before staging is declared safe.
+- [ ] Provision a separate staging frontend/deployment, environment variables, auth/session origins and CORS allowlist.
+- [ ] Provision a separate staging Mongo database and credentials with no production write authority where infrastructure supports it; never reuse production application credentials.
+- [ ] Add a fail-closed configuration guard: when APP_ENV=staging, reject known production Mongo/resource identities before the application can serve traffic or run a job.
+- [ ] Isolate Cloudinary at provider/account credential level where available. Otherwise use an explicit staging namespace plus a fail-closed application guard and scoped credentials; a folder prefix with an unrestricted production credential is not physical isolation.
+- [ ] Restrict email and push to explicit safe staging recipients/test providers, and disable or safely isolate scheduled cron/job side effects.
+- [ ] Disable POST /api/seed outside explicitly allowed local development, or place it behind an equally explicit authenticated/authorized staging-safe control, before the first staging deployment is declared safe.
 - [ ] Define fixture/anonymization and production-data protection rules; no casual production DB write or clone.
 
-**Invariants:** Staging cannot silently share production DB, secrets, Cloudinary namespace, recipient audience, webhook target or AI budget.
+**Invariants:** A staging deployment must not possess or resolve credentials/configuration that can accidentally write to production resources. Invalid, ambiguous or production-pointing staging configuration fails closed. Any future provider must be environment-isolated before activation, but FND-1 creates no placeholder credentials or setup for unused providers.
 
-**Verification:** Connection target, asset prefix, email policy, webhook secret and AI tag prove isolation; smoke evidence shows no production resource was written.
+**Verification:** Negative configuration tests reject known production Mongo/resource identities under APP_ENV=staging; credential authority and provider/account or guarded namespace boundaries prove isolation before smoke testing. Email/push recipient controls, cron behavior and seed denial are exercised, and smoke evidence confirms no production resource was reachable for writes.
 
-**Explicitly out of scope:** Production promotion, production-data migration and automatic provisioning.
+**Explicitly out of scope:** React upgrade, catch-all extraction, production promotion, production-data migration, automatic provisioning, future AI-provider configuration and future GitHub/evidence webhook configuration.
+
+**Deferred ownership:** AI-provider environment configuration belongs to DMD-AI-0. GitHub/evidence webhook configuration belongs to DMD-PROJ-3.
 
 ## DMD-FND-2 — Fresh current-system baseline
 
@@ -215,7 +219,7 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 - [ ] Process health, cron/email-digest, auth/*, users/* and user/settings inventory rows one endpoint at a time through the required protocol.
 - [ ] Give cron a dedicated signed/secret-validated application-job boundary.
 - [ ] Preserve access-token/refresh-cookie behavior until its separately approved hardening migration.
-- [ ] Close the seed-route safety decision rather than carrying it into another dispatcher.
+- [ ] Permanently extract or remove the already-contained seed endpoint; place any retained behavior behind a dedicated route and the canonical server/application boundary. FND-1 containment is a prerequisite, not a substitute for this migration.
 
 **Invariants:** Auth/session semantics are not casually changed during extraction; cron is safe/idempotent in staging.
 

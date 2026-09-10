@@ -473,11 +473,11 @@ Until new plans are decided, current prices are legacy presentation data, not ar
 - CapabilityModel;
 - ProductDefinition/ProductRouteDecision;
 - SolutionBlueprint;
-- DesignStrategy/DesignGenerationJob/DesignCandidate;
-- SelectedDesignRevision;
+- DesignStrategy/DesignJob/DesignCandidate;
+- ApprovedDesignRevision;
 - CommercialConfiguration + usage metering;
 - OnboardingRequirement;
-- ProvisioningPlan/Run/ProductInstance;
+- ProvisioningPlan/Run/ProductInstanceReference;
 - AgentRun/AI command proposals;
 - ChangeAssessment;
 - ProjectEvidence/EngineeringProjection;

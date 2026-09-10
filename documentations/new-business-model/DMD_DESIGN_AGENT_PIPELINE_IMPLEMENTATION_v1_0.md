@@ -123,6 +123,8 @@ curated handoff
 
 Claude Design, Anthropic API, OpenAI API ili drugi design executor dobijaju samo kurirani kontekst dovoljan da razumeju projekat i dizajn, bez nepotrebnog poslovnog i tehničkog šuma.
 
+Svi `text` shape blokovi u ovom dokumentu koriste jezički neutralnu contract notaciju, nisu JavaScript/TypeScript source. `?` označava opciono polje, a navedeni tipovi opisuju očekivanu vrednost.
+
 ---
 
 # 2. Discovery i identity boundary
@@ -133,8 +135,8 @@ Claude Design, Anthropic API, OpenAI API ili drugi design executor dobijaju samo
 
 Predlog:
 
-```ts
-interface DiscoverySession {
+```text
+DiscoverySession {
   id: string;
   ownerUserId: string | null;
   anonymousSessionHash: string | null;
@@ -306,8 +308,8 @@ DB ne skladišti image binaries. Cloudinary čuva fajl i delivery. DMD čuva zna
 
 Kanonski početni shape:
 
-```ts
-interface DesignAsset {
+```text
+DesignAsset {
   id: string;
   discoverySessionId: string;
   designJobId?: string;
@@ -408,14 +410,14 @@ DesignAsset
 
 ## 5.1 MediaSlot
 
-```ts
-interface DesignMediaSlot {
+```text
+DesignMediaSlot {
   id: string; // home.hero.primary
   designCandidateId: string;
   pageId: string;
   sectionId: string;
 
-  role: DesignAsset["role"];
+  role: one of DesignAsset.role values;
   required: boolean;
   editableByClient: boolean;
 
@@ -440,8 +442,8 @@ description: >
 
 ## 5.2 AssetBinding
 
-```ts
-interface DesignAssetBinding {
+```text
+DesignAssetBinding {
   id: string;
   mediaSlotId: string;
   designAssetId: string;
@@ -527,8 +529,8 @@ Tehnički audit ostaje dostupan drugim engine-ima, ali Design Handoff dobija sam
 
 ## 7.1 Shape
 
-```ts
-interface DesignStrategy {
+```text
+DesignStrategy {
   id: string;
   discoverySessionId: string;
   blueprintId: string;
@@ -577,7 +579,7 @@ interface DesignStrategy {
     version: number;
   };
 
-  ruleRefs: Record<string, number>;
+  ruleRefs: map of rule key to version number;
 
   designIntentId: string;
   websiteAnalysisId?: string;
@@ -1001,8 +1003,8 @@ Obe koriste isti `DesignStrategy` i kreiraju isti `DesignCandidate` contract.
 
 # 15. DesignJob aggregate
 
-```ts
-interface DesignJob {
+```text
+DesignJob {
   id: string;
 
   discoverySessionId: string;
@@ -1376,7 +1378,7 @@ Visual artifact:
 
 Real implementation:
 
-```tsx
+```jsx
 <BookingTrigger
   serviceId={serviceId}
   intakeContext={intakeContext}
@@ -1590,8 +1592,8 @@ ApprovedDesignRevision
 
 Predlog:
 
-```ts
-interface ApprovedDesignRevision {
+```text
+ApprovedDesignRevision {
   id: string;
   designJobId: string;
   designCandidateId: string;
@@ -1601,7 +1603,7 @@ interface ApprovedDesignRevision {
   designStrategyVersion: number;
   designSystemId: string;
   designSystemVersion: number;
-  ruleRefs: Record<string, number>;
+  ruleRefs: map of rule key to version number;
 
   previewUrl: string;
   previewCommitSha?: string;
@@ -1666,8 +1668,8 @@ Frontend ne treba da zna ko je napravio dizajn.
 
 `DesignCandidate` je provider-neutral:
 
-```ts
-interface DesignCandidate {
+```text
+DesignCandidate {
   id: string;
   designJobId: string;
 
@@ -1701,9 +1703,9 @@ Time je moguće zameniti provider bez izmene client UX-a ili poslovnog toka.
 
 Design execution mora biti adapter-based.
 
-```ts
-interface DesignExecutorAdapter {
-  createDesign(input: DesignExecutionInput): Promise<DesignExecutionResult>;
+```text
+DesignExecutorAdapter {
+  createDesign(input: DesignExecutionInput) -> DesignExecutionResult
 }
 ```
 
@@ -2264,4 +2266,3 @@ immutable design approval
 Ključna podela odgovornosti ostaje:
 
 > **Client language daje nameru. Business Intelligence daje značenje. Product Intelligence daje granice. Design Intelligence daje strategiju. Design system daje jezik. Designer agent daje vizuelno rešenje. Normalizer daje strukturu. Validator čuva product contract. Claude Code/Codex daju stvarnu implementaciju. Git/build daju dokaz. Klijent daje konačno odobrenje.**
-

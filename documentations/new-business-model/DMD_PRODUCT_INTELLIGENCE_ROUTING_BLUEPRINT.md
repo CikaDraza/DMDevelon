@@ -36,7 +36,7 @@ Product Fit
 
 Predlog:
 
-```ts
+```text
 CapabilityModel {
   id
   businessStateId
@@ -82,7 +82,7 @@ education.one_to_one
 
 Svaki DMD product family objavljuje canonical contract.
 
-```ts
+```text
 ProductDefinition {
   key
   version
@@ -224,7 +224,7 @@ AI može da predloži business classification, ali Route Engine donosi odluku iz
 
 Predlog rezultata:
 
-```ts
+```text
 ProductRouteDecision {
   id
   businessStateId
@@ -311,7 +311,7 @@ Route kaže *koji proizvod*. Blueprint kaže *šta konkretno gradimo*.
 
 Predlog:
 
-```ts
+```text
 SolutionBlueprint {
   id
   routeDecisionId
