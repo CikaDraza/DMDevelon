@@ -13,15 +13,15 @@ const EXPECTED_USERS = new Map([
   ["milan.drazic@dmdevelon.website", "7ba9ebaf-f07f-48e5-b631-3df2a1e0efcb"],
   [
     "gordana@spiritualized-language-tutor.com",
-    "93cf7074-c1c8-40c2-967c-3bd3ec2b5957",
+    "93cf7074-c1c8-40c2-8a10-ce73256bb7e3",
   ],
   [
     "sanjaneuer@gmail.com",
-    "ff9c35fb-7ecc-4536-9a8d-f17f6bc4a07a",
+    "ff9c35fb-7ecc-4536-9a49-5191589d6fc1",
   ],
   [
     "dmdevelon.orion@gmail.com",
-    "f7da41a2-f229-5ef1-ac0b-35323796751d",
+    "f7da41a2-f229-475e-85a3-5b9d57f31732",
   ],
   ["makac06@gmail.com", "167c9c0c-0c30-4822-83e0-9a5462e710b0"],
 ]);
