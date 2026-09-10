@@ -69,6 +69,32 @@ export function useClientProjects() {
     onSuccess: (_, id) => invalidate(id),
   });
 
+  const restoreProject = useMutation({
+    mutationFn: async ({ id, status, ownerUserId }) => {
+      const res = await axios.post(
+        `/api/client-projects/${id}/restore`,
+        { status, ...(ownerUserId ? { ownerUserId } : {}) },
+        { headers: getAuthHeaders() },
+      );
+      return res.data;
+    },
+    onSuccess: (result, variables) =>
+      invalidate(result?.project?._id || variables.id),
+  });
+
+  const assignProjectOwner = useMutation({
+    mutationFn: async ({ id, ownerUserId }) => {
+      const res = await axios.post(
+        `/api/client-projects/${id}/ownership`,
+        { ownerUserId },
+        { headers: getAuthHeaders() },
+      );
+      return res.data;
+    },
+    onSuccess: (result, variables) =>
+      invalidate(result?.project?._id || variables.id),
+  });
+
   // --- Granular (patch-based) progress updates ---
   const updateProjectStatus = useMutation({
     mutationFn: async ({ id, status, publishToHomepage }) => {
@@ -139,6 +165,8 @@ export function useClientProjects() {
     createProject,
     updateProject,
     deleteProject,
+    restoreProject,
+    assignProjectOwner,
     updateProjectStatus,
     updateMilestone,
     updateTask,

@@ -13,6 +13,7 @@ import DeletePhaseDialog from "@/components/admin/DeletePhaseDialog";
 import DeleteProposalForeverDialog from "@/components/admin/DeleteProposalForeverDialog";
 import MilestoneEditorDialog from "@/components/admin/MilestoneEditorDialog";
 import PendingWorkSection from "@/components/admin/PendingWorkSection";
+import ProjectRecoveryControls from "@/components/admin/ProjectRecoveryControls";
 import {
   MilestonePlanEditor,
   createEmptyMilestone,
@@ -634,6 +635,8 @@ export default function ClientProjectsManager({
     createProject,
     updateProject,
     deleteProject,
+    restoreProject,
+    assignProjectOwner,
     updateMilestone,
     updateTask,
     updateMilestoneAgreed,
@@ -919,6 +922,13 @@ export default function ClientProjectsManager({
                     </div>
                   </div>
 
+                  <ProjectRecoveryControls
+                    project={project}
+                    users={users}
+                    restoreProject={restoreProject}
+                    assignProjectOwner={assignProjectOwner}
+                  />
+
                   {/* progress bar */}
                   <div className="mt-4">
                     <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
@@ -1153,6 +1163,7 @@ export default function ClientProjectsManager({
                 <Select
                   value={form.clientUserId || ""}
                   onValueChange={handleSelectClient}
+                  disabled={Boolean(editingId)}
                 >
                   <SelectTrigger className="bg-white/5 border-white/10 text-white mt-1">
                     <SelectValue placeholder="Select a user" />
@@ -1174,10 +1185,17 @@ export default function ClientProjectsManager({
                     setForm((f) => ({ ...f, clientEmail: e.target.value }))
                   }
                   placeholder="client@email.com"
+                  disabled={Boolean(editingId)}
                   className="bg-white/5 border-white/10 text-white mt-1"
                 />
               </div>
             </div>
+            {editingId && (
+              <p className="text-xs text-gray-500">
+                Use the project ownership action on the project card to change
+                the client owner. It preserves membership and audit history.
+              </p>
+            )}
 
             <div>
               <Label className="text-white">Title</Label>

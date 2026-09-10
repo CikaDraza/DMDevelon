@@ -5074,8 +5074,6 @@ export async function PUT(request, context) {
       }
       const update = {};
       const stringFields = {
-        clientName: ["Client name", 200],
-        clientEmail: ["Client email", 320],
         title: ["Project title", 200],
         description: ["Project description", 100000],
         requirements: ["Project requirements", 100000],
@@ -5091,10 +5089,6 @@ export async function PUT(request, context) {
             required: field === "title",
           });
         }
-      }
-      if (body.clientUserId !== undefined) {
-        update.clientUserId =
-          typeof body.clientUserId === "string" ? body.clientUserId : null;
       }
       if (body.status !== undefined) {
         if (!PROJECT_STATUSES.has(body.status))
@@ -5128,14 +5122,9 @@ export async function PUT(request, context) {
         });
         update.linkedProjectId = portfolio._id;
       }
-      // Reassign / renamed client -> recompute slug and ensure its folders.
-      if (
-        update.clientName &&
-        slugify(update.clientName) !== existing.clientSlug
-      ) {
-        update.clientSlug = slugify(update.clientName);
-        ensureClientFolders(update.clientSlug).catch(() => {});
-      }
+      // Ownership changes use the dedicated audited/transactional lifecycle
+      // endpoint. This generic editor intentionally cannot update clientUserId,
+      // clientName, clientEmail, clientSlug, or ownerAccountDeletedAt.
       // Milestone content intentionally cannot be replaced by this generic
       // endpoint; use the audited /milestones/:milestoneId route instead.
       const project = await ClientProject.findByIdAndUpdate(id, update, {
@@ -5813,8 +5802,9 @@ export async function DELETE(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
-      // Block deletion while the user still owns an active project, so it
-      // doesn't become orphaned. Admin must reassign it first.
+      // A client cannot orphan their own active project. A global admin may
+      // deliberately remove an owner; the transaction below then marks the
+      // retained project ownerless so the recovery capability can take over.
       const target = await User.findById(id);
       const activeProjects = await ClientProject.countDocuments({
         status: { $nin: [...TERMINAL_PROJECT_STATUSES] },
@@ -5823,7 +5813,7 @@ export async function DELETE(request, context) {
           ...(target?.email ? [{ clientEmail: target.email }] : []),
         ],
       });
-      if (activeProjects > 0) {
+      if (activeProjects > 0 && !user.isAdmin) {
         return NextResponse.json(
           {
             error:
@@ -5832,10 +5822,9 @@ export async function DELETE(request, context) {
           { status: 409, headers: getCorsHeaders() },
         );
       }
-      // Every project this person owns is now guaranteed terminal (the guard
-      // above rejects anything still active) — closing them and removing this
-      // person's memberships elsewhere is the other half of "this identity is
-      // gone", so it happens in the same transaction as the delete itself.
+      // Marking every retained project ownerless and removing this person's
+      // memberships elsewhere is the other half of "this identity is gone",
+      // so it happens in the same transaction as the delete itself.
       // Partial failure here (account deleted but projects still marked open,
       // or vice versa) is exactly the inconsistency I2 rules out for invitation
       // accept; the same reasoning applies to account deletion.
