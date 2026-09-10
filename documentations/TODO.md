@@ -24,13 +24,21 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 **Binding architecture:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
 
-**Language decision:** DMD remains JavaScript/JSX. TypeScript examples were copied from a different project and have been removed from the active expansion guidance. Do not add .ts or .tsx source files; use runtime schemas and JSDoc where they clarify JavaScript contracts.
+**Language decision:** DMD remains JavaScript/JSX. TypeScript examples were copied from a different project and have been removed from the active expansion guidance. Do not add .ts or .tsx source files; use runtime schemas and JSDoc where they clarify JavaScript contracts. The existing tsconfig.json with allowJs/checkJs settings and npm run typecheck remain JavaScript build/module-resolution checks; they do not authorize TypeScript source.
 
 **Historical evidence:** The Project Communication Hub record beginning at section 0 remains unchanged below. Completion in that historical work never means a new-business milestone is complete.
 
 ## Dependency direction
 
-DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-3 → DMD-FND-4 gates all new domains. The primary product path is DiscoverySession → Verified Business State → Capability Model → Product Route → Solution Blueprint → Design Strategy → curated handoff → candidate/validation/review → Approved Design Revision → proposal/acceptance/payment → WorkOrder → evidence → Engineering Projection. Project Intelligence read/classification work may begin after DMD-FND-4, but its Blueprint/commercial integration waits for those inputs.
+DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-2A → DMD-FND-3 → DMD-FND-4 gates all new domains. After DMD-FND-4, controlled legacy cleanup and the new business model proceed in parallel:
+
+```text
+DMD-FND-4
+      ├──────────────→ DMD-BI-1 → DMD-BI-2 → DMD-BI-3 → ...
+      └──────────────→ DMD-FND-5 → DMD-FND-6 → DMD-FND-7 → DMD-FND-8
+```
+
+The primary product path is DiscoverySession → Verified Business State → Capability Model → Product Route → Solution Blueprint → Design Strategy → curated handoff → candidate/validation/review → Approved Design Revision → proposal/acceptance/payment → WorkOrder → evidence → Engineering Projection. Project Intelligence read/classification work may begin after DMD-FND-4, but its Blueprint/commercial integration waits for those inputs.
 
 ## Global invariants
 
@@ -48,20 +56,23 @@ DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-3 → DMD-FND-4 gates all new 
 
 **Dependencies:** None.
 
+**Status:** Complete for staging. The two deferred reconciliation items below gate only the affected later domain contracts, not DMD-FND-1.
+
 **Tasks:**
 
 - [x] Confirm the binding architecture path and preserve the existing TODO history.
 - [x] Record JavaScript/JSX-only as the active implementation decision; TypeScript suggestions were removed from the audit execution guidance.
 - [x] Record that the root master plan is canonical lifecycle guidance and the audit-master copy is its current-app execution addendum.
-- [ ] Ratify one extension folder convention: binding server/modules/<domain>/... versus audit lib/application + lib/domain + lib/ai; do not mix them ad hoc.
-- [ ] Reconcile DiscoverySession state names, BusinessStateRevision versus VerifiedBusinessState, DesignGenerationJob versus DesignJob, DesignSelection versus ApprovedDesignRevision, ProductInstance versus ProductInstanceReference, and competing candidate lifecycle labels.
-- [ ] Decide the pre-proposal preview boundary: safe renderer/sandbox versus local repository implementation/Vercel preview. Production WorkOrder execution must not be assumed before commercial acceptance/payment.
-- [ ] Repair the documentation map without inventing absent files referenced by the masters: DMD_EVIDENCE_KNOWLEDGE_INTEGRATIONS.md, DMD_IMPLEMENTATION_MILESTONES_TASKS.md, DMD_ENGINEERING_PLAN.md and DMD_IMPLEMENTATION_REPORT.md.
-- [ ] Reconcile binding React 19.2+ guidance with the current React/React DOM 18 package declarations and later update the stale README from evidence.
+- [x] Lock the folder convention: server/http, server/auth, server/db, server/modules/<domain>, server/integrations, server/jobs and server/diagnostics are canonical. lib/ remains for genuinely shared non-domain utilities. The audit proposal lib/application + lib/domain + lib/ai is superseded; do not create both structures.
+- [x] Lock canonical aggregate names: DiscoverySession, VerifiedBusinessState, CapabilityModel, ProductRouteDecision, SolutionBlueprint, DesignIntent, DesignAsset, DesignStrategy, DesignJob, DesignCandidate, ApprovedDesignRevision, CommercialConfiguration, WorkOrder, ProjectEvidence, EngineeringProjection and ProductInstanceReference. Versioning is an aggregate property, not a parallel Revision aggregate.
+- [-] Reconcile only the remaining lifecycle state enums for DiscoverySession and DesignCandidate immediately before their persistence slices; aggregate naming is no longer open and this does not block staging.
+- [x] Lock the preview boundary: Instant Design uses a safe DMD renderer/sandbox and creates no production WorkOrder. Supervised Design may include Claude Design → local supervised Claude Code/Codex → tests/build → Vercel Design Preview Work for client review. Production project execution starts only after ApprovedDesignRevision → ProjectProposal → acceptance → payment → WorkOrder.
+- [-] Repair the documentation map when those companion artifacts are intentionally authored; do not invent the currently absent DMD_EVIDENCE_KNOWLEDGE_INTEGRATIONS.md, DMD_IMPLEMENTATION_MILESTONES_TASKS.md, DMD_ENGINEERING_PLAN.md or DMD_IMPLEMENTATION_REPORT.md. Their absence does not block staging.
+- [x] Lock React target and sequencing: create staging with current code in DMD-FND-1, capture the React 18 baseline in DMD-FND-2, then upgrade React/React DOM to 19.2+ in isolated DMD-FND-2A before catch-all refactor or Discovery implementation.
 
 **Invariants:** Binding rules prevail until an explicit superseding decision exists; documentation is not implementation.
 
-**Verification:** Every cited existing source path exists; each conflict/missing reference above has a recorded owner/decision before the affected aggregate is created.
+**Verification:** Every cited existing source path exists; closed decisions match the binding contract, while deferred lifecycle/document companions explicitly gate only their affected later slices.
 
 **Explicitly out of scope:** Code, dependencies, models, migrations and route changes.
 
@@ -69,7 +80,7 @@ DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-3 → DMD-FND-4 gates all new 
 
 **Goal:** Create a real staging boundary before large refactoring, AI use or private-data workflows.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; DMD_COMMERCIAL_PROVISIONING.md.
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; DMD_COMMERCIAL_PROVISIONING.md; vercel.json; next.config.js; package.json; current environment-variable inventory (secret values must never be copied into TODO/evidence).
 
 **Dependencies:** DMD-FND-0.
 
@@ -109,13 +120,34 @@ DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-3 → DMD-FND-4 gates all new 
 
 **Explicitly out of scope:** Declaring broad legacy coverage complete without running it.
 
+## DMD-FND-2A — React 19.2 compatibility slice
+
+**Goal:** Align the runtime with the binding React 19.2+ contract as one isolated compatibility change after the current baseline is known.
+
+**Source documents:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; package.json; tsconfig.json.
+
+**Dependencies:** DMD-FND-2.
+
+**Tasks:**
+
+- [ ] Upgrade only React and React DOM to the binding-compatible 19.2+ versions and record any necessary peer/runtime compatibility changes.
+- [ ] Run npm test, npm run test:api, npm run test:ui, npm run typecheck and npm run build.
+- [ ] Run the complete DMD-FND-2 staging smoke suite and compare it with the captured React 18 baseline.
+- [ ] Record regressions and resolve them inside this bounded compatibility slice before DMD-FND-3/DMD-BI-1 work proceeds.
+
+**Invariants:** Do not combine this upgrade with catch-all extraction, page decomposition, Discovery implementation or TypeScript source introduction.
+
+**Verification:** All relevant tests/build pass and staging smoke preserves auth, requests/proposals, projects, chat, CMS, notifications, admin and dashboard behavior.
+
+**Explicitly out of scope:** Next.js migration, route refactor, UI redesign and new business-domain code.
+
 ## DMD-FND-3 — Catch-all API and giant-page inventory
 
 **Goal:** Create the mandatory migration inventory before endpoint/page extraction.
 
 **Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 9 and 61–63; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md.
 
-**Dependencies:** DMD-FND-2.
+**Dependencies:** DMD-FND-2A.
 
 **Tasks:**
 
@@ -133,18 +165,20 @@ DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-3 → DMD-FND-4 gates all new 
 
 ### Required protocol for every DMD-FND-5 through DMD-FND-8 extraction
 
-1. [ ] Document the existing HTTP contract from DMD-FND-3.
-2. [ ] Add/confirm regression tests.
-3. [ ] Extract application/domain logic from framework route code.
-4. [ ] Create dedicated route.js adapter.
-5. [ ] Preserve URL/method contract unless intentionally versioned.
-6. [ ] Run relevant tests and build.
-7. [ ] Deploy staging.
-8. [ ] Smoke-test the DMD-FND-2 journey.
-9. [ ] Remove only that domain branch from the catch-all.
-10. [ ] Commit inventory and verification evidence.
+The migration unit is one exact HTTP method + path contract, not a whole domain or a newly invented API platform. Process the DMD-FND-3 inventory sequentially: the next endpoint does not enter extraction until the current endpoint has completed this protocol.
 
-The catch-all stays for remaining domains and is deleted only at inventory zero.
+1. [ ] Identify one endpoint inventory row.
+2. [ ] Confirm and document its current HTTP contract, authorization, callers and side effects.
+3. [ ] Confirm existing regression coverage or add the missing regression test.
+4. [ ] Extract its business/application logic from the catch-all into the canonical server/modules/<domain> boundary.
+5. [ ] Add a thin dedicated app/api/**/route.js adapter for the same URL and method.
+6. [ ] Preserve observable behavior unless a separately approved/versioned change says otherwise.
+7. [ ] Run the relevant tests and full build.
+8. [ ] Deploy to staging and smoke-test the affected DMD-FND-2 journey.
+9. [ ] Only after the endpoint is green, remove that exact method + path branch from the catch-all.
+10. [ ] Update the inventory and commit contract/test/build/staging evidence before selecting the next endpoint.
+
+The catch-all remains a temporary compatibility layer for every endpoint not yet migrated and is deleted only when its inventory reaches zero. New Business Intelligence endpoints do not enter the catch-all or wait for its retirement: after DMD-FND-4 they are created directly as dedicated routes backed by server/modules/<domain>, while legacy extraction continues sequentially on the parallel foundation branch.
 
 ## DMD-FND-4 — Security and architecture shell
 
@@ -178,7 +212,7 @@ The catch-all stays for remaining domains and is deleted only at inventory zero.
 
 **Tasks:**
 
-- [ ] Apply the required protocol to health, cron/email-digest, auth/*, users/* and user/settings.
+- [ ] Process health, cron/email-digest, auth/*, users/* and user/settings inventory rows one endpoint at a time through the required protocol.
 - [ ] Give cron a dedicated signed/secret-validated application-job boundary.
 - [ ] Preserve access-token/refresh-cookie behavior until its separately approved hardening migration.
 - [ ] Close the seed-route safety decision rather than carrying it into another dispatcher.
@@ -199,7 +233,7 @@ The catch-all stays for remaining domains and is deleted only at inventory zero.
 
 **Tasks:**
 
-- [ ] Apply the protocol to uploads/downloads, services, public projects, testimonials, company profile, contact messages, categories, CMS, notifications and push.
+- [ ] Process uploads/downloads, services, public projects, testimonials, company profile, contact messages, categories, CMS, notifications and push inventory rows one endpoint at a time through the required protocol.
 - [ ] Migrate CMS to server loader, publication/reserved-slug/real-404 and same-revision metadata/body behavior.
 - [ ] Preserve robots/sitemap, notification policy/dedupe and safe push diagnostics.
 - [ ] Replace unsafe raw CMS rendering only under explicit sanitize/structured-block policy.
@@ -220,7 +254,7 @@ The catch-all stays for remaining domains and is deleted only at inventory zero.
 
 **Tasks:**
 
-- [ ] Apply the protocol to project requests, client projects/proposals/milestones/messages, members/invitations/leave, chat/DM/read/pin/convert and ProjectItems.
+- [ ] Process project requests, client projects/proposals/milestones/messages, members/invitations/leave, chat/DM/read/pin/convert and ProjectItems inventory rows one endpoint at a time through the required protocol.
 - [ ] Reuse current project-access, chat-domain and serializer policy rather than duplicating it.
 - [ ] Preserve resource-first authorization, transactions, accepted proposal snapshot, membership audit, DM uniqueness, attachment visibility and chat-to-formal-work provenance.
 
@@ -230,9 +264,9 @@ The catch-all stays for remaining domains and is deleted only at inventory zero.
 
 **Explicitly out of scope:** New-business WorkOrder or AI mutation.
 
-## DMD-FND-8 — Admin/analytics retirement and page composition
+## DMD-FND-8 — Sequential final extraction, catch-all retirement and page composition
 
-**Goal:** Complete remaining route inventory and decompose giant pages only along real ownership seams.
+**Goal:** Finish the remaining inventory endpoint by endpoint, retire the catch-all only after the last verified extraction and decompose giant pages only along real ownership seams.
 
 **Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 19, 27–39 and 61–63; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
 
@@ -240,14 +274,17 @@ The catch-all stays for remaining domains and is deleted only at inventory zero.
 
 **Tasks:**
 
-- [ ] Apply the protocol to statistics/admin remainder; delete the catch-all only after inventory zero, full build and staging smoke.
+- [ ] Select exactly one remaining statistics/admin/analytics method + path from the DMD-FND-3 inventory and complete the required extraction protocol before selecting the next one.
+- [ ] Keep app/api/[[...path]]/route.js serving all still-unmigrated contracts throughout the sequence; remove only the verified endpoint branch after each staging smoke.
+- [ ] After every slice, update the inventory and its contract/test/build/staging evidence so catch-all retirement is an auditable zero-inventory decision.
+- [ ] Delete app/api/[[...path]]/route.js only after the final branch is migrated, the inventory is zero, the full test/build suite passes and complete staging smoke is green.
 - [ ] Keep new discovery at /start, never inside HomeClient.
 - [ ] Split admin/dashboard/project-detail into page shell, feature composition, client leaves and transport modules only when touched; preserve deep links.
 - [ ] Move initial reads server-side where suitable and avoid duplicate hydration fetches/new giant files.
 
-**Invariants:** No replacement universal dispatcher or 1,000–6,000 line page/route file.
+**Invariants:** No big-bang extraction, replacement universal dispatcher, parallel API hierarchy or 1,000–6,000 line page/route file. A partially migrated catch-all is expected and remains frozen against new endpoints. New BI routes proceed from DMD-FND-4 without waiting for DMD-FND-8.
 
-**Verification:** Zero inventory branches, no deep-link/console regression and relevant UI/build tests pass.
+**Verification:** Every migrated method + path has individual contract/regression/build/staging evidence; catch-all deletion requires zero remaining inventory branches, no deep-link/console regression and green relevant UI/full-build tests.
 
 **Explicitly out of scope:** Cosmetic full-site redesign.
 
@@ -300,7 +337,7 @@ The catch-all stays for remaining domains and is deleted only at inventory zero.
 
 **Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
 
-**Dependencies:** DMD-FND-4 and DMD-FND-8.
+**Dependencies:** DMD-FND-4 only. DMD-FND-5 through DMD-FND-8 continue as a controlled parallel legacy-cleanup branch.
 
 **Tasks:**
 
@@ -428,7 +465,7 @@ The catch-all stays for remaining domains and is deleted only at inventory zero.
 
 **Tasks:**
 
-- [ ] Apply reconciled lifecycle/names to DesignIntent, DesignAsset, DesignStrategy, DesignJob, DesignCandidate and ApprovedDesignRevision contracts.
+- [ ] Use the canonical DMD-FND-0 aggregate names and apply the separately reconciled lifecycle enums to DesignIntent, DesignAsset, DesignStrategy, DesignJob, DesignCandidate and ApprovedDesignRevision contracts.
 - [ ] Collect objective, feeling/style, dislikes, brand, colors, type, website/reference URLs, device priority, motion and uploads.
 - [ ] Use signed/direct Cloudinary flow; store semantic source/role/title/description/intended placement/person/alt and delivery identity in DMD, never blobs.
 - [ ] Require client-upload description; final binding cannot retain role unsure.
@@ -530,7 +567,7 @@ The catch-all stays for remaining domains and is deleted only at inventory zero.
 
 **Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 22–28; audit-dmd/DMD_REPO_DB_ENGINEERING_HANDOFF.md.
 
-**Dependencies:** DMD-DES-3 or DMD-DES-4, plus DMD-FND-0 preview decision.
+**Dependencies:** DMD-DES-3 or DMD-DES-4; the resolved DMD-FND-0 preview boundary applies.
 
 **Tasks:**
 
