@@ -106,6 +106,7 @@ export async function POST(request) {
 
   await Promise.all(fixtures.map(({ Model }) => Model.init()));
 
+  const replaceableIds = {};
   for (const fixture of fixtures) {
     const allowedIds = new Set(
       fixture.documents.map((document) => String(document._id)),
@@ -114,6 +115,10 @@ export async function POST(request) {
     const unexpectedIds = existingIds.filter(
       (id) => !allowedIds.has(String(id)),
     );
+    if (fixture.name === "companyProfiles" && unexpectedIds.length === 1) {
+      replaceableIds[fixture.name] = unexpectedIds;
+      continue;
+    }
     if (unexpectedIds.length) {
       return NextResponse.json(
         { error: `Unexpected records already exist in ${fixture.name}` },
@@ -127,6 +132,15 @@ export async function POST(request) {
   try {
     await session.withTransaction(async () => {
       for (const fixture of fixtures) {
+        const idsToReplace = replaceableIds[fixture.name] || [];
+        const removed = idsToReplace.length
+          ? (
+              await fixture.Model.deleteMany(
+                { _id: { $in: idsToReplace } },
+                { session },
+              )
+            ).deletedCount
+          : 0;
         const result = await fixture.Model.bulkWrite(
           fixture.documents.map((document) => ({
             replaceOne: {
@@ -138,6 +152,7 @@ export async function POST(request) {
           { ordered: true, session },
         );
         results[fixture.name] = {
+          removed,
           matched: result.matchedCount,
           modified: result.modifiedCount,
           upserted: result.upsertedCount,
