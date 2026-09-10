@@ -18,6 +18,681 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 ---
 
+# NEW BUSINESS MODEL — Foundation & Platform Expansion
+
+**Status:** Planning baseline. New-business implementation is not started; all unchecked items below are future work. This is the execution index, while documents under documentations/new-business-model/ remain the architecture and product contracts.
+
+**Binding architecture:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
+
+**Language decision:** DMD remains JavaScript/JSX. TypeScript examples were copied from a different project and have been removed from the active expansion guidance. Do not add .ts or .tsx source files; use runtime schemas and JSDoc where they clarify JavaScript contracts.
+
+**Historical evidence:** The Project Communication Hub record beginning at section 0 remains unchanged below. Completion in that historical work never means a new-business milestone is complete.
+
+## Dependency direction
+
+DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-3 → DMD-FND-4 gates all new domains. The primary product path is DiscoverySession → Verified Business State → Capability Model → Product Route → Solution Blueprint → Design Strategy → curated handoff → candidate/validation/review → Approved Design Revision → proposal/acceptance/payment → WorkOrder → evidence → Engineering Projection. Project Intelligence read/classification work may begin after DMD-FND-4, but its Blueprint/commercial integration waits for those inputs.
+
+## Global invariants
+
+- AI interprets. The system decides. The engine executes.
+- New expansion endpoints use dedicated Route Handlers; app/api/[[...path]]/route.js receives no new branch.
+- DMD DB owns business/product/design/commercial/client-decision truth. Repository and CI own code/build/test truth. Frontend is a projection, never authority.
+- Every state-changing slice has runtime validation, authorization, version/idempotency rule, audit/evidence, tests, staging deploy and smoke evidence.
+- No application code, model, migration or route change is performed by this planning milestone.
+
+## DMD-FND-0 — Documentation and architecture baseline
+
+**Goal:** Reconcile source authority and terminology before any new persistence or route work.
+
+**Source documents:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md; audit-dmd/DMD_EXTENSION_EXECUTION_PLAN_V2.md.
+
+**Dependencies:** None.
+
+**Tasks:**
+
+- [x] Confirm the binding architecture path and preserve the existing TODO history.
+- [x] Record JavaScript/JSX-only as the active implementation decision; TypeScript suggestions were removed from the audit execution guidance.
+- [x] Record that the root master plan is canonical lifecycle guidance and the audit-master copy is its current-app execution addendum.
+- [ ] Ratify one extension folder convention: binding server/modules/<domain>/... versus audit lib/application + lib/domain + lib/ai; do not mix them ad hoc.
+- [ ] Reconcile DiscoverySession state names, BusinessStateRevision versus VerifiedBusinessState, DesignGenerationJob versus DesignJob, DesignSelection versus ApprovedDesignRevision, ProductInstance versus ProductInstanceReference, and competing candidate lifecycle labels.
+- [ ] Decide the pre-proposal preview boundary: safe renderer/sandbox versus local repository implementation/Vercel preview. Production WorkOrder execution must not be assumed before commercial acceptance/payment.
+- [ ] Repair the documentation map without inventing absent files referenced by the masters: DMD_EVIDENCE_KNOWLEDGE_INTEGRATIONS.md, DMD_IMPLEMENTATION_MILESTONES_TASKS.md, DMD_ENGINEERING_PLAN.md and DMD_IMPLEMENTATION_REPORT.md.
+- [ ] Reconcile binding React 19.2+ guidance with the current React/React DOM 18 package declarations and later update the stale README from evidence.
+
+**Invariants:** Binding rules prevail until an explicit superseding decision exists; documentation is not implementation.
+
+**Verification:** Every cited existing source path exists; each conflict/missing reference above has a recorded owner/decision before the affected aggregate is created.
+
+**Explicitly out of scope:** Code, dependencies, models, migrations and route changes.
+
+## DMD-FND-1 — Isolated staging environment
+
+**Goal:** Create a real staging boundary before large refactoring, AI use or private-data workflows.
+
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; DMD_COMMERCIAL_PROVISIONING.md.
+
+**Dependencies:** DMD-FND-0.
+
+**Tasks:**
+
+- [ ] Provision separate staging frontend/deployment, Mongo database/credentials, environment variables, auth/session origins and CORS allowlist.
+- [ ] Establish separate Cloudinary namespace/folder and private-delivery policy; never use production portfolio/default storage for new private assets.
+- [ ] Establish safe staging email/push recipients, webhook targets/secrets, cron/job behavior and AI provider environment tag/budget.
+- [ ] Protect or disable unauthenticated POST /api/seed before staging is declared safe.
+- [ ] Define fixture/anonymization and production-data protection rules; no casual production DB write or clone.
+
+**Invariants:** Staging cannot silently share production DB, secrets, Cloudinary namespace, recipient audience, webhook target or AI budget.
+
+**Verification:** Connection target, asset prefix, email policy, webhook secret and AI tag prove isolation; smoke evidence shows no production resource was written.
+
+**Explicitly out of scope:** Production promotion, production-data migration and automatic provisioning.
+
+## DMD-FND-2 — Fresh current-system baseline
+
+**Goal:** Establish reproducible legacy behavior and test evidence that expansion must preserve.
+
+**Source documents:** audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md; ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
+
+**Dependencies:** DMD-FND-1.
+
+**Tasks:**
+
+- [ ] Record fresh results for npm test, npm run test:api, npm run test:ui, npm run build and npm run typecheck; never reuse historical TODO counts as fresh evidence.
+- [ ] Record that no lint script/config currently exists and make an explicit lint-gate decision before requiring one.
+- [ ] Define staging smoke journeys for login/auth, project request, proposal access, client project, chat, CMS, notifications, admin and dashboard.
+- [ ] Capture contract/authorization behavior for each journey touched by a later slice and name existing coverage gaps.
+- [ ] Preserve existing ProjectRequest, ProjectProposal, ClientProject, ProjectItem, chat, central access and notification foundations.
+
+**Invariants:** Legacy records with no new-business references remain usable; accepted proposal/history is not replaced.
+
+**Verification:** Baseline output and staging smoke evidence are attached before extracting a touched legacy contract.
+
+**Explicitly out of scope:** Declaring broad legacy coverage complete without running it.
+
+## DMD-FND-3 — Catch-all API and giant-page inventory
+
+**Goal:** Create the mandatory migration inventory before endpoint/page extraction.
+
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 9 and 61–63; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md.
+
+**Dependencies:** DMD-FND-2.
+
+**Tasks:**
+
+- [ ] Inventory every reachable verb/path in app/api/[[...path]]/route.js with URL, method, auth, models, responsibility, callers, tests and risk.
+- [ ] Classify rows as operations/cron, auth/users, public catalog, CMS, project requests, client projects/proposals, membership/invitations, chat/items, notifications/push/media or admin/analytics.
+- [ ] Include separate POST /api/seed and every direct provider/model/error/CORS concern.
+- [ ] Inventory ownership seams in HomeClient, admin, dashboard, project-detail and CMS catch-all/client loader.
+- [ ] Freeze the catch-all: no new branch may be added.
+
+**Invariants:** No endpoint migrates before its complete row and regression contract exist; public CMS catch-all is not a business-router precedent.
+
+**Verification:** Inventory count equals reachable dispatcher branches and has no unclassified row.
+
+**Explicitly out of scope:** Big-bang rewrite or catch-all deletion.
+
+### Required protocol for every DMD-FND-5 through DMD-FND-8 extraction
+
+1. [ ] Document the existing HTTP contract from DMD-FND-3.
+2. [ ] Add/confirm regression tests.
+3. [ ] Extract application/domain logic from framework route code.
+4. [ ] Create dedicated route.js adapter.
+5. [ ] Preserve URL/method contract unless intentionally versioned.
+6. [ ] Run relevant tests and build.
+7. [ ] Deploy staging.
+8. [ ] Smoke-test the DMD-FND-2 journey.
+9. [ ] Remove only that domain branch from the catch-all.
+10. [ ] Commit inventory and verification evidence.
+
+The catch-all stays for remaining domains and is deleted only at inventory zero.
+
+## DMD-FND-4 — Security and architecture shell
+
+**Goal:** Establish safe dedicated-route and private-data foundations before new domains.
+
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md.
+
+**Dependencies:** DMD-FND-1, DMD-FND-2 and DMD-FND-3.
+
+**Tasks:**
+
+- [ ] Remove JWT default-secret fallback and validate required server environment fail-closed.
+- [ ] Replace wildcard CORS with one explicit same-origin/allowlist policy; do not copy legacy headers into new routes.
+- [ ] Implement only the DMD-FND-0-ratified JavaScript HTTP/auth/application/domain/repository boundaries, stable problem responses, correlation IDs and runtime validation.
+- [ ] Define idempotency/rate-limit policy, secure secret input, private asset classes, SSRF controls and prompt-injection boundary.
+- [ ] Keep provider credentials server-only and route handlers thin.
+
+**Invariants:** JavaScript/JSX only; Route Handlers are adapters, not Mongoose/provider/workflow containers.
+
+**Verification:** Missing secrets fail closed; new routes have no wildcard CORS; auth/validation/private-asset/security tests pass on staging.
+
+**Explicitly out of scope:** Full auth rewrite, provider integration and new domain model.
+
+## DMD-FND-5 — Operations, auth and users extraction
+
+**Goal:** Extract health, cron, auth/session, user/settings and seed safety sequentially.
+
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+
+**Dependencies:** DMD-FND-4.
+
+**Tasks:**
+
+- [ ] Apply the required protocol to health, cron/email-digest, auth/*, users/* and user/settings.
+- [ ] Give cron a dedicated signed/secret-validated application-job boundary.
+- [ ] Preserve access-token/refresh-cookie behavior until its separately approved hardening migration.
+- [ ] Close the seed-route safety decision rather than carrying it into another dispatcher.
+
+**Invariants:** Auth/session semantics are not casually changed during extraction; cron is safe/idempotent in staging.
+
+**Verification:** Auth/session, cron authorization and staging smoke contracts pass before each legacy branch is removed.
+
+**Explicitly out of scope:** Discovery identity model.
+
+## DMD-FND-6 — CMS, public catalog, upload and notification extraction
+
+**Goal:** Isolate public/content/media/notification concerns before they support discovery and design.
+
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 22–26 and 45–47; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md.
+
+**Dependencies:** DMD-FND-5.
+
+**Tasks:**
+
+- [ ] Apply the protocol to uploads/downloads, services, public projects, testimonials, company profile, contact messages, categories, CMS, notifications and push.
+- [ ] Migrate CMS to server loader, publication/reserved-slug/real-404 and same-revision metadata/body behavior.
+- [ ] Preserve robots/sitemap, notification policy/dedupe and safe push diagnostics.
+- [ ] Replace unsafe raw CMS rendering only under explicit sanitize/structured-block policy.
+
+**Invariants:** Cloudinary owns bytes/delivery; DMD owns semantics/authorization. Clients never receive internal notification/process details.
+
+**Verification:** CMS/SEO/slug/upload/notification regressions and staging recipient safety pass.
+
+**Explicitly out of scope:** DesignAsset semantics and new design events.
+
+## DMD-FND-7 — Project, proposal, membership, chat and item extraction
+
+**Goal:** Extract established project/communication domains without weakening authorization, history or evidence.
+
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; DMD_PROJECT_INTELLIGENCE.md.
+
+**Dependencies:** DMD-FND-6.
+
+**Tasks:**
+
+- [ ] Apply the protocol to project requests, client projects/proposals/milestones/messages, members/invitations/leave, chat/DM/read/pin/convert and ProjectItems.
+- [ ] Reuse current project-access, chat-domain and serializer policy rather than duplicating it.
+- [ ] Preserve resource-first authorization, transactions, accepted proposal snapshot, membership audit, DM uniqueness, attachment visibility and chat-to-formal-work provenance.
+
+**Invariants:** Chat is evidence, not automatic project truth; accepted scope/history is never physically rewritten.
+
+**Verification:** Existing proposal/membership/chat integration suites and collaborator/stranger staging security smoke pass.
+
+**Explicitly out of scope:** New-business WorkOrder or AI mutation.
+
+## DMD-FND-8 — Admin/analytics retirement and page composition
+
+**Goal:** Complete remaining route inventory and decompose giant pages only along real ownership seams.
+
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 19, 27–39 and 61–63; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
+
+**Dependencies:** DMD-FND-7.
+
+**Tasks:**
+
+- [ ] Apply the protocol to statistics/admin remainder; delete the catch-all only after inventory zero, full build and staging smoke.
+- [ ] Keep new discovery at /start, never inside HomeClient.
+- [ ] Split admin/dashboard/project-detail into page shell, feature composition, client leaves and transport modules only when touched; preserve deep links.
+- [ ] Move initial reads server-side where suitable and avoid duplicate hydration fetches/new giant files.
+
+**Invariants:** No replacement universal dispatcher or 1,000–6,000 line page/route file.
+
+**Verification:** Zero inventory branches, no deep-link/console regression and relevant UI/build tests pass.
+
+**Explicitly out of scope:** Cosmetic full-site redesign.
+
+## DMD-OPS-0 — Durable workflows, audit and diagnostics
+
+**Goal:** Coordinate side effects, retries and risky workflows through durable evidence rather than browser requests.
+
+**Source documents:** audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
+
+**Dependencies:** DMD-FND-4.
+
+**Tasks:**
+
+- [ ] Define outbox/event schema, correlation/causation IDs, idempotency keys and retry/error classification.
+- [ ] Define durable lifecycle for analysis, design, provisioning and webhooks, including dead-letter/review/reconciliation state.
+- [ ] Add read-only diagnostics that distinguish no finding from collector failure and expose safe evidence IDs.
+- [ ] Define operator/client notification audience policy, including design.human_assistance_required without leaking internal details to clients.
+
+**Invariants:** Canonical write precedes side effect; diagnostics never silently repair production state.
+
+**Verification:** Duplicate/retry/failure simulations create no duplicate state/notification and remain diagnosable.
+
+**Explicitly out of scope:** Microservices or worker cluster.
+
+## DMD-AI-0 — Provider-neutral AI infrastructure
+
+**Goal:** Make online AI a schema-bound interpretation layer, never a provider-shaped source of business truth.
+
+**Source documents:** audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md.
+
+**Dependencies:** DMD-OPS-0 and DMD-FND-1.
+
+**Tasks:**
+
+- [ ] Define agent registry/policies, allowed tools, JavaScript runtime input/output schemas, provider adapter and one-provider-first policy.
+- [ ] Build minimal context assemblers from versioned canonical state; do not send full DB/transcript by default.
+- [ ] Persist AgentRun with policy/provider/model/input/output refs, tokens/cost, latency, retry/error and staging tag; never private chain-of-thought.
+- [ ] Enforce quotas, public-discovery abuse controls, model routing/fallback rules and emergency disable.
+- [ ] Stream low-latency chat only; use durable jobs for design/analysis/provisioning.
+
+**Invariants:** Schema-valid output is not business-valid; AI cannot directly write DB/project truth or gain privilege from external content.
+
+**Verification:** Fake-provider tests cover malformed output, injection, quota, retry/fallback and rejected command proposal.
+
+**Explicitly out of scope:** Autonomous server-side coding, final pricing or multi-provider voting.
+
+## DMD-BI-1 — /start and DiscoverySession boundary
+
+**Goal:** Give a technical or non-technical lead a secure, resumable discovery entry.
+
+**Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
+
+**Dependencies:** DMD-FND-4 and DMD-FND-8.
+
+**Tasks:**
+
+- [ ] Add /start with free-text, optional links/assets and optional technical shortcut cards; cards are hints, not product decisions.
+- [ ] Implement reconciled guest ownership, hashed/rotatable opaque access, expiry/resume and account claim.
+- [ ] Require registered ownership for deferred/supervised work while preserving allowed anonymous instant flow.
+- [ ] Keep legacy ProjectRequest as a manual fallback; do not create it from first vague input.
+
+**Invariants:** Raw session ID never authorizes access; claim never makes a client re-enter captured data.
+
+**Verification:** Guest resume/expiry/claim/cross-account tests and mobile staging smoke pass.
+
+**Explicitly out of scope:** Routing, AI authority and design generation.
+
+## DMD-BI-2 — Structured discovery and Understanding Gate
+
+**Goal:** Persist evidence, sourced facts and client-correctable understanding before verification.
+
+**Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; DMD_DESIGN_ENGINE_PRINCIPLES.md; audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
+
+**Dependencies:** DMD-BI-1 and DMD-AI-0.
+
+**Tasks:**
+
+- [ ] Persist raw messages, links/assets, extracted/inferred/rejected facts, unresolved conflicts and requirement classification separately.
+- [ ] Use AI only to propose extraction, clarification and next questions through validated commands.
+- [ ] Support unknown, inferred, client_stated, verified, conflicted and not_applicable provenance/status; preserve source refs.
+- [ ] Apply no-repeat, intent-sensitive adaptive questions and product-category-aware blocking/non-blocking completeness rules.
+- [ ] Show editable plain-language summary/progress and capture existing-system/migration need without ordinary-chat credentials.
+
+**Invariants:** Chat is evidence; future idea/preference is not production requirement; missing critical fact is not fabricated.
+
+**Verification:** Tests cover contradiction, correction, no-repeat, provenance, requirement classification and blocking gate.
+
+**Explicitly out of scope:** Product selection or verified-state authority by the model.
+
+## DMD-BI-3 — Verified Business State and ProjectRequest conversion
+
+**Goal:** Produce versioned canonical business truth and carry it to legacy request flow without duplicate intake.
+
+**Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_EXTENSION_EXECUTION_PLAN_V2.md.
+
+**Dependencies:** DMD-BI-2.
+
+**Tasks:**
+
+- [ ] Implement verification command, resolved/visible non-blocking conflicts, completeness report and immutable/versioned VerifiedBusinessState.
+- [ ] Record verifiedBy as authorized actor/system gate, never LLM assertion.
+- [ ] Convert verified discovery idempotently to existing ProjectRequest with source references and legacy compatibility.
+
+**Invariants:** Only VerifiedBusinessState enters Product Intelligence; legacy requests/projects remain valid without it.
+
+**Verification:** Staging flow proves vague input → correction → one verified snapshot → one linked request with no retyping.
+
+**Explicitly out of scope:** Proposal pricing, provisioning or design execution.
+
+## DMD-PI-1 — Capability registry and ProductDefinition manifests
+
+**Goal:** Publish versioned capability/product contracts for Marysoll, P.DC and Custom.
+
+**Source documents:** DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md.
+
+**Dependencies:** DMD-BI-3.
+
+**Tasks:**
+
+- [ ] Define capability namespaces, metadata, dependencies/conflicts and required/optional/future/prohibited sets.
+- [ ] Define versioned ProductDefinition manifests with business model, capabilities/configuration, constraints/incompatible patterns, extension policy, design-policy and provisioning references.
+- [ ] Preserve Marysoll service/booking/operations and broad P.DC expert/knowledge/learning core models.
+
+**Invariants:** Capability is not UI; brand/tenant request never forks product core.
+
+**Verification:** Manifest tests cover version pinning, conflicts and known Marysoll/P.DC examples.
+
+**Explicitly out of scope:** Profession-specific hardcoded routing or tenant provisioning.
+
+## DMD-PI-2 — Deterministic fit, route and extension governance
+
+**Goal:** Derive auditable product route from verified capability needs and protect product boundaries.
+
+**Source documents:** DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md.
+
+**Dependencies:** DMD-PI-1.
+
+**Tasks:**
+
+- [ ] Derive CapabilityModel from VerifiedBusinessState with source/version refs.
+- [ ] Implement deterministic per-capability fit and route outcomes: native, configurable, product_extension, unsupported/conflict and custom_required.
+- [ ] Persist immutable ProductRouteDecision with business/catalog/product/rule versions and human-readable rule reasons.
+- [ ] Review extension general value, entitlement, compatibility and migration before approve/reject/custom decision.
+
+**Invariants:** AI cannot set selected product; product_extension is not implementation approval; same versioned inputs reproduce the same route.
+
+**Verification:** Fixtures prove Marysoll, P.DC and Custom decisions; old decisions do not change after catalog update.
+
+**Explicitly out of scope:** Design candidate or product-instance mutation.
+
+## DMD-BP-1 — Versioned Solution Blueprint
+
+**Goal:** Bridge Business/Product truth into design, commercial and project work.
+
+**Source documents:** DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; DMD_DESIGN_ENGINE_CLIENT_FLOW.md.
+
+**Dependencies:** DMD-PI-2.
+
+**Tasks:**
+
+- [ ] Define/version validated Blueprint with documented product, actors, included/excluded/extensions, flows, data/integrations/migration, conversion/trust/content/operations, design/commercial/provisioning inputs, risks and unresolved items.
+- [ ] Generate only through application orchestration and expose role-safe summaries.
+- [ ] Preserve references/version pins for each downstream decision.
+
+**Invariants:** Blueprint is a canonical bridge, not a competing copy of business/product state.
+
+**Verification:** A versioned route/Blueprint passes Design, Commercial and Project contract validators.
+
+**Explicitly out of scope:** Pricing, design execution and proposal acceptance.
+
+## DMD-DES-0 — Design contracts, intake and semantic assets
+
+**Goal:** Capture design meaning/assets before design execution.
+
+**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 2–5; ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md section 45; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+
+**Dependencies:** DMD-FND-0, DMD-BP-1 and DMD-FND-6.
+
+**Tasks:**
+
+- [ ] Apply reconciled lifecycle/names to DesignIntent, DesignAsset, DesignStrategy, DesignJob, DesignCandidate and ApprovedDesignRevision contracts.
+- [ ] Collect objective, feeling/style, dislikes, brand, colors, type, website/reference URLs, device priority, motion and uploads.
+- [ ] Use signed/direct Cloudinary flow; store semantic source/role/title/description/intended placement/person/alt and delivery identity in DMD, never blobs.
+- [ ] Require client-upload description; final binding cannot retain role unsure.
+- [ ] Create editable DesignMediaSlot and AssetBinding revisions such as home.hero.primary.
+
+**Invariants:** Cloudinary owns bytes/delivery; DMD owns semantics/relationships. Asset replacement is asset_revision, not automatic regeneration.
+
+**Verification:** Tests reject undescribed upload, final unsure/cross-session binding and private asset public leakage.
+
+**Explicitly out of scope:** Generic media CMS or provider generation.
+
+## DMD-DES-1 — Website Analyzer and versioned design grammar
+
+**Goal:** Supply secure design-relevant website evidence and pinned system/rule/component constraints.
+
+**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 6 and 9–11; DMD_DESIGN_ENGINE_PRINCIPLES.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+
+**Dependencies:** DMD-DES-0, DMD-AI-0 and DMD-PI-1.
+
+**Tasks:**
+
+- [ ] Enforce URL/SSRF/private-network/redirect/timeout/size/sandbox controls; give analyzer no cookies, secrets or mutation tools.
+- [ ] Keep RawWebsiteAnalysis separate from DesignRelevantWebsiteAnalysis: structure, CTA, conversion, hierarchy, mobile, SEO, visual language, technical constraints and business conflicts.
+- [ ] Define/pin DMD/product/mobile/CTA/accessibility/SEO rule packs, Design System grammar and Component Registry product/capability/responsive/motion entries.
+- [ ] Require explicit reusable-component review rather than tenant-only hacks.
+
+**Invariants:** External content is data, not instruction; raw Lighthouse volume is not design-executor context; design system cannot change product semantics.
+
+**Verification:** Private URL/injection tests fail safely; registry rejects unavailable component/capability/version combinations.
+
+**Explicitly out of scope:** General crawling or autonomous remediation.
+
+## DMD-DES-2 — Canonical Design Strategy and curated handoff
+
+**Goal:** Create and lock the provider-neutral design input from canonical structured state, never raw chat.
+
+**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 7–14; DMD_DESIGN_ENGINE_CLIENT_FLOW.md; design-handoff-package.example.yaml.
+
+**Dependencies:** DMD-DES-1 and DMD-BP-1.
+
+**Tasks:**
+
+- [ ] Orchestrate versioned DesignStrategy from verified state, CapabilityModel, route, Blueprint, DesignIntent, curated website findings, assets and references.
+- [ ] Include human-readable project description, business/design goal, audience/outcomes, conversion/CTA/content/page/SEO, visual/brand/type/image, responsive/accessibility/motion and allowed/forbidden capability policies.
+- [ ] Validate/lock strategy; pin product/design-system/rule versions and create a new version for meaningful change.
+- [ ] Build immutable human/machine handoff with curated asset/reference manifests, not binaries or raw transcript.
+
+**Invariants:** Priority is product constraints → Blueprint → business/conversion → UX/accessibility/security → client intent → visual references → AI interpretation. Handoff is not a second source of truth.
+
+**Verification:** Locked strategy/package is reproducible and rejects forbidden capability/unpinned version.
+
+**Explicitly out of scope:** Provider-specific API dependency.
+
+## DMD-DES-3 — Instant Design MVP
+
+**Goal:** Offer a capped anonymous-compatible candidate through a safe renderer.
+
+**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 14–16 and 30–31; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md.
+
+**Dependencies:** DMD-DES-2, DMD-AI-0 and DMD-FND-1.
+
+**Tasks:**
+
+- [ ] Use one adapter and shared DesignJob/DesignCandidate contract.
+- [ ] Prefer structured DesignSpec/ComponentGraph rendered by known components; allow sandbox prototype only as non-production fallback.
+- [ ] Enforce anonymous claim, quota and durable progress rules; validate candidate before presentation.
+
+**Invariants:** Generated arbitrary React/HTML/JS never becomes production application code; instant design does not create a WorkOrder.
+
+**Verification:** Claim/quota/invalid-spec/provider-failure/safe-preview tests pass on staging.
+
+**Explicitly out of scope:** Full product implementation or payment.
+
+## DMD-DES-4 — Supervised Design, normalizer and validator
+
+**Goal:** Support optional Claude Design/human handoff while guaranteeing a valid implementation map.
+
+**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 17–22 and 30–33; audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
+
+**Dependencies:** DMD-DES-2, DMD-OPS-0 and registered ownership from DMD-BI-1.
+
+**Tasks:**
+
+- [ ] Require registration before awaiting_operator; create operator queue, audited controls and client-safe state.
+- [ ] Use supervised/manual Claude Design adapter initially and attach visual artifact to shared candidate lifecycle.
+- [ ] Emit design.human_assistance_required for missing assets, ambiguity, special visual language, sourcing/handoff or validation failure.
+- [ ] Normalize artifact page/section/component/media/CTA/capability/responsive/motion mappings.
+- [ ] Validate Blueprint/product/registry/accessibility/rule constraints and return unsupported functional design to Product Intelligence.
+
+**Invariants:** Claude Design has no DB/capability/proposal/payment authority; normalizer reconstructs mapping but never invents capability.
+
+**Verification:** Registration/audience/non-JSON artifact/invented-capability/invalid-CTA tests take correct paths.
+
+**Explicitly out of scope:** Assumed public Claude Design API or automatic implementation.
+
+## DMD-DES-5 — Implementation classification, preview and review
+
+**Goal:** Turn validated visual intent into safe preview/review evidence without hidden scope expansion.
+
+**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 22–28; audit-dmd/DMD_REPO_DB_ENGINEERING_HANDOFF.md.
+
+**Dependencies:** DMD-DES-3 or DMD-DES-4, plus DMD-FND-0 preview decision.
+
+**Tasks:**
+
+- [ ] Classify visual targets as existing component, approved reusable extension or Product Intelligence return; Claude Code/Codex implement only against real architecture under human supervision.
+- [ ] Require design-job commit/evidence metadata, test/build/preview evidence before preview_ready and obey the approved pre-proposal preview policy.
+- [ ] Provide mobile/desktop review, content/visual revision and slot-based asset replacement.
+- [ ] Classify asset/content/visual versus functional/scope/pivot feedback; functional change returns to capability/Blueprint/change assessment.
+
+**Invariants:** Client review never exposes provider/operator/internal build details. Implemented preview is not accepted scope or paid WorkOrder.
+
+**Verification:** Asset replacement creates no DesignJob; incompatible mapping cannot reach ready preview; functional feedback cannot masquerade as visual revision.
+
+**Explicitly out of scope:** Autonomous cloud coding or unpaid production execution.
+
+## DMD-DES-6 — Approved Design Revision
+
+**Goal:** Freeze the design decision that may enter commercial/project workflow.
+
+**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 27–29; DMD_DESIGN_ENGINE_CLIENT_FLOW.md.
+
+**Dependencies:** DMD-DES-5.
+
+**Tasks:**
+
+- [ ] Persist immutable client-approved revision with candidate, strategy, Design System, rule, preview/commit and approval refs.
+- [ ] Preserve revision history; later change creates a new explicit decision.
+
+**Invariants:** Approved design is not project purchase/payment and cannot mutate after acceptance.
+
+**Verification:** Approval authorization/immutability tests pass.
+
+**Explicitly out of scope:** Proposal acceptance and payment.
+
+## DMD-PROJ-1 — Project Intelligence read/classification foundation
+
+**Goal:** Add source-safe assistance to existing projects without replacing their aggregates.
+
+**Source documents:** DMD_PROJECT_INTELLIGENCE.md; audit-dmd/DMD_PROJECT_INTELLIGENCE_TICKETING_CHANGE_CONTROL_V2.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md.
+
+**Dependencies:** DMD-FND-4 and DMD-FND-2; this is the allowed parallel branch.
+
+**Tasks:**
+
+- [ ] Assemble authorized context from accepted proposals, milestones/tasks, ProjectItems, messages, decisions, onboarding and evidence.
+- [ ] Add read-only message classification/client Q&A with source refs and client-safe answers.
+- [ ] Implement versioned ChangeAssessment, deterministic bug/clarification/capability/pivot distinctions, hard triggers and authorized override.
+- [ ] Add dependency graph/readiness and separate implementationState from verificationState without breaking legacy status.
+
+**Invariants:** Chat memory alone is not project truth; AI cannot promise scope/date/price or mutate accepted state.
+
+**Verification:** Tests cover scope delta/hard trigger/cycle/failed verification and client-safe status.
+
+**Explicitly out of scope:** Unreviewed project/commercial mutation or repo sync.
+
+## DMD-COM-1 — Commercial configuration and proposal materialization
+
+**Goal:** Separate commercial objects and draft the existing proposal from approved scope/design.
+
+**Source documents:** DMD_COMMERCIAL_PROVISIONING.md; DMD_PROJECT_INTELLIGENCE.md; DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md.
+
+**Dependencies:** DMD-DES-6, DMD-BP-1 and DMD-AI-0.
+
+**Tasks:**
+
+- [ ] Version CommercialConfiguration linked to Blueprint/approved design and distinguish ProjectProposal scope, ProductSubscription entitlement and EngineeringPlan capacity.
+- [ ] Reference measured AgentRun/DesignJob/workflow/storage cost evidence without inventing pricing formula.
+- [ ] Draft existing ProjectProposal/milestones/tasks/acceptance/evidence policy from approved inputs through authorized review/send/accept lifecycle.
+
+**Invariants:** No AIProposal parallel aggregate; draft/task edit cannot rewrite accepted proposal snapshot.
+
+**Verification:** Contract/integration tests prove separate lifecycles, versioning and authorization.
+
+**Explicitly out of scope:** Automatic price setting or payment provider selection.
+
+## DMD-COM-2 — Proposal acceptance and payment gate
+
+**Goal:** Define explicit commercial authority before WorkOrder or production-affecting provisioning.
+
+**Source documents:** DMD_COMMERCIAL_PROVISIONING.md; DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md section 29; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+
+**Dependencies:** DMD-COM-1.
+
+**Tasks:**
+
+- [ ] Approve payment architecture before code: provider, currency/tax, states, idempotency, failures/refunds, entitlement timing and webhook validation.
+- [ ] Implement only that approved acceptance/payment contract and define any SaaS-native route exception explicitly.
+- [ ] Gate WorkOrder/provisioning on authoritative accepted/payment state required by policy.
+
+**Invariants:** UI/LLM never decides payment success; no silent bypass of approved design → proposal → acceptance/payment → WorkOrder.
+
+**Verification:** Duplicate accept/payment/webhook retry tests prove no double charge, false paid state or double WorkOrder.
+
+**Explicitly out of scope:** Choosing a provider or price before approval.
+
+## DMD-COM-3 — Onboarding, migration and provisioning
+
+**Goal:** Progressively collect safe inputs and provision through plan/verify/reconcile adapters.
+
+**Source documents:** DMD_COMMERCIAL_PROVISIONING.md; DMD_PROJECT_INTELLIGENCE.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+
+**Dependencies:** DMD-COM-2.
+
+**Tasks:**
+
+- [ ] Implement stage-aware OnboardingRequirement with blocking state, secure secret/connection reference and client-safe projection; never collect credentials in normal chat.
+- [ ] Implement migration workflow: source discovery/export/profiling → mapping → dry run → validation → import → reconciliation → cutover.
+- [ ] Version ProvisioningPlan with prerequisites/resources/verification/reconciliation and adapter contract plan/validate/provision/verify/reconcile.
+- [ ] Persist ProductInstanceReference/environment/subscription status without copying Marysoll/P.DC domain data; make external mutation idempotent.
+
+**Invariants:** Non-blocking input does not halt unrelated work; partial external success is reconciliation_required, not active.
+
+**Verification:** Secret-redaction, migration dry-run and repeated-adapter/partial-failure tests pass.
+
+**Explicitly out of scope:** Automatic production provisioning or target-schema deformation by legacy data.
+
+## DMD-PROJ-2 — WorkOrder and repository binding
+
+**Goal:** Hand accepted scope to local/human-supervised Claude Code/Codex with no second authority.
+
+**Source documents:** audit-dmd/DMD_REPO_DB_ENGINEERING_HANDOFF.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md; DMD_PROJECT_INTELLIGENCE.md.
+
+**Dependencies:** DMD-COM-2.
+
+**Tasks:**
+
+- [ ] Create least-privilege RepositoryBinding and versioned WorkOrder from accepted proposal, Blueprint, approved design, tasks/dependencies/evidence/client decisions.
+- [ ] Define .dmd project/work-order/engineering-state machine schemas and human engineering companions.
+- [ ] Implement minimal local link/pull/status/validate/evidence/sync flow and local agent instructions.
+
+**Invariants:** DMD DB owns accepted scope/price/approval; repo/CI owns performed implementation/build/test facts; local agents cannot edit accepted scope through files.
+
+**Verification:** Stale WorkOrder and invalid manifest/ref/dependency tests conflict rather than overwrite.
+
+**Explicitly out of scope:** DMD-hosted autonomous coding or unnecessary GitHub write access.
+
+## DMD-PROJ-3 — GitHub evidence and Engineering Projection
+
+**Goal:** Translate validated repository/CI evidence into client-safe project truth.
+
+**Source documents:** audit-dmd/DMD_REPO_DB_ENGINEERING_HANDOFF.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_PROJECT_INTELLIGENCE_TICKETING_CHANGE_CONTROL_V2.md.
+
+**Dependencies:** DMD-PROJ-2 and DMD-OPS-0.
+
+**Tasks:**
+
+- [ ] Use dedicated GitHub App webhook with signature validation, delivery dedupe, repository allowlist/stable ID, EventInbox and asynchronous processing.
+- [ ] Validate committed engineering state, WorkOrder version, commit/CI/test/build evidence and persist ProjectEvidence.
+- [ ] Derive EngineeringProjection with implementationState, verificationState, blockers/evidence and role-safe client/internal views.
+- [ ] Reconcile conflicts, allow manual override only with reason/audit, and never change accepted scope from repo/Markdown claims.
+
+**Invariants:** Commit alone does not complete task; implemented plus failed/pending verification is not client complete; frontend remains a projection.
+
+**Verification:** Staging end-to-end proves local commit → validated webhook → projection, while duplicate/invalid/stale/failed-CI paths remain safe.
+
+**Explicitly out of scope:** GitHub write automation, automatic client acceptance or commercial change.
+
+## Explicit deferred decisions
+
+- [-] Final pricing formula, payment provider and detailed payment behavior remain deferred until DMD-COM-2 architecture approval and usage metering.
+- [-] Autonomous cloud coding, arbitrary generated React execution, generic Figma importer, collaborative design editor, multi-model voting, microservices and vector DB by default are intentionally deferred.
+- [-] Claude Design remains an optional supervised/manual adapter until a stable approved integration exists.
+
 ## 0. Dokumentacija
 
 - [x] `documentations/PROJECT_CHAT_PLAN.md` — plan izrade (v1)

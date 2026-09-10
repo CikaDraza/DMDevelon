@@ -42,11 +42,11 @@ Start with contracts, state, security and one end-to-end vertical slice.
 - no new extension branches in catch-all API;
 - standard error/response/idempotency utilities.
 
-### A4 Incremental TypeScript contracts
+### A4 JavaScript contract discipline
 
-- tsconfig with legacy JS compatibility;
-- Zod schemas;
-- shared domain types.
+- JavaScript/JSX only; do not add .ts or .tsx source files;
+- Zod schemas at untrusted and cross-domain boundaries;
+- JSDoc for non-trivial exported application/server contracts where it improves clarity.
 
 **Exit:** safe architecture exists before model calls.
 

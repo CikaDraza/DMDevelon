@@ -410,19 +410,18 @@ Use one workflow per logical run and checkpoint meaningful steps.
 
 ---
 
-## 10. Type/schema strategy
+## 10. JavaScript/schema strategy
 
-The repo is currently mostly JavaScript. Do not block the expansion on a full rewrite.
+The repository remains JavaScript/JSX. Do not block the expansion on a rewrite and do not introduce .ts or .tsx source files.
 
 Recommended incremental approach:
 
-1. add a `tsconfig.json` with `allowJs: true`;
-2. keep legacy JS working;
-3. implement new cross-domain contracts in TypeScript where practical;
-4. use Zod/JSON Schema at every external/AI boundary;
-5. generate provider schemas from one canonical contract when possible.
+1. keep legacy JavaScript working;
+2. implement new contracts in JavaScript with JSDoc where it materially clarifies an exported boundary;
+3. use Zod/JSON Schema at every external, persisted-configuration, webhook and AI boundary;
+4. generate provider schemas from one canonical runtime contract when possible.
 
-Strong candidates for TypeScript first:
+Strong candidates for early runtime schemas:
 
 - AI structured outputs;
 - CommandProposal;
@@ -431,7 +430,7 @@ Strong candidates for TypeScript first:
 - webhook events;
 - WorkOrder/EngineeringState manifests.
 
-Pure business rules can remain `.mjs` temporarily if that minimizes migration risk.
+Pure business rules may remain .mjs when that minimizes migration risk.
 
 ---
 
