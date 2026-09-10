@@ -86,13 +86,15 @@ The primary product path is DiscoverySession → Verified Business State → Cap
 
 **Tasks:**
 
-- [ ] Provision a separate staging frontend/deployment, environment variables, auth/session origins and CORS allowlist.
+- [~] Provision a separate staging frontend/deployment, environment variables, auth/session origins and CORS allowlist. Protected Preview deployment and stable staging origin exist; completion waits for the separate staging DB/provider boundaries described below.
 - [ ] Provision a separate staging Mongo database and credentials with no production write authority where infrastructure supports it; never reuse production application credentials.
 - [ ] Add a fail-closed configuration guard: when APP_ENV=staging, reject known production Mongo/resource identities before the application can serve traffic or run a job.
 - [ ] Isolate Cloudinary at provider/account credential level where available. Otherwise use an explicit staging namespace plus a fail-closed application guard and scoped credentials; a folder prefix with an unrestricted production credential is not physical isolation.
 - [ ] Restrict email and push to explicit safe staging recipients/test providers, and disable or safely isolate scheduled cron/job side effects.
-- [ ] Disable POST /api/seed outside explicitly allowed local development, or place it behind an equally explicit authenticated/authorized staging-safe control, before the first staging deployment is declared safe.
+- [x] Disable POST /api/seed outside explicitly allowed local development, or place it behind an equally explicit authenticated/authorized staging-safe control, before the first staging deployment is declared safe.
 - [ ] Define fixture/anonymization and production-data protection rules; no casual production DB write or clone.
+
+**Progress evidence (2026-09-10):** Created the separate Vercel project `dm-develon-staging`, connected it to the GitHub repository, deployed a protected Preview build and assigned `https://staging.dmdevelon.website` as its canonical alias; the temporary `dm-develon-staging.vercel.app` alias was removed. `APP_ENV`, application origins, an exact CORS origin and a staging-only JWT secret are scoped to Preview. Email, push, Cloudinary and cron credentials were intentionally not copied. Home and `/api/health` return 200; `POST /api/seed` returns 404 before connecting to Mongo. The owner explicitly approved a temporary exception allowing the Preview deployment to use the current production `MONGO_URL`; this leaves normal authenticated write routes capable of changing production data, so the deployment remains protected and is not a completed/isolated staging environment. A separate staging DB with migrated fixtures is required before DMD-FND-2 authenticated/write smoke journeys begin.
 
 **Invariants:** A staging deployment must not possess or resolve credentials/configuration that can accidentally write to production resources. Invalid, ambiguous or production-pointing staging configuration fails closed. Any future provider must be environment-isolated before activation, but FND-1 creates no placeholder credentials or setup for unused providers.
 

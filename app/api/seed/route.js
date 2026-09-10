@@ -9,6 +9,15 @@ import { hashPassword } from "@/lib/auth";
 import { v4 as uuidv4 } from "uuid";
 
 export async function POST(request) {
+  const seedAllowed =
+    process.env.APP_ENV === "local" &&
+    process.env.NODE_ENV !== "production" &&
+    process.env.ALLOW_DB_SEED === "true";
+
+  if (!seedAllowed) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   await connectDB();
 
   try {

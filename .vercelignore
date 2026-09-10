@@ -1,0 +1,14 @@
+.git
+.next
+node_modules
+.dump
+.smartercode
+.agents
+.codex
+.vault
+.env*
+coverage
+logs
+test_reports
+*.log
+*.tsbuildinfo
