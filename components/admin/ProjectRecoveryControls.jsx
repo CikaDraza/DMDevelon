@@ -50,6 +50,7 @@ export default function ProjectRecoveryControls({
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const ownerless = Boolean(project.ownerAccountDeletedAt);
   const isDeleted = project.status === "deleted";
+  const isSecondaryTransfer = !isDeleted && !ownerless;
   const assignableUsers = useMemo(
     () => (users || []).filter((user) => user.isAdmin !== true),
     [users],
@@ -125,11 +126,13 @@ export default function ProjectRecoveryControls({
 
   return (
     <div
-      className={`mt-4 rounded-lg p-4 ${
-        ownerless
+      className={`mt-4 ${
+        isSecondaryTransfer
+          ? "flex justify-end"
+          : ownerless
           ? "border border-amber-400/30 bg-amber-400/10"
           : "border border-white/10 bg-white/[0.03]"
-      }`}
+      } ${isSecondaryTransfer ? "" : "rounded-lg p-4"}`}
     >
       {ownerless && (
         <div className="flex gap-3">
@@ -161,7 +164,7 @@ export default function ProjectRecoveryControls({
             Restore project
           </Button>
         )}
-        {!isDeleted && (
+        {!isDeleted && ownerless && (
           <Button
             type="button"
             size="sm"
@@ -170,8 +173,25 @@ export default function ProjectRecoveryControls({
             className="border-amber-300/40 bg-transparent text-amber-200 hover:bg-amber-300/10"
           >
             <UserRoundCog className="mr-1.5 h-4 w-4" />
-            {ownerless ? "Assign new owner" : "Transfer owner"}
+            Assign new owner
           </Button>
+        )}
+        {isSecondaryTransfer && (
+          <details className="group text-right">
+            <summary className="cursor-pointer list-none text-xs text-gray-500 transition-colors hover:text-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/60">
+              Transfer owner?
+            </summary>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setMode("ownership")}
+              className="mt-2 border-amber-300/40 bg-transparent text-amber-200 hover:bg-amber-300/10"
+            >
+              <UserRoundCog className="mr-1.5 h-4 w-4" />
+              Transfer owner
+            </Button>
+          </details>
         )}
       </div>
 

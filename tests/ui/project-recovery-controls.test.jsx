@@ -76,7 +76,7 @@ describe("project recovery controls", () => {
     expect(screen.getByText(/Global admins cannot be client owners/)).toBeVisible();
   });
 
-  it("offers audited ownership transfer for an active project", () => {
+  it("keeps ownership transfer behind a secondary disclosure", async () => {
     render(
       <ProjectRecoveryControls
         project={{
@@ -90,7 +90,19 @@ describe("project recovery controls", () => {
         {...mutations}
       />,
     );
-    expect(screen.getByRole("button", { name: "Transfer owner" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Transfer owner", hidden: true }),
+    ).not.toBeVisible();
+    fireEvent.click(screen.getByText("Transfer owner?"));
+    const transferButton = screen.getByRole("button", {
+      name: "Transfer owner",
+    });
+    expect(transferButton).toBeVisible();
+    fireEvent.click(transferButton);
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Assign new owner")).toBeVisible();
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("No active collaborators.")).toBeVisible();
     expect(
       screen.queryByText("This project has no active owner"),
     ).not.toBeInTheDocument();
