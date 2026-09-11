@@ -47,6 +47,7 @@ import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
 import { randomBytes } from "crypto";
 import { emailTemplates } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
+import { registrationProvenance } from "@/lib/account-provenance.mjs";
 import {
   isStagingCronEnabled,
   isStagingEnvironment,
@@ -201,6 +202,9 @@ function authUserPayload(user) {
     emailVerified: user.emailVerified,
     emailNotifications: user.emailNotifications,
     pushNotifications: user.pushNotifications,
+    accountOrigin: user.accountOrigin ?? null,
+    registeredAt: user.registeredAt ?? null,
+    verifiedAt: user.verifiedAt ?? null,
   };
 }
 
@@ -2034,6 +2038,7 @@ export async function POST(request, context) {
       const verifyToken = invitation
         ? undefined
         : randomBytes(32).toString("hex");
+      const now = new Date();
       const user = await User.create({
         _id: uuidv4(),
         name,
@@ -2041,6 +2046,8 @@ export async function POST(request, context) {
         password: hashedPassword,
         isAdmin: false,
         emailVerified: Boolean(invitation),
+        ...registrationProvenance(process.env, now),
+        verifiedAt: invitation ? now : null,
         verifyToken,
       });
 
@@ -2173,6 +2180,7 @@ export async function POST(request, context) {
         );
       }
       user.emailVerified = true;
+      user.verifiedAt ||= new Date();
       user.verifyToken = null;
       await user.save();
       return NextResponse.json(
@@ -5363,6 +5371,10 @@ export async function PUT(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
+      // Provenance is server-authored audit context, never client-controlled.
+      delete body.accountOrigin;
+      delete body.registeredAt;
+      delete body.verifiedAt;
       // Only admin can change isAdmin status
       if (body.isAdmin !== undefined && !user.isAdmin) {
         delete body.isAdmin;

@@ -13,6 +13,15 @@ const UserSchema = new mongoose.Schema(
     image: { type: String, default: '' },
     isAdmin: { type: Boolean, default: false },
     provider: { type: String, default: 'local' },
+    // Operational provenance only. These fields never grant access and must
+    // not be used as an authorization or outbound-delivery decision.
+    accountOrigin: {
+      type: String,
+      enum: ['local', 'test', 'staging', 'production'],
+      default: null,
+    },
+    registeredAt: { type: Date, default: null },
+    verifiedAt: { type: Date, default: null },
     emailVerified: { type: Boolean, default: false },
     emailNotifications: { type: Boolean, default: true },
     pushNotifications: { type: Boolean, default: true },

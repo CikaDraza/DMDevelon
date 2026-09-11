@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  assertSafeStagingRecipient,
+  assertStagingBootstrapRecipient,
   isStagingCronEnabled,
   resolveApplicationOrigin,
   validateStagingRuntimeConfig,
@@ -128,16 +128,11 @@ test("staging URL resolution fails closed instead of falling back to production"
   );
 });
 
-test("configured outbound providers require explicit safe recipients", () => {
-  assert.throws(
-    () => validateStagingRuntimeConfig({ ...base, RESEND_API_KEY: "re_test" }),
-    /STAGING_SAFE_RECIPIENTS/,
-  );
+test("isolated staging providers do not require a recipient allowlist", () => {
   assert.doesNotThrow(() =>
     validateStagingRuntimeConfig({
       ...base,
       RESEND_API_KEY: "re_test",
-      STAGING_SAFE_RECIPIENTS: "pantelyasm@gmail.com",
     }),
   );
 });
@@ -158,7 +153,6 @@ test("staging VAPID configuration is complete and uses one public key", () => {
         VAPID_PUBLIC_KEY: "server-public-key",
         VAPID_PRIVATE_KEY: "private-key",
         NEXT_PUBLIC_VAPID_PUBLIC_KEY: "different-public-key",
-        STAGING_SAFE_RECIPIENTS: "safe@example.com",
       }),
     /VAPID keys do not match/,
   );
@@ -168,22 +162,29 @@ test("staging VAPID configuration is complete and uses one public key", () => {
       VAPID_PUBLIC_KEY: "public-key",
       VAPID_PRIVATE_KEY: "private-key",
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: "public-key",
-      STAGING_SAFE_RECIPIENTS: "safe@example.com",
     }),
   );
 });
 
-test("email and push delivery reject every recipient outside the allowlist", () => {
+test("the recipient list remains an explicit manual/bootstrap override", () => {
   const env = {
     ...base,
     STAGING_SAFE_RECIPIENTS: "pantelyasm@gmail.com, drazic.milan@gmail.com",
   };
   assert.doesNotThrow(() =>
-    assertSafeStagingRecipient("PantelyaSM@gmail.com", env),
+    assertStagingBootstrapRecipient("PantelyaSM@gmail.com", env),
   );
   assert.throws(
-    () => assertSafeStagingRecipient(["pantelyasm@gmail.com", "other@test.com"], env),
-    /non-safe recipient/,
+    () =>
+      assertStagingBootstrapRecipient(
+        ["pantelyasm@gmail.com", "other@test.com"],
+        env,
+      ),
+    /non-bootstrap recipient/,
+  );
+  assert.throws(
+    () => assertStagingBootstrapRecipient("anyone@example.com", base),
+    /No optional staging bootstrap recipients/,
   );
 });
 

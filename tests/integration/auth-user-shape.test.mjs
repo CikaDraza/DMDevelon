@@ -12,6 +12,7 @@ import {
 const BASE = "http://localhost:3003/api";
 const USER_KEYS = [
   "_id",
+  "accountOrigin",
   "email",
   "emailNotifications",
   "emailVerified",
@@ -20,6 +21,8 @@ const USER_KEYS = [
   "isAdmin",
   "name",
   "pushNotifications",
+  "registeredAt",
+  "verifiedAt",
 ];
 
 async function postWithCookies(apiPath, body, cookie = "") {
@@ -60,6 +63,9 @@ describe("auth user response contract", () => {
       body: credentials,
     });
     expect(registered.status).toBe(201);
+    expect(registered.body.user.accountOrigin).toBe("test");
+    expect(registered.body.user.registeredAt).toBeTruthy();
+    expect(registered.body.user.verifiedAt).toBeNull();
 
     const loggedIn = await postWithCookies("auth/login", {
       email: credentials.email,
@@ -84,5 +90,30 @@ describe("auth user response contract", () => {
       expect(Object.keys(user).sort()).toEqual(USER_KEYS);
       expect(user.id).toBe(user._id);
     }
+
+    const { default: User } = await import("@/models/User");
+    const persisted = await User.findById(registered.body.user.id);
+    const verified = await callApi("POST", "auth/verify-email", {
+      body: { token: persisted.verifyToken },
+    });
+    expect(verified.status).toBe(200);
+    const verifiedMe = await callApi("GET", "auth/me", {
+      token: loggedIn.body.token,
+    });
+    expect(verifiedMe.body.emailVerified).toBe(true);
+    expect(verifiedMe.body.verifiedAt).toBeTruthy();
+
+    const spoofed = await callApi("PUT", `users/${registered.body.user.id}`, {
+      token: loggedIn.body.token,
+      body: {
+        accountOrigin: "production",
+        registeredAt: "2000-01-01T00:00:00.000Z",
+        verifiedAt: "2000-01-01T00:00:00.000Z",
+      },
+    });
+    expect(spoofed.status).toBe(200);
+    expect(spoofed.body.accountOrigin).toBe("test");
+    expect(spoofed.body.registeredAt).toBe(registered.body.user.registeredAt);
+    expect(spoofed.body.verifiedAt).toBe(verifiedMe.body.verifiedAt);
   });
 });
