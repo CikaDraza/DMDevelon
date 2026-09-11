@@ -5,6 +5,11 @@ import axios from "axios";
 import { useAuth } from "./useAuth";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+// Some browsers (notably Firefox versions in the field) do not expose
+// PushSubscription.options.applicationServerKey. Remember the public key used
+// when this origin last saved a subscription so a key rotation can still be
+// detected. This is a public key, not a credential.
+export const PUSH_VAPID_KEY_STORAGE = "dmdevelon.push.vapidPublicKey";
 
 // iOS (iPhone/iPad) supports Web Push only from iOS 16.4+ AND only when the site
 // is installed as a PWA (running in standalone mode). In a normal Safari/Chrome
@@ -112,11 +117,11 @@ async function registerServiceWorker() {
  * only way to notice, so a stale subscription can be torn down and rebuilt
  * instead of silently failing forever.
  */
-function subscriptionMatchesCurrentKey(sub) {
+function subscriptionMatchesCurrentKey(sub, publicKey = VAPID_PUBLIC_KEY) {
   const stored = sub?.options?.applicationServerKey;
-  if (!stored || !VAPID_PUBLIC_KEY) return true; // nothing to compare against
+  if (!stored || !publicKey) return true; // nothing to compare against
   try {
-    const current = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+    const current = urlBase64ToUint8Array(publicKey);
     const existing = new Uint8Array(stored);
     if (existing.length !== current.length) return false;
     return existing.every((byte, i) => byte === current[i]);
@@ -125,6 +130,48 @@ function subscriptionMatchesCurrentKey(sub) {
     // subscription on a browser that reports options differently.
     return true;
   }
+}
+
+/**
+ * Decide whether an existing browser subscription must be rebuilt.
+ *
+ * The subscription's own applicationServerKey is authoritative when the
+ * browser exposes it. The local marker covers browsers that omit that field:
+ * no marker means this version of the app has never verified/rebuilt the
+ * subscription, while a changed marker proves a VAPID rotation happened.
+ */
+export function pushSubscriptionNeedsRefresh(
+  sub,
+  {
+    publicKey = VAPID_PUBLIC_KEY,
+    storage = typeof window !== "undefined" ? window.localStorage : null,
+  } = {},
+) {
+  if (!sub || !publicKey) return false;
+  if (!subscriptionMatchesCurrentKey(sub, publicKey)) return true;
+  try {
+    return storage
+      ? storage.getItem(PUSH_VAPID_KEY_STORAGE) !== publicKey
+      : false;
+  } catch {
+    // Storage can be unavailable in hardened/private contexts. In that case
+    // retain the subscription instead of rebuilding it on every page load.
+    return false;
+  }
+}
+
+function rememberCurrentVapidKey() {
+  if (!VAPID_PUBLIC_KEY || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PUSH_VAPID_KEY_STORAGE, VAPID_PUBLIC_KEY);
+  } catch {}
+}
+
+function forgetRememberedVapidKey() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(PUSH_VAPID_KEY_STORAGE);
+  } catch {}
 }
 
 export function usePush() {
@@ -210,7 +257,7 @@ export function usePush() {
       // older VAPID key is worse than none, because it looks healthy and fails
       // every send. Reusing it here was how a "successful" enable could still
       // deliver nothing.
-      if (sub && !subscriptionMatchesCurrentKey(sub)) {
+      if (sub && pushSubscriptionNeedsRefresh(sub)) {
         try {
           await sub.unsubscribe();
         } catch {}
@@ -251,6 +298,7 @@ export function usePush() {
         { subscription: sub.toJSON() },
         { headers: getAuthHeaders() },
       );
+      rememberCurrentVapidKey();
       setIsSubscribed(true);
       return true;
     } catch (e) {
@@ -285,6 +333,7 @@ export function usePush() {
         );
         await sub.unsubscribe();
       }
+      forgetRememberedVapidKey();
       setIsSubscribed(false);
       return true;
     } catch (e) {
@@ -306,7 +355,7 @@ export function usePush() {
         (await navigator.serviceWorker.ready);
       await navigator.serviceWorker.ready;
       let sub = await reg.pushManager.getSubscription();
-      if (sub && !subscriptionMatchesCurrentKey(sub)) {
+      if (sub && pushSubscriptionNeedsRefresh(sub)) {
         // Bound to a key the server no longer signs with: every send would be
         // rejected with 403 while everything on this side looked healthy.
         // Tear it down so the subscribe below rebuilds it against the current
@@ -329,6 +378,7 @@ export function usePush() {
         { subscription: sub.toJSON() },
         { headers: getAuthHeaders() },
       );
+      rememberCurrentVapidKey();
       setIsSubscribed(true);
     } catch (e) {
       console.error("push ensureSubscribed failed:", e);
