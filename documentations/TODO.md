@@ -70,6 +70,141 @@ The Workspace is the canonical client projection of the complete lifecycle, not 
 - Every state-changing slice has runtime validation, authorization, version/idempotency rule, audit/evidence, tests, staging deploy and smoke evidence.
 - No application code, model, migration or route change is performed by this planning milestone.
 
+## Product Quality Gate
+
+The binding Product Quality Doctrine is defined in `ARCHITECTURAL RULES_DMD.md`.
+
+Global product-quality invariants:
+
+- **System quality is measured at the client outcome, not at the internal execution layer.**
+- **Complexity may increase internally only if perceived complexity decreases for the client.**
+- **The client expresses intent; the system absorbs complexity.**
+- **A feature is MVP-ready only when the full client journey is usable end-to-end.**
+- Technical completion does not by itself prove client-outcome readiness.
+- Human escape, dead ends, repetition, unclear state and failed recovery are first-class product defects.
+- Real non-technical user behavior is required evidence for maturing client-facing workflows.
+- Do not optimize one internal layer in isolation when the complete client journey remains weak.
+
+### Canonical client journey
+
+For relevant product-facing milestones evaluate the complete path:
+
+```text
+Intent
+→ Understanding
+→ Guidance
+→ Decision / routing
+→ Action
+→ Execution
+→ Evidence
+→ Recovery
+→ Client confirmation
+```
+
+### Client Outcome Score
+
+Use a 0–100 aggregate score for comparable real-user scenarios:
+
+```text
+Task Success        30
+Ease                20
+Clarity             20
+Recovery            15
+Confidence / Trust  15
+----------------------
+Total              100
+```
+
+Record raw evidence alongside the score where applicable:
+
+```text
+completed_without_human
+human_escape
+dead_end_count
+user_repeat_count
+ai_recovery_count
+wrong_route_count
+manual_intervention_count
+steps_to_outcome
+time_to_outcome
+user_ease_score
+user_clarity_score
+user_confidence_score
+```
+
+Do not store model chain-of-thought. Store only operational evidence needed to understand routing, execution, recovery and outcome.
+
+### Quality trend
+
+The desired product trend is:
+
+```text
+Client Outcome Score       ↑
+Task completion            ↑
+Confidence                 ↑
+Successful recovery        ↑
+
+Human escape rate          ↓
+Dead-end rate              ↓
+User repetition            ↓
+Wrong routing              ↓
+Manual intervention        ↓
+Time to useful outcome     ↓
+```
+
+### Product-facing milestone gate
+
+Before marking a mature client-facing slice complete, ask:
+
+- Can a non-technical user express the goal in their own words?
+- Does the system correctly understand or clarify the intent without unnecessary questioning?
+- Can the user reach the useful outcome without knowing internal product architecture?
+- Does the system distinguish guidance, configuration, bug, feature request, unsupported request and human escalation where relevant?
+- Is current state and next action clear?
+- If an execution fails, can the system recover without requiring the user to reconstruct prior context?
+- Does the user avoid unnecessary repetition?
+- Does the system provide evidence of what happened?
+- Is human escalation intentional rather than the user escaping the system?
+- Has the journey been exercised in staging?
+- For sufficiently mature workflows, has at least one relevant non-technical real user exercised the journey without coaching?
+
+A milestone may be recorded as technically complete while the product-quality gate remains open.
+
+### Dogfood baseline
+
+Use real client projects as controlled dogfood when safe and appropriate.
+
+Initial high-value testers should use DMD as normal users rather than as QA operators.
+
+Do not tell them which internal classification or workflow is expected.
+
+Capture what they naturally try to do, including:
+
+```text
+"Ne znam gde da kreiram artikal."
+"Ne piše mi ko je zakazao."
+"Hoću da se uradi ova funkcionalnost."
+"Ovo ne radi."
+"Ne znam šta sada treba."
+```
+
+The resulting evidence should determine whether the failure belongs to:
+
+```text
+UI / discoverability
+flow
+copy / clarity
+AI interpretation
+routing
+engine execution
+missing capability
+recovery
+state continuity
+trust
+```
+
+Prioritize improvements that reduce client effort and human escape across the complete journey before expanding feature count without evidence of client value.
+
 ## DMD-FND-0 — Documentation and architecture baseline
 
 **Goal:** Reconcile source authority and terminology before any new persistence or route work.

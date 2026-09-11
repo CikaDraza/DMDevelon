@@ -1,8 +1,8 @@
 # DMD — Architectural Rules & Coding Standards
 
-**Version:** 1.0  
+**Version:** 1.1
 **Status:** binding implementation contract  
-**Date:** 2026-09-09  
+**Date:** 2026-09-11
 **Applies to:** DMD Next.js application, Route Handlers, React UI, server modules, tests, scripts and all AI coding agents  
 **Primary architecture:** Next.js 16+ App Router + React 19.2+ + JavaScript + MongoDB/Mongoose  
 **Language rule:** DMD source is `.js`, `.jsx` and `.mjs` only. Do not introduce TypeScript files, TypeScript syntax, TypeScript-only architecture or a typed-JavaScript migration.
@@ -161,6 +161,437 @@ Only repositories or explicitly named server data-access modules may import Mong
 ### 2.7 AI-generated code obeys the same rules
 
 Claude Code, Codex and any other coding agent are not allowed to bypass these boundaries because a change is “small” or “faster”.
+
+---
+
+## Product Quality Doctrine
+
+DMD product quality is measured by the client's ability to reach a useful outcome, not by the sophistication or apparent correctness of any individual internal layer.
+
+The following principles are binding product and architecture rules.
+
+### 1. Client outcome is the quality boundary
+
+> **System quality is measured at the client outcome, not at the internal execution layer.**
+
+A technically successful internal execution is not sufficient evidence of product success.
+
+An AI agent may correctly interpret a request, an engine may successfully execute a task, tests may pass and persistence may be correct, while the client still fails to understand what happened, cannot continue, reaches a dead end or abandons the system and contacts a human.
+
+In that case the client journey failed.
+
+Internal subsystem quality remains necessary, but final product quality is evaluated at the end-to-end client outcome.
+
+The canonical client path is:
+
+```text
+Client intent
+      ↓
+Understanding
+      ↓
+Guidance
+      ↓
+Decision / routing
+      ↓
+Action
+      ↓
+Execution
+      ↓
+Evidence
+      ↓
+Recovery when required
+      ↓
+Client understanding / confirmation
+```
+
+A failure at any material step is an end-to-end quality failure even when preceding layers behaved correctly.
+
+---
+
+### 2. Internal complexity must reduce client complexity
+
+> **Complexity may increase internally only if perceived complexity decreases for the client.**
+
+DMD may add engines, agents, workflows, policies, evidence, orchestration, background jobs and internal state only when that complexity makes the client's work simpler, clearer, safer or faster.
+
+Internal architecture must absorb complexity rather than expose it.
+
+The client should express intent in their own language.
+
+The client must not be required to understand:
+
+* engine boundaries;
+* AI agent topology;
+* workflow state machines;
+* internal task classifications;
+* technical implementation terminology;
+* repository structure;
+* provider boundaries;
+* work-order internals;
+* evidence infrastructure;
+* whether a request was resolved by AI, deterministic code, an engine or a human.
+
+Where the system can infer, route or execute safely, the client should not be asked to perform that coordination manually.
+
+---
+
+### 3. The client expresses intent; the system absorbs complexity
+
+The default interaction model is:
+
+```text
+Client:
+"Ne piše mi ko je zakazao."
+
+System:
+understands project + surface + expected outcome
+        ↓
+determines whether this is:
+GUIDANCE
+BUG
+CONFIGURATION
+FEATURE REQUEST
+UNSUPPORTED / DEAD END
+        ↓
+takes or proposes the appropriate next action
+```
+
+The client must not be forced to first decide whether their problem is a bug, feature request, support question, configuration problem or implementation task.
+
+That classification belongs to the system.
+
+The same rule applies to navigation.
+
+If the client says:
+
+```text
+"Ne znam gde da kreiram artikal."
+```
+
+the preferred result is guidance or direct navigation to the correct capability, not forcing the client to understand the information architecture before receiving help.
+
+---
+
+### 4. MVP means smallest complete client journey
+
+DMD does not define MVP as the smallest number of implemented features.
+
+A DMD capability is MVP-ready only when the smallest useful end-to-end client journey works coherently.
+
+> **A feature is MVP-ready only when the full client journey is usable end-to-end.**
+
+A product-facing capability is not complete merely because:
+
+* the API exists;
+* the database schema exists;
+* the UI exists;
+* the agent can answer;
+* the engine can execute;
+* automated tests pass.
+
+For MVP readiness, the relevant client scenario must function across all required layers:
+
+```text
+Intent
+→ Understanding
+→ Guidance
+→ Action
+→ Execution
+→ Evidence
+→ Recovery
+→ Client confirmation
+```
+
+Prefer five complete high-quality client journeys over thirty disconnected capabilities.
+
+Development should therefore favor vertical slices that produce measurable client value rather than maximizing completion of one internal subsystem in isolation.
+
+---
+
+### 5. Product development is balanced across the whole system
+
+No internal layer is optimized as an end in itself.
+
+Do not maximize:
+
+* AI capability while UX remains unclear;
+* engine automation while recovery is poor;
+* feature count while discoverability declines;
+* workflow sophistication while client effort increases;
+* UI polish while execution is unreliable;
+* automation rate while client trust decreases.
+
+The development question is not:
+
+```text
+"Is Engine X finished?"
+```
+
+The preferred question is:
+
+```text
+"Which real client scenario now works better than before?"
+```
+
+A change is valuable when it measurably improves the client outcome while preserving security, correctness and product invariants.
+
+---
+
+### 6. Human escape is a first-class failure signal
+
+A **human escape** occurs when the client abandons the intended DMD interaction and contacts a human because the system could not carry them to a useful outcome.
+
+Examples:
+
+```text
+"Ne razumem šta treba da uradim."
+"Ne mogu ovo."
+"Ne znam gde dalje."
+"Bolje da pišem Milanu."
+"Objasni mi ti šta se ovde dešava."
+```
+
+Human escalation is not automatically a failure.
+
+A correct escalation is valid when the system identifies that human authority, judgment or implementation is genuinely required and manages that handoff clearly.
+
+A **human escape** is different: the user bypasses the system because the system became confusing, repetitive, untrustworthy, blocked or burdensome.
+
+Human escape rate is therefore a primary product-quality metric.
+
+---
+
+### 7. Dead ends must become explicit system states
+
+The system must not leave the client in an ambiguous state when it cannot complete an action.
+
+A request that cannot proceed must resolve to an explicit outcome such as:
+
+```text
+supported and executable
+supported but requires configuration
+requires reusable product extension
+requires project-specific implementation
+requires human decision
+temporarily blocked
+unsupported
+```
+
+The client must receive:
+
+* what happened;
+* whether anything was changed;
+* what is blocked;
+* what happens next;
+* whether the system or a human owns the next action.
+
+Silent failure, circular AI conversation and unexplained inability to continue are prohibited product states.
+
+---
+
+### 8. Recovery quality is part of normal quality
+
+Misunderstanding and failure are expected operating conditions.
+
+A high-quality system is not one that never encounters errors; it is one that recovers without making the client reconstruct the system state.
+
+The system should preserve known context and avoid requiring the client to repeat information already available in the current project/session.
+
+Recovery should preserve:
+
+```text
+client intent
+project context
+previous decisions
+current lifecycle state
+completed actions
+failed action
+evidence
+next valid options
+```
+
+AI repetition without progress is a product defect.
+
+---
+
+### 9. Real non-technical users are required evidence
+
+Product-facing quality cannot be proven only by developers, automated tests or agents evaluating their own output.
+
+DMD must periodically be exercised by real users who:
+
+* do not know the implementation;
+* do not know internal terminology;
+* are not trained to use the system;
+* have a real task or project;
+* are allowed to use their own natural language.
+
+Dogfooding with real client projects is therefore part of product validation.
+
+The tester should not be coached through the intended architecture unless safety requires it.
+
+Confusion is evidence.
+
+Unexpected navigation is evidence.
+
+Repeated questions are evidence.
+
+Calling a human is evidence.
+
+The goal is not to make the tester succeed artificially. The goal is to discover where the product fails to carry them.
+
+---
+
+### 10. Canonical client outcome metrics
+
+The primary aggregate quality metric is:
+
+```text
+Client Outcome Score: 0–100
+```
+
+Initial weighting:
+
+```text
+Task Success        30%
+Ease                20%
+Clarity             20%
+Recovery            15%
+Confidence / Trust  15%
+```
+
+Definitions:
+
+**Task Success**
+
+* Did the client reach the intended useful outcome?
+* Could they do it without unplanned human intervention?
+
+**Ease**
+
+* How much navigation, repetition, unnecessary input and cognitive effort was required?
+
+**Clarity**
+
+* Did the client understand what was happening and what the next step was?
+
+**Recovery**
+
+* When misunderstanding, failure or a dead end occurred, did the system restore progress?
+
+**Confidence / Trust**
+
+* Did the client feel that continuing inside DMD was the fastest and safest path to solving the problem?
+
+The score is not a substitute for raw behavioral evidence.
+
+The following metrics must also be retained where applicable:
+
+```text
+completed_without_human
+human_escape
+dead_end_count
+user_repeat_count
+ai_recovery_count
+wrong_route_count
+manual_intervention_count
+steps_to_outcome
+time_to_outcome
+user_ease_score
+user_clarity_score
+user_confidence_score
+```
+
+Do not persist private model chain-of-thought.
+
+Only operational classification, actions, state transitions, outcomes and client feedback may be retained as product evidence.
+
+---
+
+### 11. Hard-failure indicators
+
+The following are high-severity product-quality signals even when an aggregate score remains acceptable:
+
+* the client abandons the task without a useful result;
+* the client bypasses DMD and contacts a human because DMD became unusable or unclear;
+* the system requires the client to repeat information already available;
+* the system claims an action succeeded when it did not;
+* the client cannot determine whether the request was accepted, blocked, completed or failed;
+* the system enters a repetitive AI loop without progress;
+* a recoverable error becomes a terminal dead end;
+* the system exposes internal implementation complexity as required client knowledge.
+
+These signals must be investigated independently of aggregate scores.
+
+---
+
+### 12. Improvement is measured as a trend
+
+Product quality is measured across repeated real scenarios.
+
+Desired trend:
+
+```text
+Client Outcome Score       ↑
+Task completion            ↑
+Confidence                 ↑
+Successful AI recovery     ↑
+
+Human escape rate          ↓
+Dead-end rate              ↓
+User repetition            ↓
+Wrong routing              ↓
+Manual intervention        ↓
+Steps to useful outcome    ↓
+Time to useful outcome     ↓
+```
+
+A larger system is not automatically a better system.
+
+If internal capability increases while these client metrics deteriorate, the product has regressed.
+
+---
+
+### 13. Release and milestone consequence
+
+For client-facing milestones, technical completion and client-outcome readiness are separate gates.
+
+A milestone may be:
+
+```text
+TECHNICALLY COMPLETE
+```
+
+while remaining:
+
+```text
+CLIENT OUTCOME NOT VALIDATED
+```
+
+Product-facing work should not be described as mature, production-ready or validated solely from code/test completion.
+
+Relevant milestones require evidence appropriate to their maturity:
+
+```text
+automated correctness
++ staging smoke
++ end-to-end journey
++ real-user evidence when the capability is intended for real client use
+```
+
+Early MVP work may use small samples.
+
+The purpose is not statistical certainty; it is to identify major friction, dead ends and human escapes before adding broader complexity.
+
+---
+
+### 14. Governing rule
+
+When choosing between adding a new capability and removing friction from an existing client journey, prefer the work that produces the larger improvement in real client outcome unless another binding security, integrity or commercial requirement takes precedence.
+
+DMD should become more sophisticated internally while feeling progressively simpler to use.
+
+That is the target architecture at the product boundary.
 
 ---
 
