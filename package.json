@@ -7,6 +7,7 @@
     "test:api": "vitest run --project chat-api",
     "test:ui": "vitest run --project chat-ui",
     "test:all": "npm run test && vitest run",
+    "verify:staging:mongo": "node scripts/verify-staging-mongo-authority.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "dev": "NODE_OPTIONS='--max-old-space-size=1024' next dev --turbopack --hostname 0.0.0.0 --port 3003",
     "dev:no-reload": "next dev --turbopack --hostname 0.0.0.0 --port 3003",

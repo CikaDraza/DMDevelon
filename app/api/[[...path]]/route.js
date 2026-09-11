@@ -47,6 +47,7 @@ import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
 import { randomBytes } from "crypto";
 import { emailTemplates } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
+import { isStagingCronEnabled } from "@/lib/staging-safety.mjs";
 
 // Base URL for links in emails (prod domain, falls back to localhost in dev)
 const APP_URL =
@@ -876,7 +877,7 @@ export async function OPTIONS() {
 function isCronAuthorized(request) {
   const auth = request.headers.get("authorization") || "";
   const secret = process.env.CRON_SECRET;
-  return !!secret && auth === `Bearer ${secret}`;
+  return isStagingCronEnabled() && !!secret && auth === `Bearer ${secret}`;
 }
 
 // Batched email digest of unread message notifications. Shared by GET (Vercel
