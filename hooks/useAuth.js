@@ -37,6 +37,10 @@ function storeSession(token, user) {
   announceSessionChange();
 }
 
+export function canonicalUserId(user) {
+  return user?.id ?? user?._id;
+}
+
 // All existing API calls use axios directly. Install one interceptor on that
 // shared client so every protected area (client dashboard and admin alike)
 // transparently receives a renewed access token after a 401.
@@ -216,6 +220,10 @@ export function useAuth() {
       ? { Authorization: `Bearer ${currentToken}` }
       : {};
     const stored = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = canonicalUserId(stored);
+    if (!userId) {
+      throw new Error("Authenticated user identity is missing");
+    }
 
     const dataUri = await readAsDataURL(file);
     const { data: uploaded } = await axios.post(
@@ -224,7 +232,7 @@ export function useAuth() {
       { headers },
     );
     const { data: updated } = await axios.put(
-      `/api/users/${stored.id}`,
+      `/api/users/${userId}`,
       { image: uploaded.url },
       { headers },
     );

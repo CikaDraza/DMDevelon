@@ -199,6 +199,8 @@ function authUserPayload(user) {
     isAdmin: user.isAdmin,
     image: user.image,
     emailVerified: user.emailVerified,
+    emailNotifications: user.emailNotifications,
+    pushNotifications: user.pushNotifications,
   };
 }
 
@@ -1660,7 +1662,9 @@ export async function GET(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
-      return NextResponse.json(user, { headers: getCorsHeaders() });
+      return NextResponse.json(authUserPayload(user), {
+        headers: getCorsHeaders(),
+      });
     }
 
     // Notifications (current user)

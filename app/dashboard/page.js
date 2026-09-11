@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { useAuth } from "@/hooks/useAuth";
+import { canonicalUserId, useAuth } from "@/hooks/useAuth";
 import { useTestimonials } from "@/hooks/useTestimonials";
 import { useClientProjects } from "@/hooks/useClientProjects";
 import { useProjectRequests } from "@/hooks/useProjectRequests";
@@ -100,6 +100,7 @@ function DashboardInner() {
     rating: 5,
     comment: "",
   });
+  const userId = canonicalUserId(user);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -196,11 +197,14 @@ function DashboardInner() {
       return;
     }
     try {
+      if (!userId) {
+        throw new Error("Authenticated user identity is missing");
+      }
       const updateData = { name: profileData.name };
       if (profileData.password) {
         updateData.password = profileData.password;
       }
-      await axios.put(`/api/users/${user.id}`, updateData, {
+      await axios.put(`/api/users/${userId}`, updateData, {
         headers: getAuthHeaders(),
       });
       toast.success("Profile updated successfully!");
@@ -217,7 +221,10 @@ function DashboardInner() {
 
   const handleDeleteAccount = async () => {
     try {
-      await axios.delete(`/api/users/${user.id}`, {
+      if (!userId) {
+        throw new Error("Authenticated user identity is missing");
+      }
+      await axios.delete(`/api/users/${userId}`, {
         headers: getAuthHeaders(),
       });
       toast.success("Account deleted successfully");
@@ -308,7 +315,7 @@ function DashboardInner() {
 
   // Filter user's testimonials
   const userTestimonials = testimonials.filter(
-    (t) => t.clientEmail === user?.email || t.userId === user?.id,
+    (t) => t.clientEmail === user?.email || t.userId === userId,
   );
 
   // Deep-link card highlight: scroll to ?id once the active tab is rendered and
