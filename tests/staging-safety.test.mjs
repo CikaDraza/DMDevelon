@@ -10,7 +10,6 @@ const base = {
   APP_ENV: "staging",
   MONGO_URL: "mongodb+srv://user:secret@staging.example.invalid/",
   DB_NAME: "portfolio_staging",
-  STAGING_DB_NAME: "portfolio_staging",
   NEXT_PUBLIC_APP_URL: "https://staging.dmdevelon.website",
 };
 
@@ -32,17 +31,16 @@ test("a minimal provider-disabled staging configuration is valid", () => {
   });
 });
 
-test("staging rejects an ambiguous or production database identity", () => {
+test("staging requires DB_NAME and rejects a production database identity", () => {
   assert.throws(
-    () => validateStagingRuntimeConfig({ ...base, STAGING_DB_NAME: "other" }),
-    /expected staging database/,
+    () => validateStagingRuntimeConfig({ ...base, DB_NAME: "" }),
+    /explicit DB_NAME/,
   );
   assert.throws(
     () =>
       validateStagingRuntimeConfig({
         ...base,
         DB_NAME: "portfolio_db",
-        STAGING_DB_NAME: "portfolio_db",
       }),
     /production database identity/,
   );

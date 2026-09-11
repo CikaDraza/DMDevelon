@@ -68,7 +68,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import Image from "next/image";
-import { useIsMobile } from "@/hooks/use-mobile";
 import Slider from "react-slick";
 import LogoIcon from "../ui/logo-icon";
 import Link from "next/link";
@@ -420,7 +419,6 @@ function Header({ user, onLoginClick, onLogout }) {
 
 // Hero Section Component
 function HeroSection({ profile }) {
-  const isMobile = useIsMobile();
   return (
     <section id="hero" className="w-full relative overflow-hidden pt-20">
       <div className="container mx-auto px-4 h-full relative z-10">
@@ -477,9 +475,10 @@ function HeroSection({ profile }) {
                 <Image
                   src={PROFILE_PICTURE}
                   alt="Milan Drazic"
-                  className="rounded-full object-cover relative z-10"
-                  width={isMobile ? 100 : 256}
-                  height={isMobile ? 96 : 224}
+                  className="relative z-10 h-auto w-[100px] rounded-full object-cover lg:w-64"
+                  width={696}
+                  height={762}
+                  sizes="(min-width: 1024px) 256px, 100px"
                 />
               </div>
             </motion.div>
