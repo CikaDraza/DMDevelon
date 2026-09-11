@@ -30,15 +30,16 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 ## Dependency direction
 
-DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-2A → DMD-FND-3 → DMD-FND-4 gates all new domains. After DMD-FND-4, controlled legacy cleanup and the new business model proceed in parallel:
+DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-2A → DMD-FND-3 → DMD-FND-4 gates all new domains. After DMD-FND-4, the Workspace is the first product-facing expansion slice, while controlled legacy cleanup and non-UI platform foundations may proceed in parallel:
 
 ```text
 DMD-FND-4
-      ├──────────────→ DMD-BI-1 → DMD-BI-2 → DMD-BI-3 → ...
+      ├──────────────→ DMD-WORKSPACE-0 → DMD-BI-1 → DMD-BI-2 → DMD-BI-3 → ...
+      ├──────────────→ DMD-OPS-0 → DMD-AI-0 → ...
       └──────────────→ DMD-FND-5 → DMD-FND-6 → DMD-FND-7 → DMD-FND-8
 ```
 
-The primary product path is DiscoverySession → Verified Business State → Capability Model → Product Route → Solution Blueprint → Design Strategy → curated handoff → candidate/validation/review → Approved Design Revision → proposal/acceptance/payment → WorkOrder → evidence → Engineering Projection. Project Intelligence read/classification work may begin after DMD-FND-4, but its Blueprint/commercial integration waits for those inputs.
+The Workspace is the canonical client projection of the complete lifecycle, not a new source-of-truth aggregate: idea → discovery → design → solution → commercial → project all remain one continuous client experience. The underlying product path is DiscoverySession → Verified Business State → Capability Model → Product Route → Solution Blueprint → Design Strategy → curated handoff → candidate/validation/review → Approved Design Revision → proposal/acceptance/payment → WorkOrder → evidence → Engineering Projection. Project Intelligence read/classification work may begin after DMD-FND-4, but its Blueprint/commercial integration waits for those inputs.
 
 ## Global invariants
 
@@ -218,6 +219,33 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Explicitly out of scope:** Full auth rewrite, provider integration and new domain model.
 
+## DMD-WORKSPACE-0 — Canonical client Workspace shell
+
+**Status:** NOT STARTED — gated by `DMD-FND-4 COMPLETE`.
+
+**Goal:** Establish the first product-facing expansion slice: one continuous client Workspace from idea through future Project Mode, while deeper systems still use bounded fixture projections.
+
+**Source documents:** documentations/new-business-model/DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
+
+**Dependencies:** `DMD-FND-4 COMPLETE`. Design discussion and prototypes may continue earlier, but production implementation must not start before this gate is closed. DMD-FND-5 through DMD-FND-8 may continue as the controlled parallel legacy-cleanup branch.
+
+**Tasks:**
+
+- [ ] Update the primary public CTA to start with the client's idea and keep portfolio/projects as the secondary path.
+- [ ] Replace the current CodeReview/New Extra Services explanation with the canonical idea → discovery → design → solution → commercial → project journey.
+- [ ] Add the public fullscreen Workspace route and shell with clear return-to-home navigation and visible guest state.
+- [ ] Implement a resizable desktop conversation/work-area split and a mobile `Chat | Preview` state switch that preserves both sides.
+- [ ] Add explicit Desktop / Tablet / Mobile preview controls; resizing alone is not the responsive-preview contract.
+- [ ] Project bounded fixture conversation, business-understanding and design-preview states to validate the interaction model without inventing backend truth.
+- [ ] Preserve layout space for future allowance/unlock and Project Mode states without implementing their economics or workflows.
+- [ ] Verify desktop/mobile accessibility, navigation, state preservation and absence of console errors on staging.
+
+**Invariants:** Workspace is the canonical client-facing projection, not a new aggregate or source of truth. Dashboard remains the authenticated navigator and ownership surface; Workspace is where lifecycle work happens. The shell may project only fixture or authorized canonical state and must not infer lifecycle transitions in the frontend. DMD is not a generic page builder.
+
+**Verification:** A guest can move from the primary CTA into the responsive Workspace shell, use conversation/preview modes across desktop and mobile, return home and observe stable fixture state; staging evidence confirms no real AI/provider call, persistence mutation, payment or project automation occurred.
+
+**Explicitly out of scope:** Real AI calls, AgentRun infrastructure, DiscoverySession persistence, payment/preview charging, Product Intelligence, Design Engine execution, proposal generation, project automation, arbitrary canvas/page-builder controls, multiple generated design variants and final preview economics.
+
 ## DMD-FND-5 — Operations, auth and users extraction
 
 **Goal:** Extract health, cron, auth/session, user/settings and seed safety sequentially.
@@ -353,7 +381,7 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
 
-**Dependencies:** DMD-FND-4 only. DMD-FND-5 through DMD-FND-8 continue as a controlled parallel legacy-cleanup branch.
+**Dependencies:** DMD-FND-4 and DMD-WORKSPACE-0. DMD-FND-5 through DMD-FND-8 continue as a controlled parallel legacy-cleanup branch.
 
 **Tasks:**
 

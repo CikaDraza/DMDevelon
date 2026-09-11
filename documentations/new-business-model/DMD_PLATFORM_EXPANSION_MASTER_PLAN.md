@@ -2,6 +2,7 @@
 
 **Status:** Architecture / implementation roadmap  
 **Date:** 2026-09-09  
+**Last updated:** 2026-09-11
 **Foundation:** `DMD_DESIGN_ENGINE_PRINCIPLES.md`
 
 ---
@@ -145,6 +146,32 @@ Continuous Product + Engineering Lifecycle
 ```
 
 Ovaj tok je canonical. Pojedini product route može preskočiti neke komercijalne ili engineering korake, ali ne sme preskočiti razumevanje biznisa i product fit odluku.
+
+### 3.1 Client Workspace — canonical lifecycle projection
+
+`DMD Workspace` je canonical client-facing projekcija celog lifecycle-a, od prve ideje do aktivnog proizvoda i engineering projekta:
+
+```text
+IDEA
+  ↓
+DISCOVERY
+  ↓
+DESIGN
+  ↓
+SOLUTION
+  ↓
+COMMERCIAL
+  ↓
+PROJECT
+```
+
+Klijent se ne prebacuje između nepovezanih intake, design, pricing i project proizvoda. Ostaje u jednom kontinuiranom Workspace-u koji menja prikaz i dozvoljene akcije kako canonical lifecycle napreduje. Conversation, business understanding, preview, product-route objašnjenje, commercial odluka i Project Mode predstavljaju različite projekcije istog kontinuiranog rada, a ne paralelne izvore istine.
+
+Workspace nije novi business aggregate i ne poseduje lifecycle stanje. On projektuje autorizovano stanje iz `DiscoverySession`, `VerifiedBusinessState`, `CapabilityModel`, `ProductRouteDecision`, `SolutionBlueprint`, design/commercial objekata, `WorkOrder`, postojećih project objekata i evidence sloja. Frontend nikada ne zaključuje niti mutira canonical state iz lokalnog prikaza; svaka promena prolazi kroz odgovarajuću application/domain granicu.
+
+Postojeći authenticated Dashboard ostaje navigator i account/project ownership surface. Iz njega se klijent vraća u isti Workspace na odgovarajući lifecycle state; Dashboard nije zamena za Workspace, a Workspace nije zamena za account i portfolio navigaciju.
+
+Prvi product-facing expansion slice je `DMD-WORKSPACE-0`: fullscreen responsive shell sa fixture stanjem kojim se proverava interaction model. Njegova implementacija je strogo blokirana dok `DMD-FND-4` nije kompletan i ne uvodi `DiscoverySession` persistence, AI provider, payment, Product Intelligence, Design Engine ili project automation pre njihovih zasebnih milestone-a.
 
 ---
 
@@ -622,7 +649,8 @@ Svaki milestone treba da dokaže jedan end-to-end flow.
 Primer prvog velikog vertical slice-a:
 
 ```text
-Entry
+DMD-WORKSPACE-0 shell
+→ Entry
 → DiscoverySession
 → Guided Discovery
 → VerifiedBusinessState
@@ -680,7 +708,7 @@ Ne čuvati privatni AI chain-of-thought.
 
 DMD Platform Expansion nije završen dok se ne može dokazati sledeći scenario:
 
-1. novi klijent dolazi bez IT znanja;
+1. novi klijent dolazi bez IT znanja i ulazi u jedan kontinuirani Workspace;
 2. kaže šta pokušava da uradi;
 3. sistem vodi discovery bez ponavljanja poznatih pitanja;
 4. kritične činjenice ostaju unresolved dok nisu jasne;
@@ -694,7 +722,7 @@ DMD Platform Expansion nije završen dok se ne može dokazati sledeći scenario:
 12. onboarding sistem traži samo nedostajuće podatke;
 13. provisioning je planiran, validiran i idempotentan;
 14. product instance nastaje i može se verifikovati;
-15. DMD engineering project nastavlja iz istog konteksta;
+15. DMD engineering project nastavlja iz istog konteksta i istog Workspace-a u Project Mode-u;
 16. Project Intelligence zna accepted scope, milestones, tasks i client discussion;
 17. GitHub/docs/Claude/Codex/build evidence ažurira project truth kroz autorizovan engine;
 18. frontend prikazuje isto canonical stanje koje bi prikazivao da je admin ručno unosio podatke.
@@ -705,6 +733,7 @@ DMD Platform Expansion nije završen dok se ne može dokazati sledeći scenario:
 
 Ovaj master dokument se razrađuje kroz:
 
+- `DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md`
 - `DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md`
 - `DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md`
 - `DMD_DESIGN_ENGINE_CLIENT_FLOW.md`
