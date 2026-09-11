@@ -31,10 +31,10 @@ The package manifest intentionally remains on `react: ^18` and `react-dom: ^18`.
 | `npm run test:ui -- --reporter=dot` | 8 files, 55 tests passed | PASS |
 | `npm run typecheck` | zero errors | PASS |
 | `npm run build` | Next.js production build passed; 16 routes generated/registered | PASS |
-| `npm run test:api` | local Docker daemon unavailable; the pinned replica set at `127.0.0.1:27077` cannot start | PENDING |
+| `npm run test:api -- --reporter=dot` | 12 files, 236 tests passed in 28.85s; 0 failed/skipped | PASS |
 | `npm run lint` | no script or lint configuration exists | NOT A CURRENT GATE |
 
-The earlier 236/236 API result is useful history but is deliberately not reused as fresh FND-2 evidence. Start Docker and `dmd-test-mongo`, then run `npm run test:api` to close this row.
+The API suite ran against the pinned local `dmd-test-mongo` replica set at `127.0.0.1:27077`. Its stderr contains expected negative authorization and validation paths (`400/401/403/404/409`) asserted by passing tests; none is a suite failure. This is a fresh run, not the earlier historical 236/236 result.
 
 ### Fresh staging HTTP baseline
 
@@ -119,7 +119,7 @@ DMD-FND-2 and DMD-FND-2A must preserve rather than replace:
 
 DMD-FND-2 remains open until:
 
-1. Docker and `dmd-test-mongo` are running and the fresh API suite result is recorded;
+1. [x] Docker and `dmd-test-mongo` are running and the fresh API suite result is recorded;
 2. every staging smoke row has dated evidence or an explicitly accepted, narrowly described limitation;
 3. the baseline commit is recorded in `documentations/TODO.md`;
 4. no implementation behavior changed while capturing the baseline.
