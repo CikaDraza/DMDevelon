@@ -47,13 +47,14 @@ import { v4 as uuidv4, v5 as uuidv5 } from "uuid";
 import { randomBytes } from "crypto";
 import { emailTemplates } from "@/lib/email-templates";
 import { sendEmail } from "@/lib/email";
-import { isStagingCronEnabled } from "@/lib/staging-safety.mjs";
+import {
+  isStagingCronEnabled,
+  isStagingEnvironment,
+  resolveApplicationOrigin,
+} from "@/lib/staging-safety.mjs";
 
 // Base URL for links in emails (prod domain, falls back to localhost in dev)
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ||
-  process.env.NEXT_PUBLIC_BASE_URL ||
-  "http://localhost:3003";
+const APP_URL = resolveApplicationOrigin();
 
 // The dev server binds `--hostname 0.0.0.0` (listens on every interface), but
 // that address is only meaningful to bind to — it is not something a browser
@@ -86,7 +87,9 @@ function detectLanIPv4() {
 // token being tested — using the dev server's own request origin instead
 // lets the whole invite/verify/reset flow be exercised locally.
 function resolveAppUrl(request) {
-  if (process.env.NODE_ENV === "production") return APP_URL;
+  if (process.env.NODE_ENV === "production" || isStagingEnvironment()) {
+    return APP_URL;
+  }
   try {
     const url = new URL(request.url);
     const port = url.port ? `:${url.port}` : "";

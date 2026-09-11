@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   assertSafeStagingRecipient,
   isStagingCronEnabled,
+  resolveApplicationOrigin,
   validateStagingRuntimeConfig,
 } from "../lib/staging-safety.mjs";
 
@@ -58,7 +59,7 @@ test("staging rejects a production or mismatched application origin", () => {
   }
 });
 
-test("Cloudinary stays disabled or requires an explicit isolated identity", () => {
+test("Cloudinary stays disabled or denies every known production identity", () => {
   assert.throws(
     () => validateStagingRuntimeConfig({ ...base, CLOUDINARY_NAME: "partial" }),
     /incomplete/,
@@ -70,9 +71,8 @@ test("Cloudinary stays disabled or requires an explicit isolated identity", () =
         CLOUDINARY_NAME: "prod-cloud",
         CLOUDINARY_KEY: "key",
         CLOUDINARY_SECRET: "secret",
-        STAGING_CLOUDINARY_NAME: "prod-cloud",
         PRODUCTION_CLOUDINARY_NAMES: "prod-cloud",
-        CLOUDINARY_FOLDER: "staging/uploads",
+        CLOUDINARY_FOLDER: "portfolio-staging",
       }),
     /production Cloudinary identity/,
   );
@@ -82,9 +82,49 @@ test("Cloudinary stays disabled or requires an explicit isolated identity", () =
       CLOUDINARY_NAME: "staging-cloud",
       CLOUDINARY_KEY: "key",
       CLOUDINARY_SECRET: "secret",
-      STAGING_CLOUDINARY_NAME: "staging-cloud",
-      CLOUDINARY_FOLDER: "staging/portfolio",
+      PRODUCTION_CLOUDINARY_NAMES: "prod-cloud",
+      CLOUDINARY_FOLDER: "portfolio-staging",
     }),
+  );
+  assert.throws(
+    () =>
+      validateStagingRuntimeConfig({
+        ...base,
+        CLOUDINARY_NAME: "staging-cloud",
+        CLOUDINARY_KEY: "key",
+        CLOUDINARY_SECRET: "secret",
+        CLOUDINARY_FOLDER: "portfolio-staging",
+      }),
+    /production identities/,
+  );
+});
+
+test("staging account and project email links always use the canonical origin", () => {
+  const origin = resolveApplicationOrigin(base);
+  for (const path of [
+    "/verify-email?token=verify-token",
+    "/reset-password?token=reset-token",
+    "/invite?token=invite-token",
+    "/dashboard/projects",
+  ]) {
+    const link = new URL(path, `${origin}/`);
+    assert.equal(link.origin, "https://staging.dmdevelon.website");
+    assert.notEqual(link.origin, "https://dmdevelon.website");
+  }
+});
+
+test("staging URL resolution fails closed instead of falling back to production", () => {
+  assert.throws(
+    () =>
+      resolveApplicationOrigin({
+        ...base,
+        NEXT_PUBLIC_APP_URL: "https://dmdevelon.website",
+      }),
+    /canonical origin/,
+  );
+  assert.throws(
+    () => resolveApplicationOrigin({ ...base, NEXT_PUBLIC_APP_URL: "" }),
+    /requires NEXT_PUBLIC_APP_URL/,
   );
 });
 
@@ -98,6 +138,37 @@ test("configured outbound providers require explicit safe recipients", () => {
       ...base,
       RESEND_API_KEY: "re_test",
       STAGING_SAFE_RECIPIENTS: "pantelyasm@gmail.com",
+    }),
+  );
+});
+
+test("staging VAPID configuration is complete and uses one public key", () => {
+  assert.throws(
+    () =>
+      validateStagingRuntimeConfig({
+        ...base,
+        VAPID_PUBLIC_KEY: "public-key",
+      }),
+    /VAPID configuration is incomplete/,
+  );
+  assert.throws(
+    () =>
+      validateStagingRuntimeConfig({
+        ...base,
+        VAPID_PUBLIC_KEY: "server-public-key",
+        VAPID_PRIVATE_KEY: "private-key",
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: "different-public-key",
+        STAGING_SAFE_RECIPIENTS: "safe@example.com",
+      }),
+    /VAPID keys do not match/,
+  );
+  assert.doesNotThrow(() =>
+    validateStagingRuntimeConfig({
+      ...base,
+      VAPID_PUBLIC_KEY: "public-key",
+      VAPID_PRIVATE_KEY: "private-key",
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: "public-key",
+      STAGING_SAFE_RECIPIENTS: "safe@example.com",
     }),
   );
 });
