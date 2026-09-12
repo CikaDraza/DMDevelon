@@ -1,6 +1,12 @@
 # TODO — Project Communication Hub
 
-Prateći dokument uz [PROJECT_CHAT_PLAN.md](./PROJECT_CHAT_PLAN.md) (v2).
+**Status:** ACTIVE
+**Authority:** canonical
+**Owner domain:** Repository Execution / Status
+**Supersedes:** —
+**Superseded by:** —
+
+Prateći dokument uz [current-system/communication-hub/PROJECT_CHAT_PLAN.md](./current-system/communication-hub/PROJECT_CHAT_PLAN.md) (v2).
 Ovde se označava šta je urađeno, a šta nije.
 
 ## Documentation governance
@@ -40,11 +46,11 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 # NEW BUSINESS MODEL — Foundation & Platform Expansion
 
-**Status:** Foundation execution in progress. DMD-FND-0, DMD-FND-1, DMD-FND-2 and DMD-FND-2A are complete. DMD-FND-3 is in progress: the complete-system API/page/auth/data/side-effect inventory. This is the execution index, while documents under documentations/new-business-model/ remain the architecture and product contracts.
+**Status:** Foundation execution in progress. DMD-FND-0, DMD-FND-1, DMD-FND-2 and DMD-FND-2A are complete. DMD-FND-3 is in progress: the complete-system API/page/auth/data/side-effect inventory. This is the execution index, while documents under `documentations/dmd/` remain the architecture, product, domain and evidence contracts.
 
-**Binding architecture:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
+**Binding architecture:** documentations/dmd/architecture/ARCHITECTURAL_RULES_DMD.md.
 
-**Active Workspace companion:** documentations/new-business-model/DMD_WORKSPACE_VERTICAL_SLICE_EXECUTION_PLAN.md. It explains client-visible slice acceptance without replacing this file's canonical IDs, dependencies or status.
+**Active Workspace companion:** documentations/dmd/workspace/DMD_WORKSPACE_VERTICAL_SLICE_EXECUTION_PLAN.md. It explains client-visible slice acceptance without replacing this file's canonical IDs, dependencies or status.
 
 **Language decision:** DMD source remains `.js`, `.jsx` and `.mjs` only. TypeScript examples were copied from a different project and have been removed from the active expansion guidance. Do not add TypeScript files or syntax, and do not perform a typed-JavaScript/JSDoc migration: JSDoc is optional only for non-trivial exported boundaries, not local variables, ordinary props or routine helpers. Zod/JSON Schema are runtime validation, while the existing typescript/tsconfig/typecheck tooling remains a JavaScript build/module-resolution check; neither authorizes TypeScript source or generated TS types.
 
@@ -98,7 +104,7 @@ The Workspace is the canonical client projection of the complete lifecycle, not 
 
 ## Product Quality Gate
 
-The binding Product Quality Doctrine is defined in `ARCHITECTURAL RULES_DMD.md`.
+The binding Product Quality Doctrine is defined in `dmd/architecture/ARCHITECTURAL_RULES_DMD.md`.
 
 Global product-quality invariants:
 
@@ -235,7 +241,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Goal:** Reconcile source authority and terminology before any new persistence or route work.
 
-**Source documents:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md; audit-dmd/DMD_EXTENSION_EXECUTION_PLAN_V2.md.
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md; dmd/product/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; dmd/audits/current-system/DMD_CURRENT_APP_AUDIT_ADDENDUM.md; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; dmd/execution/foundation/DMD_EXTENSION_EXECUTION_PLAN_V2.md.
 
 **Dependencies:** None.
 
@@ -263,7 +269,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Goal:** Create a real staging boundary before large refactoring, AI use or private-data workflows.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; DMD_COMMERCIAL_PROVISIONING.md; vercel.json; next.config.js; package.json; current environment-variable inventory (secret values must never be copied into TODO/evidence).
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; dmd/domains/commercial/DMD_COMMERCIAL_PROVISIONING.md; vercel.json; next.config.js; package.json; current environment-variable inventory (secret values must never be copied into TODO/evidence).
 
 **Dependencies:** DMD-FND-0.
 
@@ -327,11 +333,11 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Goal:** Establish reproducible legacy behavior and test evidence that expansion must preserve.
 
-**Source documents:** audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md; ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
+**Source documents:** dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; dmd/execution/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md; dmd/architecture/ARCHITECTURAL_RULES_DMD.md.
 
 **Dependencies:** DMD-FND-1.
 
-**Status:** COMPLETE (2026-09-12). Canonical evidence: `audit-dmd/DMD_FND_2_CURRENT_SYSTEM_BASELINE.md`.
+**Status:** COMPLETE (2026-09-12). Canonical evidence: `dmd/audits/current-system/DMD_FND_2_CURRENT_SYSTEM_BASELINE.md`.
 
 **Tasks:**
 
@@ -344,7 +350,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Fresh baseline evidence (2026-09-12):** Application baseline `4efeebb` resolves Node 24.13.1, npm 11.14.1, Next 16.2.10, React/React DOM 18.3.1, Mongoose 8.24.1, Vitest 2.1.9 and TypeScript checker 5.9.3. Fresh `npm test` passed 9/9 files, API integration passed 12/12 files and 236/236 tests in 28.85s, UI passed 8/8 files and 55/55 tests, typecheck passed and the production build compiled, typechecked and generated all 16 registered routes. API stderr contains the expected negative authorization/validation paths exercised by passing assertions, not failures. No lint script or configuration exists, so lint is explicitly not claimed or required until a separately bounded lint decision defines it. Read-only staging checks passed 14/14: the landing and six public API surfaces returned 200, a deliberately missing CMS slug returned 404, and anonymous auth/request/project/chat/notification/users calls returned 401. Authenticated role journeys remain open exactly as shown in the canonical baseline document; no implementation behavior changed during capture.
 
-**Authenticated staging completion evidence (2026-09-12):** Preview deployment `dpl_7EaC9UXKa8Tp6AVu6V4d78WbStCF` passed the staging-only `scripts/fnd2-authenticated-staging-smoke.mjs` matrix with temporary admin, owner, collaborator, viewer and outsider identities. Login, canonical `/auth/me`, refresh, logout invalidation, project/request access, proposal draft visibility/send, chat read/write boundaries, account-scoped notifications, settings persistence and admin/non-admin boundaries all returned their expected `200/201/401/403/404` contracts. The final run performed its own cleanup and reported zero fixture residue; an independent prefix audit also returned zero across users, projects, requests, memberships, channels, messages, proposals and notifications. All temporary recipients used `@example.invalid` with email/push disabled, and the smoke avoided client-originated actions that would notify real staging admins or create Cloudinary folders. Automated browser navigation reached Vercel Preview SSO, so no SSO credential or protection cookie was extracted or bypassed. The owner then personally completed the authenticated staging UI journeys and accepted the client outcome. This supplies the previously missing rendered login/reload and role-page evidence, closes DMD-FND-2 and permits DMD-FND-2A. Canonical detail is recorded in `audit-dmd/DMD_FND_2_CURRENT_SYSTEM_BASELINE.md`.
+**Authenticated staging completion evidence (2026-09-12):** Preview deployment `dpl_7EaC9UXKa8Tp6AVu6V4d78WbStCF` passed the staging-only `scripts/fnd2-authenticated-staging-smoke.mjs` matrix with temporary admin, owner, collaborator, viewer and outsider identities. Login, canonical `/auth/me`, refresh, logout invalidation, project/request access, proposal draft visibility/send, chat read/write boundaries, account-scoped notifications, settings persistence and admin/non-admin boundaries all returned their expected `200/201/401/403/404` contracts. The final run performed its own cleanup and reported zero fixture residue; an independent prefix audit also returned zero across users, projects, requests, memberships, channels, messages, proposals and notifications. All temporary recipients used `@example.invalid` with email/push disabled, and the smoke avoided client-originated actions that would notify real staging admins or create Cloudinary folders. Automated browser navigation reached Vercel Preview SSO, so no SSO credential or protection cookie was extracted or bypassed. The owner then personally completed the authenticated staging UI journeys and accepted the client outcome. This supplies the previously missing rendered login/reload and role-page evidence, closes DMD-FND-2 and permits DMD-FND-2A. Canonical detail is recorded in `dmd/audits/current-system/DMD_FND_2_CURRENT_SYSTEM_BASELINE.md`.
 
 **Invariants:** Legacy records with no new-business references remain usable; accepted proposal/history is not replaced.
 
@@ -356,7 +362,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Goal:** Align the runtime with the binding React 19.2+ contract as one isolated compatibility change after the current baseline is known.
 
-**Source documents:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; package.json; tsconfig.json.
+**Source documents:** documentations/dmd/architecture/ARCHITECTURAL_RULES_DMD.md; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; package.json; tsconfig.json.
 
 **Dependencies:** DMD-FND-2.
 
@@ -379,7 +385,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Goal:** Produce one complete, evidence-based API/page/auth/data/side-effect migration map before endpoint extraction or the FND-4 security/architecture shell is scoped.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 2.1, 9 and 61–63; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md.
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md sections 2.1, 9 and 61–63; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md.
 
 **Dependencies:** DMD-FND-2A.
 
@@ -391,14 +397,14 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Canonical submilestones:**
 
-- [x] **3A — Public / Marketing / CMS:** public catalog, services, projects, testimonials, company profile, categories, contact/request entry points, homepage, `HomeClient`, metadata, public loaders and CMS catch-all behavior. **Evidence:** `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` (2026-09-12) records 28 proposed exact rows (12 GET, 5 POST, 6 PUT, 5 DELETE, 0 PATCH), six owned models, two side effects and twelve risks. The row count is a domain proposal; registry merge and the system-wide count remain 3H.
+- [x] **3A — Public / Marketing / CMS:** public catalog, services, projects, testimonials, company profile, categories, contact/request entry points, homepage, `HomeClient`, metadata, public loaders and CMS catch-all behavior. **Evidence:** `dmd/audits/fnd-3/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` (2026-09-12) records 28 proposed exact rows (12 GET, 5 POST, 6 PUT, 5 DELETE, 0 PATCH), six owned models, two side effects and twelve risks. The row count is a domain proposal; registry merge and the system-wide count remain 3H.
 - [ ] **3B — Auth / Session / Access:** login/register/reset/verify/refresh/logout, `GET /api/auth/me`, users/settings, access-token ownership, refresh-cookie behavior, every direct/nested `useAuth()` consumer, server authentication, resource authorization, client UX gates, redirects and duplicated identity/session resolution.
 - [ ] **3C — Uploads / Assets:** Cloudinary/media dependencies, image/PDF flows, public/private assumptions, validation, ownership, provider side effects and future Design Asset seams.
 - [ ] **3D — Notifications / Cron / Operational endpoints:** health/system operations, notifications, email/digest, push, cron entry points, secrets, delivery side effects and operational ownership.
 - [ ] **3E — Project Requests / Proposals / Client Projects:** request/proposal/project lifecycle, accepted scope, milestones/tasks, membership/invitations, access/resource ownership, transactions and audit/history.
 - [ ] **3F — Communication / Chat / DM / Project Items:** milestone `Ask a question`, group channels, direct messages, reads/pins, message conversion, `ProjectItem`, permissions and notification/evidence relationships.
-- [x] **3G — Dashboard / Admin / Application Pages:** every relevant route surface, including admin, dashboard, project/request detail, chat/DM and auth-related pages; map Server/Client boundaries, loaders/browser calls, state ownership, deep links and real decomposition seams. **Evidence:** `audit-dmd/DMD_FND_3_PAGE_INVENTORY.md` (2026-09-12) records 12 page routes, 2 supporting route surfaces and 2 global layout/provider surfaces. Its own caller/metadata reconciliation against the central API registry is carried by 3H/3I, not reopened here.
-- [~] **3H — Central Legacy API Registry & Completeness Audit:** this is the single registry populated by 3A–3G, not an eighth duplicate domain audit. Reconcile every HTTP method, catch-all branch and matcher/branch order; include `OPTIONS`, separate `/api/seed`, existing dedicated ownership/restore routes and any other reachable API route. Prove the registry count matches source and no endpoint remains only implicit in a domain note. **Current state:** `audit-dmd/DMD_FND_3_API_INVENTORY.md` (2026-09-12) holds the completeness method, row schema, global dispatcher facts, route-surface control table and initial cross-cutting risks. Section 5 exact endpoint rows are empty and the exact endpoint count remains `UNKNOWN — requires follow-up`.
+- [x] **3G — Dashboard / Admin / Application Pages:** every relevant route surface, including admin, dashboard, project/request detail, chat/DM and auth-related pages; map Server/Client boundaries, loaders/browser calls, state ownership, deep links and real decomposition seams. **Evidence:** `dmd/audits/fnd-3/DMD_FND_3_PAGE_INVENTORY.md` (2026-09-12) records 12 page routes, 2 supporting route surfaces and 2 global layout/provider surfaces. Its own caller/metadata reconciliation against the central API registry is carried by 3H/3I, not reopened here.
+- [~] **3H — Central Legacy API Registry & Completeness Audit:** this is the single registry populated by 3A–3G, not an eighth duplicate domain audit. Reconcile every HTTP method, catch-all branch and matcher/branch order; include `OPTIONS`, separate `/api/seed`, existing dedicated ownership/restore routes and any other reachable API route. Prove the registry count matches source and no endpoint remains only implicit in a domain note. **Current state:** `dmd/audits/fnd-3/DMD_FND_3_API_INVENTORY.md` (2026-09-12) holds the completeness method, row schema, global dispatcher facts, route-surface control table and initial cross-cutting risks. Section 5 exact endpoint rows are empty and the exact endpoint count remains `UNKNOWN — requires follow-up`.
 - [ ] **3I — Reconciliation / Risk Map / Migration Map:** reconcile cross-domain findings, explicit unknowns, source-of-truth ownership, side effects, coverage gaps, risk and future seams; only this pass may recommend the exact FND-4 scope and whether DMD currently needs `proxy.js` for identified coarse request/security boundaries.
 
 ### FND-3 evidence ledger
@@ -407,14 +413,14 @@ Canonical status is the table below. A submilestone may not be reported complete
 
 | Submilestone | Status | Durable artifact |
 |---|---|---|
-| 3A Public / Marketing / CMS | COMPLETE | `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` |
+| 3A Public / Marketing / CMS | COMPLETE | `dmd/audits/fnd-3/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` |
 | 3B Auth / Session / Access | NOT STARTED | none |
 | 3C Uploads / Assets | NOT STARTED | none |
 | 3D Notifications / Cron / Operational | NOT STARTED | none |
 | 3E Project Requests / Proposals / Client Projects | NOT STARTED | none |
 | 3F Communication / Chat / DM / Project Items | NOT STARTED | none |
-| 3G Dashboard / Admin / Application Pages | COMPLETE | `audit-dmd/DMD_FND_3_PAGE_INVENTORY.md` |
-| 3H Central Legacy API Registry | IN PROGRESS | `audit-dmd/DMD_FND_3_API_INVENTORY.md` (method/schema/risks only; endpoint rows empty) |
+| 3G Dashboard / Admin / Application Pages | COMPLETE | `dmd/audits/fnd-3/DMD_FND_3_PAGE_INVENTORY.md` |
+| 3H Central Legacy API Registry | IN PROGRESS | `dmd/audits/fnd-3/DMD_FND_3_API_INVENTORY.md` (method/schema/risks only; endpoint rows empty) |
 | 3I Reconciliation / Risk Map / Migration Map | NOT STARTED | none |
 
 **DMD-FND-3 overall: IN PROGRESS.**
@@ -554,7 +560,7 @@ branch:   hotfix/shc-1-testimonial-authz
   - Expected stderr in the run is asserted negative authorization/validation paths, not failures.
 - **Merge gate:** satisfied. Remaining owner steps: merge `hotfix/shc-1-testimonial-authz`, deploy, then run the targeted read-only same-pattern sweep before FND-3 resumes at 3B.
 - **Recorded consequence:** testimonials created anonymously carry `userId: null` and are not editable by their submitter. The DELETE branch already behaved this way; `app/dashboard/page.js:318` additionally treats an email match as ownership client-side. This divergence is an FND-4 input, not repaired here.
-- Full evidence: `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.
+- Full evidence: `dmd/audits/fnd-3/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.
 
 ### Explicitly not hotfix candidates
 
@@ -571,7 +577,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Establish safe dedicated-route and private-data foundations before new domains.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md.
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md.
 
 **Dependencies:** DMD-FND-1, DMD-FND-2 and DMD-FND-3.
 
@@ -596,7 +602,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Establish the first product-facing expansion slice: one continuous client Workspace from idea through future Project Mode, while deeper systems still use bounded fixture projections.
 
-**Source documents:** documentations/new-business-model/DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
+**Source documents:** documentations/dmd/product/DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; dmd/product/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; dmd/architecture/ARCHITECTURAL_RULES_DMD.md.
 
 **Dependencies:** `DMD-FND-4 COMPLETE`. Design discussion and prototypes may continue earlier, but production implementation must not start before this gate is closed. DMD-FND-5 through DMD-FND-8 may continue as the controlled parallel legacy-cleanup branch.
 
@@ -621,7 +627,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Extract health, cron, auth/session, user/settings and seed safety sequentially.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md.
 
 **Dependencies:** DMD-FND-4.
 
@@ -643,7 +649,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Isolate public/content/media/notification concerns before they support discovery and design.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 22–26 and 45–47; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md.
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md sections 22–26 and 45–47; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md.
 
 **Dependencies:** DMD-FND-5.
 
@@ -664,7 +670,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Extract established project/communication domains without weakening authorization, history or evidence.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; DMD_PROJECT_INTELLIGENCE.md.
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE.md.
 
 **Dependencies:** DMD-FND-6.
 
@@ -684,7 +690,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Finish the remaining inventory endpoint by endpoint, retire the catch-all only after the last verified extraction and decompose giant pages only along real ownership seams.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 19, 27–39 and 61–63; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md sections 19, 27–39 and 61–63; dmd/execution/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
 
 **Dependencies:** DMD-FND-7.
 
@@ -708,7 +714,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Coordinate side effects, retries and risky workflows through durable evidence rather than browser requests.
 
-**Source documents:** audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
+**Source documents:** dmd/architecture/ARCHITECTURAL_RULES_DMD.md; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md.
 
 **Dependencies:** DMD-FND-4.
 
@@ -729,7 +735,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Make online AI a schema-bound interpretation layer, never a provider-shaped source of business truth.
 
-**Source documents:** audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md.
+**Source documents:** dmd/ai/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md; dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md.
 
 **Dependencies:** DMD-OPS-0 and DMD-WS-1. DMD-FND-4 and DMD-WORKSPACE-0 are transitive prerequisites through those milestones.
 
@@ -751,7 +757,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Give a guest a secure, resumable, claimable conversation/session boundary without requiring AI or formal business understanding.
 
-**Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
+**Source documents:** dmd/domains/business-intelligence/DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; dmd/product/DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; dmd/execution/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
 
 **Dependencies:** DMD-FND-4 and DMD-WORKSPACE-0. DMD-FND-5 through DMD-FND-8 continue as a controlled parallel legacy-cleanup branch.
 
@@ -773,7 +779,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Continuously build client-correctable business understanding from conversation evidence without prematurely verifying it.
 
-**Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; DMD_DESIGN_ENGINE_PRINCIPLES.md; audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
+**Source documents:** dmd/domains/business-intelligence/DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; dmd/domains/design/DMD_DESIGN_ENGINE_PRINCIPLES.md; dmd/ai/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
 
 **Dependencies:** DMD-WS-1 and DMD-AI-0.
 
@@ -795,7 +801,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Offer concise professional recommendations and alternatives without turning model advice into business truth.
 
-**Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
+**Source documents:** dmd/domains/business-intelligence/DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; dmd/product/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; dmd/ai/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
 
 **Dependencies:** DMD-BI-1.
 
@@ -816,7 +822,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Produce an authorized, versioned canonical business snapshot only after completeness and visible material conflicts are resolved or explicitly accepted.
 
-**Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_EXTENSION_EXECUTION_PLAN_V2.md.
+**Source documents:** dmd/domains/business-intelligence/DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; dmd/product/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; dmd/execution/foundation/DMD_EXTENSION_EXECUTION_PLAN_V2.md.
 
 **Dependencies:** DMD-BI-2.
 
@@ -837,7 +843,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Publish versioned capability/product contracts for Marysoll, P.DC and Custom.
 
-**Source documents:** DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md.
+**Source documents:** dmd/domains/product-intelligence/DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; dmd/product/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; dmd/product/DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md.
 
 **Dependencies:** DMD-BI-3.
 
@@ -857,7 +863,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Derive auditable product route from verified capability needs and protect product boundaries.
 
-**Source documents:** DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md.
+**Source documents:** dmd/domains/product-intelligence/DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; dmd/product/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md.
 
 **Dependencies:** DMD-PI-1.
 
@@ -878,7 +884,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Bridge Business/Product truth into design, commercial and project work.
 
-**Source documents:** DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; DMD_DESIGN_ENGINE_CLIENT_FLOW.md.
+**Source documents:** dmd/domains/product-intelligence/DMD_PRODUCT_INTELLIGENCE_ROUTING_BLUEPRINT.md; dmd/product/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; dmd/domains/design/DMD_DESIGN_ENGINE_CLIENT_FLOW.md.
 
 **Dependencies:** DMD-PI-2.
 
@@ -898,7 +904,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Capture design meaning/assets before design execution.
 
-**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 2–5; ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md section 45; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+**Source documents:** dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 2–5; dmd/architecture/ARCHITECTURAL_RULES_DMD.md section 45; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md.
 
 **Dependencies:** DMD-FND-0, DMD-BP-1 and DMD-FND-6.
 
@@ -921,7 +927,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Supply secure design-relevant website evidence and pinned system/rule/component constraints.
 
-**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 6 and 9–11; DMD_DESIGN_ENGINE_PRINCIPLES.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+**Source documents:** dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 6 and 9–11; dmd/domains/design/DMD_DESIGN_ENGINE_PRINCIPLES.md; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md.
 
 **Dependencies:** DMD-DES-0, DMD-AI-0 and DMD-PI-1.
 
@@ -942,7 +948,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Create and lock the provider-neutral design input from canonical structured state, never raw chat.
 
-**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 7–14; DMD_DESIGN_ENGINE_CLIENT_FLOW.md; design-handoff-package.example.yaml.
+**Source documents:** dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 7–14; dmd/domains/design/DMD_DESIGN_ENGINE_CLIENT_FLOW.md; design-handoff-package.example.yaml.
 
 **Dependencies:** DMD-DES-1 and DMD-BP-1.
 
@@ -963,7 +969,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Offer a capped anonymous-compatible candidate through a safe renderer.
 
-**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 14–16 and 30–31; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md.
+**Source documents:** dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 14–16 and 30–31; dmd/product/DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md.
 
 **Dependencies:** DMD-DES-2, DMD-AI-0 and DMD-FND-1.
 
@@ -983,7 +989,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Support optional Claude Design/human handoff while guaranteeing a valid implementation map.
 
-**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 17–22 and 30–33; audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
+**Source documents:** dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 17–22 and 30–33; dmd/ai/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
 
 **Dependencies:** DMD-DES-2, DMD-OPS-0 and registered ownership from DMD-WS-1.
 
@@ -1005,7 +1011,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Turn validated visual intent into safe preview/review evidence without hidden scope expansion.
 
-**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 22–28; audit-dmd/DMD_REPO_DB_ENGINEERING_HANDOFF.md.
+**Source documents:** dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 22–28; dmd/architecture/DMD_REPO_DB_ENGINEERING_HANDOFF.md.
 
 **Dependencies:** DMD-DES-3 or DMD-DES-4; the resolved DMD-FND-0 preview boundary applies.
 
@@ -1026,7 +1032,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Freeze the design decision that may enter commercial/project workflow.
 
-**Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 27–29; DMD_DESIGN_ENGINE_CLIENT_FLOW.md.
+**Source documents:** dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 27–29; dmd/domains/design/DMD_DESIGN_ENGINE_CLIENT_FLOW.md.
 
 **Dependencies:** DMD-DES-5.
 
@@ -1045,7 +1051,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Add source-safe assistance to existing projects without replacing their aggregates.
 
-**Source documents:** DMD_PROJECT_INTELLIGENCE.md; audit-dmd/DMD_PROJECT_INTELLIGENCE_TICKETING_CHANGE_CONTROL_V2.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md.
+**Source documents:** dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE.md; dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE_TICKETING_CHANGE_CONTROL_V2.md; dmd/audits/current-system/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md.
 
 **Dependencies:** Existing-project read/classification work may begin after DMD-FND-4 and DMD-FND-2. In the new Workspace vertical, DMD-PROJECT-0 supplies claimed pre-project continuity before this capability is projected there.
 
@@ -1066,7 +1072,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Separate commercial objects and draft the existing proposal from approved scope/design.
 
-**Source documents:** DMD_COMMERCIAL_PROVISIONING.md; DMD_PROJECT_INTELLIGENCE.md; DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md.
+**Source documents:** dmd/domains/commercial/DMD_COMMERCIAL_PROVISIONING.md; dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE.md; dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md.
 
 **Dependencies:** DMD-DES-6, DMD-BP-1 and DMD-AI-0.
 
@@ -1086,7 +1092,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Preserve claimed pre-project Workspace work as an authenticated dashboard projection without prematurely creating `ProjectRequest` or `ClientProject` records.
 
-**Source documents:** DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; DMD_PROJECT_INTELLIGENCE.md.
+**Source documents:** dmd/product/DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; dmd/product/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE.md.
 
 **Dependencies:** DMD-WS-1 and the relevant lifecycle state through DMD-COM-0. Formal project materialization remains governed by the existing request → proposal → acceptance/payment → project authority path.
 
@@ -1107,7 +1113,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Define explicit commercial authority before WorkOrder or production-affecting provisioning.
 
-**Source documents:** DMD_COMMERCIAL_PROVISIONING.md; DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md section 29; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+**Source documents:** dmd/domains/commercial/DMD_COMMERCIAL_PROVISIONING.md; dmd/domains/design/DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md section 29; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md.
 
 **Dependencies:** DMD-COM-0.
 
@@ -1127,7 +1133,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Progressively collect safe inputs and provision through plan/verify/reconcile adapters.
 
-**Source documents:** DMD_COMMERCIAL_PROVISIONING.md; DMD_PROJECT_INTELLIGENCE.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
+**Source documents:** dmd/domains/commercial/DMD_COMMERCIAL_PROVISIONING.md; dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE.md; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md.
 
 **Dependencies:** DMD-COM-2.
 
@@ -1148,7 +1154,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Hand accepted scope to local/human-supervised Claude Code/Codex with no second authority.
 
-**Source documents:** audit-dmd/DMD_REPO_DB_ENGINEERING_HANDOFF.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md; DMD_PROJECT_INTELLIGENCE.md.
+**Source documents:** dmd/architecture/DMD_REPO_DB_ENGINEERING_HANDOFF.md; dmd/execution/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md; dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE.md.
 
 **Dependencies:** DMD-COM-2.
 
@@ -1168,7 +1174,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Translate validated repository/CI evidence into client-safe project truth.
 
-**Source documents:** audit-dmd/DMD_REPO_DB_ENGINEERING_HANDOFF.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_PROJECT_INTELLIGENCE_TICKETING_CHANGE_CONTROL_V2.md.
+**Source documents:** dmd/architecture/DMD_REPO_DB_ENGINEERING_HANDOFF.md; dmd/architecture/DMD_SECURITY_RELIABILITY_GATES.md; dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE_TICKETING_CHANGE_CONTROL_V2.md.
 
 **Dependencies:** DMD-PROJECT-2 and DMD-OPS-0.
 
@@ -1191,7 +1197,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 **Goal:** Reuse proven conversation intelligence across project/milestone `Ask a question`, group chat and direct messages without allowing conversation or AI interpretation to mutate project truth directly.
 
-**Source documents:** DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; DMD_PROJECT_INTELLIGENCE.md; PROJECT_CHAT_PLAN.md.
+**Source documents:** dmd/product/DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE.md; current-system/communication-hub/PROJECT_CHAT_PLAN.md.
 
 **Dependencies:** DMD-PROJECT-0 and the relevant implemented/verified Project and conversation foundations. This slice starts only after the preceding Workspace vertical has established stable truth, authorization and formalization boundaries.
 
@@ -1216,7 +1222,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 ## 0. Dokumentacija
 
-- [x] `documentations/PROJECT_CHAT_PLAN.md` — plan izrade (v1)
+- [x] `documentations/current-system/communication-hub/PROJECT_CHAT_PLAN.md` — plan izrade (v1)
 - [x] `documentations/TODO.md` — ova lista (v1)
 - [x] v2 bezbednosna dopuna oba dokumenta: matrica rola, odvojeni Invitation/Member, allowlist serializeri, audit log, prošireni E2E napadi
 - [-] Kratak rezime zatečenog toka pre početka implementacije — **već postoji**, to je Sekcija 2 plana („Zatečeno stanje — tri nepovezana toka poruka", badge sistem, nepostojeći invite flow), napisana pre prve linije koda. Pisanje drugog rezimea istog nalaza bio bi duplikat.
@@ -1295,7 +1301,7 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 
 ## 3A. Cross-cutting invarijante
 
-Pravila koja važe kroz sve preostale sekcije. Puna razrada: [PROJECT_CHAT_PLAN.md](./PROJECT_CHAT_PLAN.md) sekcija 4A. Najveći rizik nije da je plan pogrešan, nego da se neka od ovih invarijanti primeni **nedosledno** kroz ~18 endpointa — zato se čekiraju ovde, a ne unutar svake sekcije ponaosob.
+Pravila koja važe kroz sve preostale sekcije. Puna razrada: [current-system/communication-hub/PROJECT_CHAT_PLAN.md](./current-system/communication-hub/PROJECT_CHAT_PLAN.md) sekcija 4A. Najveći rizik nije da je plan pogrešan, nego da se neka od ovih invarijanti primeni **nedosledno** kroz ~18 endpointa — zato se čekiraju ovde, a ne unutar svake sekcije ponaosob.
 
 - [ ] **I1 Child-resource autorizacija** — `projectId` iz učitanog resursa, nikad iz URL/body. Primenjeno u: 4, 6, 12
 - [x] **I2 Atomičnost accept-a** — `acceptInvitationForUser` u route.js: membership + invitation status u jednoj `session.withTransaction`, **membership prvi** (redosled deo koda, ne samo komentara); bez fallback grane (transaction-not-supported → čist 503, isti obrazac kao postojeći phase-archive kod); audit + sistemska poruka post-commit, best-effort. **Uživo potvrđeno pod pravom konkurencijom**: dva paralelna accept poziva istim tokenom → tačno jedno `ProjectMember` (test F, Sekcija 5)
@@ -1312,7 +1318,7 @@ Pravila koja važe kroz sve preostale sekcije. Puna razrada: [PROJECT_CHAT_PLAN.
 
 ## 4. Postojeći endpointi — member-aware
 
-**Pravilo za celu sekciju — resource-first autorizacija.** `projectId` se izvodi iz **učitanog resursa**, nikad iz URL-a ili body-ja. Resurs se učita prvi, projekat se izvede iz njega, pa se tek onda zove `requireProjectPermission` nad tim projektom. Kada URL nosi i roditelja i dete, `:projectId` služi samo za učitavanje, a pripadnost deteta roditelju se **potvrđuje** pre provere prava — nepodudaranje je **404, ne 403** (403 bi potvrdio da resurs postoji). Detaljno u [PROJECT_CHAT_PLAN.md](./PROJECT_CHAT_PLAN.md) sekcija 7.
+**Pravilo za celu sekciju — resource-first autorizacija.** `projectId` se izvodi iz **učitanog resursa**, nikad iz URL-a ili body-ja. Resurs se učita prvi, projekat se izvede iz njega, pa se tek onda zove `requireProjectPermission` nad tim projektom. Kada URL nosi i roditelja i dete, `:projectId` služi samo za učitavanje, a pripadnost deteta roditelju se **potvrđuje** pre provere prava — nepodudaranje je **404, ne 403** (403 bi potvrdio da resurs postoji). Detaljno u [current-system/communication-hub/PROJECT_CHAT_PLAN.md](./current-system/communication-hub/PROJECT_CHAT_PLAN.md) sekcija 7.
 
 - [x] **Preduslov, urađeno pre bilo kog endpointa ispod:** `resolveProjectAccess` ožičen kroz `restrictForClosedProject` ([lib/project-access.js](../lib/project-access.js)) — poslednji korak u rezoluciji, posle koraka 1–4. Namerno **pre**, ne posle, glavnih bullet-a ove sekcije: svaki endpoint koji zove `requireProjectPermission` nasleđuje zatvaranje projekta od prvog dana, umesto da se dodaje naknadno po završenim endpointima. Integraciono provereno (owner na zatvorenom → `chatWrite: false`, `projectRead: true`; admin na zatvorenom → nepromenjen).
 
@@ -1933,7 +1939,7 @@ SEC 1–8, 11, 13, 14 se prvi put pokreću **odmah po Sekciji 4** (vidi 4b), a o
 
 ## Parkirane dopune — razrešeno
 
-Sve stavke sa ove liste su razrešene i prebačene u **sekciju 3A** kao invarijante I1–I10, sa punom razradom u [PROJECT_CHAT_PLAN.md](./PROJECT_CHAT_PLAN.md) sekcija 4A. Ostavljeno kao trag odluka:
+Sve stavke sa ove liste su razrešene i prebačene u **sekciju 3A** kao invarijante I1–I10, sa punom razradom u [current-system/communication-hub/PROJECT_CHAT_PLAN.md](./current-system/communication-hub/PROJECT_CHAT_PLAN.md) sekcija 4A. Ostavljeno kao trag odluka:
 
 | Dopuna                                  | Ishod                                                                                                                                                           |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
