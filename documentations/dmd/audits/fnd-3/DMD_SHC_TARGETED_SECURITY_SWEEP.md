@@ -136,14 +136,15 @@ The owner subsequently authorized this bounded implementation. Local fix and ver
 
 ## 6. Execution consequence
 
-The sweep is complete. SHC-2 is fixed and locally verified, but its deployment gate remains open.
+The sweep is complete. SHC-2 is closed: staging deployment `dpl_5dVsNgBKCvXoK3KsSdyNVsw3zEhN` passed the authenticated mutation smoke, and main-specific revision `1982f40` is live through Ready production deployment `dpl_GHFD1fh2mZa9DtviAuLphYmjrpM1`. The bounded production smoke passed without production-secret export or data mutation.
 
 ```text
 SHC-1 implementation/merge
 → targeted same-pattern sweep
 → SHC-2 hotfix/local verification
-→ staging deploy/smoke and immediate main promotion/production smoke
-→ only then DMD-FND-3B
+→ staging deploy/smoke
+→ minimal equivalent main fix and production smoke
+→ DMD-FND-3B unblocked
 ```
 
-DMD-FND-3B remains `NOT STARTED`.
+DMD-FND-3B remains `NOT STARTED` until its audit begins; it is now the next authorized FND-3 work.

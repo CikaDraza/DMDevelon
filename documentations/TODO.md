@@ -567,7 +567,7 @@ branch:   staging (implementation commit 5e18d24)
 ```text
 status: COMPLETE — ONE NEW CRITICAL CANDIDATE FOUND
 scope:  read-only catch-all mutation/auth pattern review
-result: SHC-2; DMD-FND-3B remains blocked
+result: SHC-2 closed; DMD-FND-3B is unblocked and next
 ```
 
 The bounded sweep required after SHC-1 is recorded in `dmd/audits/fnd-3/DMD_SHC_TARGETED_SECURITY_SWEEP.md`. It found no other active High/Critical occurrence except SHC-2. This sweep is not FND-3B and does not change any FND-3 submilestone status.
@@ -578,24 +578,30 @@ The bounded sweep required after SHC-1 is recorded in `dmd/audits/fnd-3/DMD_SHC_
 SECURITY HOTFIX CANDIDATE
 severity: critical
 source:   targeted same-pattern sweep after SHC-1
-status:   FIXED — LOCALLY VERIFIED, AWAITING PUSH/STAGING DEPLOY
+status:   CLOSED — STAGING AND PRODUCTION VERIFIED
 endpoint: PUT /api/users/:id
-branch:   hotfix/shc-2-user-update-boundary
-commit:   f2a6aa0
+staging:  f2a6aa0
+main:     1982f40
 ```
 
 An authenticated non-admin may update their own user ID, and the route removes only a top-level `body.isAdmin` before passing the complete body to `User.findByIdAndUpdate`. An operator payload such as `{"$set":{"isAdmin":true}}` bypasses the shallow check and persists global admin authority. `getUserFromRequest` reloads that authority from MongoDB on later requests, so the escalation is effective without trusting browser role state.
 
 The owner authorized a bounded mass-assignment/operator-injection hotfix. Revision `f2a6aa0` now rejects unsafe Mongo keys recursively, constructs the self/admin field allowlist, derives `sessionVersion` only from stored state during password changes and writes through explicit `$set` with `runValidators: true`. Existing email/password behavior was preserved; endpoint extraction, a central auth framework and the FND-4 actor-resolved profile redesign remain out of scope.
 
-Local verification is complete: focused SHC-2/auth tests **13/13**, full API **257/257**, unit **9/9**, UI **55/55**, typecheck and production build pass. Negative control on vulnerable `65af19c` fails **4/12** SHC-2 tests; the same 12 pass on fixed `f2a6aa0`. Full evidence: `dmd/audits/fnd-3/DMD_SHC_2_VERIFICATION.md`.
+Local verification is complete: focused SHC-2/auth tests **13/13**, full API **257/257**, unit **9/9**, UI **55/55**, typecheck and production build pass. Negative control on vulnerable `65af19c` fails **4/12** SHC-2 tests; the same 12 pass on fixed `f2a6aa0`. Staging Preview deployment `dpl_5dVsNgBKCvXoK3KsSdyNVsw3zEhN` is Ready on the canonical staging alias and passed the bounded authenticated account/profile/admin-role smoke, including zero-residue cleanup. Full evidence: `dmd/audits/fnd-3/DMD_SHC_2_VERIFICATION.md`.
 
 Deferred to 3B, not expanded into SHC-2:
 
 - **AUTH-EMAIL-1:** replacement email currently requires no current password, does not clear verification state, require replacement-address verification, normalize through `emailNormalized` or invalidate sessions; admin replacement remains possible under the existing active-project guard.
 - **AUTH-PASSWORD-1:** self password change requires a valid session but not the current password; admin password reset shares the generic endpoint and has no dedicated audit/operation contract.
 
-Required next sequence: push hotfix → staging deployment/smoke → immediate `main` promotion/production smoke → resume DMD-FND-3 at 3B.
+Main required a conflict-safe equivalent rather than a direct cherry-pick. Main-specific revision `1982f40` preserves the older main route/model semantics and contains only the equivalent SHC-2 mutation boundary plus its regression test. On that tree, SHC-2 passed **12/12**, API **238/238**, unit **178/178**, typecheck and production build. The existing UI baseline remains **40/45** because five Radix pointer-event assertions in `channel-purge-menu.test.jsx` fail identically on untouched `origin/main@25fa70a`; no UI source was changed by SHC-2.
+
+Production deployment `dpl_GHFD1fh2mZa9DtviAuLphYmjrpM1` is Ready on `https://dmdevelon.website`. A no-secret/no-data production smoke returned homepage `200` and anonymous `PUT /api/users/:id` `401`. The full authenticated mutation matrix was exercised against staging rather than exporting or using production secrets.
+
+Current status: **CLOSED — STAGING AND PRODUCTION VERIFIED**.
+
+Next: begin DMD-FND-3B Auth / Session / Access audit. It remains `NOT STARTED` until that audit work actually begins.
 
 ### Explicitly not hotfix candidates
 

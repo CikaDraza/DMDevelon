@@ -1,6 +1,6 @@
 # DMD SHC-2 Verification Evidence
 
-**Status:** AUDIT EVIDENCE — LOCAL VERIFICATION COMPLETE
+**Status:** AUDIT EVIDENCE — CLOSED, STAGING AND PRODUCTION VERIFIED
 **Authority:** evidence-only
 **Owner domain:** Foundation / Security
 **Supersedes:** —
@@ -9,7 +9,7 @@
 **Date:** 2026-09-12
 **Vulnerable revision:** `65af19c`
 **Fixed revision:** `f2a6aa0`
-**Branch:** `hotfix/shc-2-user-update-boundary`
+**Branch:** `staging`
 **Endpoint:** `PUT /api/users/:id`
 
 ---
@@ -132,19 +132,63 @@ client_supplied_authority_fields after SHC-2: none
 
 ---
 
-## 5. Release gate
+## 5. Staging deployment and smoke
 
-Local implementation and verification are complete. Deployment is not claimed by this artifact.
-
-The approved staging-first sequence remains:
+Revision `0fa9d2e` was fast-forwarded from the verified hotfix branch to `staging` and pushed without a merge commit. Vercel built the protected Preview deployment and assigned the canonical staging alias:
 
 ```text
-push hotfix branch
-→ deploy to staging
-→ account/profile/admin-role smoke
-→ immediately promote to main
-→ production smoke
-→ resume DMD-FND-3B
+deployment: dpl_5dVsNgBKCvXoK3KsSdyNVsw3zEhN
+target:     Preview
+alias:      https://staging.dmdevelon.website
+status:     Ready
 ```
+
+An authenticated smoke used temporary, clearly prefixed staging-only users and one temporary active project. Only these environment variables were consumed: `APP_ENV`, `DB_NAME` and `MONGO_URL`. `JWT_SECRET` was not exported or used; authentication tokens were issued by the deployed login endpoint. No secret values were printed or recorded.
+
+```text
+ordinary self profile update        → PASS
+cross-account update                → PASS (denied)
+operator/admin escalation           → PASS (denied)
+server-owned field injection        → PASS (ignored)
+legitimate admin role change        → PASS (promotion and demotion)
+password change                     → PASS
+derived sessionVersion              → PASS
+old-session invalidation            → PASS
+active-project email guard          → PASS
+cleanup                             → PASS (zero residue)
+```
+
+The protected temporary environment file and smoke script were deleted immediately after the run and independently confirmed absent from `/tmp`.
+
+## 6. Production promotion and smoke
+
+The direct cherry-pick conflicted with the older main user route, as anticipated. It was aborted rather than resolved by importing staging history. Main-specific revision `1982f40` was authored from `origin/main@25fa70a` with only the equivalent SHC-2 mutation boundary and regression test.
+
+Main-tree verification:
+
+```text
+SHC-2 focused       → 12/12 passed
+API                 → 12 files, 238/238 passed
+unit                → 178/178 passed
+typecheck           → passed
+production build    → passed
+```
+
+The main UI baseline has five pre-existing Radix pointer-event failures in `tests/ui/channel-purge-menu.test.jsx`: the SHC-2 tree and an untouched temporary `origin/main@25fa70a` worktree both produced the identical **5 failed / 3 passed** result for that file. SHC-2 changed no UI source.
+
+Vercel production evidence:
+
+```text
+deployment: dpl_GHFD1fh2mZa9DtviAuLphYmjrpM1
+target:     Production
+alias:      https://dmdevelon.website
+status:     Ready
+homepage:   200
+anonymous PUT /api/users/:id: 401
+```
+
+Production smoke used no production environment export, credentials or fixture records. The authenticated mutation matrix was already exercised on the isolated staging deployment; production smoke verifies that the promoted build is live and that the unauthenticated mutation boundary rejects before resource mutation.
+
+SHC-2 is **CLOSED — STAGING AND PRODUCTION VERIFIED**. DMD-FND-3 resumes with 3B Auth / Session / Access, while `AUTH-EMAIL-1` and `AUTH-PASSWORD-1` remain explicit 3B inputs.
 
 If evidence of active exploitation appears, incident handling may replace staging-first with an explicitly authorized production-first response.
