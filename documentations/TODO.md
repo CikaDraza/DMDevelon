@@ -578,13 +578,24 @@ The bounded sweep required after SHC-1 is recorded in `dmd/audits/fnd-3/DMD_SHC_
 SECURITY HOTFIX CANDIDATE
 severity: critical
 source:   targeted same-pattern sweep after SHC-1
-status:   OPEN — OWNER DECISION REQUIRED
+status:   FIXED — LOCALLY VERIFIED, AWAITING PUSH/STAGING DEPLOY
 endpoint: PUT /api/users/:id
+branch:   hotfix/shc-2-user-update-boundary
+commit:   f2a6aa0
 ```
 
 An authenticated non-admin may update their own user ID, and the route removes only a top-level `body.isAdmin` before passing the complete body to `User.findByIdAndUpdate`. An operator payload such as `{"$set":{"isAdmin":true}}` bypasses the shallow check and persists global admin authority. `getUserFromRequest` reloads that authority from MongoDB on later requests, so the escalation is effective without trusting browser role state.
 
-This finding qualifies for the existing SHC governance exception but is not authorized for implementation by the read-only sweep. Required next sequence: owner decision → bounded SHC-2 hotfix and regression tests → merge/deploy evidence → resume DMD-FND-3 at 3B. Do not fold endpoint extraction, a central auth framework or the FND-4 actor-resolved profile redesign into SHC-2.
+The owner authorized a bounded mass-assignment/operator-injection hotfix. Revision `f2a6aa0` now rejects unsafe Mongo keys recursively, constructs the self/admin field allowlist, derives `sessionVersion` only from stored state during password changes and writes through explicit `$set` with `runValidators: true`. Existing email/password behavior was preserved; endpoint extraction, a central auth framework and the FND-4 actor-resolved profile redesign remain out of scope.
+
+Local verification is complete: focused SHC-2/auth tests **13/13**, full API **257/257**, unit **9/9**, UI **55/55**, typecheck and production build pass. Negative control on vulnerable `65af19c` fails **4/12** SHC-2 tests; the same 12 pass on fixed `f2a6aa0`. Full evidence: `dmd/audits/fnd-3/DMD_SHC_2_VERIFICATION.md`.
+
+Deferred to 3B, not expanded into SHC-2:
+
+- **AUTH-EMAIL-1:** replacement email currently requires no current password, does not clear verification state, require replacement-address verification, normalize through `emailNormalized` or invalidate sessions; admin replacement remains possible under the existing active-project guard.
+- **AUTH-PASSWORD-1:** self password change requires a valid session but not the current password; admin password reset shares the generic endpoint and has no dedicated audit/operation contract.
+
+Required next sequence: push hotfix → staging deployment/smoke → immediate `main` promotion/production smoke → resume DMD-FND-3 at 3B.
 
 ### Explicitly not hotfix candidates
 

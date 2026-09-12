@@ -72,7 +72,7 @@ No other active High/Critical instance of this same mutation/authorization patte
 SECURITY HOTFIX CANDIDATE
 severity: critical
 source:   targeted same-pattern sweep after SHC-1
-status:   OPEN — OWNER DECISION REQUIRED
+status:   FIXED — LOCALLY VERIFIED, AWAITING PUSH/STAGING DEPLOY
 endpoint: PUT /api/users/:id
 affected: staging and main source baselines reviewed above
 ```
@@ -122,7 +122,7 @@ authenticate
 
 The request body must never be passed directly as a Mongo update document. Regression coverage must include direct and operator-shaped privilege/provenance payloads.
 
-This evidence does not authorize implementation and does not select the eventual FND-4 actor-resolved endpoint design.
+The owner subsequently authorized this bounded implementation. Local fix and verification evidence is recorded in `documentations/dmd/audits/fnd-3/DMD_SHC_2_VERIFICATION.md`; it does not select the eventual FND-4 actor-resolved endpoint design.
 
 ---
 
@@ -136,12 +136,13 @@ This evidence does not authorize implementation and does not select the eventual
 
 ## 6. Execution consequence
 
-The sweep is complete, but its pass condition is not satisfied because it found SHC-2.
+The sweep is complete. SHC-2 is fixed and locally verified, but its deployment gate remains open.
 
 ```text
 SHC-1 implementation/merge
 → targeted same-pattern sweep
-→ SHC-2 owner decision and, if approved, hotfix/verification/deploy
+→ SHC-2 hotfix/local verification
+→ staging deploy/smoke and immediate main promotion/production smoke
 → only then DMD-FND-3B
 ```
 
