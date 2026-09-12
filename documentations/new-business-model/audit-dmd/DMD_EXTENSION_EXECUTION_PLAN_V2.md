@@ -12,6 +12,8 @@ The conceptual M0–M12 roadmap remains valid, but the repo audit changes the im
 
 `documentations/TODO.md` is the canonical execution index. The active foundation order before any new-business implementation is:
 
+`documentations/new-business-model/DMD_WORKSPACE_VERTICAL_SLICE_EXECUTION_PLAN.md` is the operational companion for the post-FND-4 client vertical. It carries no independent milestone status.
+
 ```text
 DMD-FND-0 complete
 → DMD-FND-1 isolated staging
@@ -21,7 +23,7 @@ DMD-FND-0 complete
 → DMD-FND-4 security/architecture shell
 ```
 
-After DMD-FND-4, the Business Intelligence branch may begin while DMD-FND-5 through DMD-FND-8 migrate legacy endpoints sequentially on the parallel cleanup branch.
+After DMD-FND-4, `DMD-WORKSPACE-0` and `DMD-OPS-0` may progress independently while DMD-FND-5 through DMD-FND-8 migrate legacy endpoints sequentially on the parallel cleanup branch. `DMD-WS-1` follows the Workspace shell; real `DMD-AI-0` waits for both the persistent session boundary and required OPS foundation before Business Intelligence begins.
 
 After DMD-FND-4 the default development model becomes vertical slices. Targeted audits remain allowed when new evidence exposes an unresolved architectural, security or data-integrity risk.
 
@@ -91,34 +93,51 @@ The binding `proxy.js` architecture is conditional: it defines how Proxy must be
 
 ---
 
-## 3. Phase B — First Business Intelligence vertical slice
+## 3. Phase B — Guided Discovery umbrella, executed as independent vertical slices
 
-### B1 Landing refactor minimal
+This conceptual phase is implemented through the canonical milestone order in `documentations/TODO.md`; it is not one batch.
+
+### B1 DMD-WORKSPACE-0 — interaction shell
 
 - extract new `How DMD works` section;
 - primary CTA to `/start`;
+- accept free natural-language intent without product-type/technical shortcut cards;
 - do not redesign entire marketing site yet.
 
-### B2 DiscoverySession
+### B2 DMD-WS-1 — persistent anonymous conversation
 
 - guest session;
 - session access token/cookie;
+- persistent messages;
 - resume;
-- user/account linkage.
+- user/account claim and isolation;
+- no AI dependency.
 
-### B3 Discovery chat without autonomous routing
+### B3 DMD-OPS-0 + DMD-AI-0 — operational and interpretation foundations
 
-- persist messages;
+- establish durable audit/runtime foundations;
 - provider-neutral AI orchestrator;
-- one discovery agent + structured extractor;
-- business-state draft;
-- missing-information UI.
+- one schema-bound interpretation path after WS-1 and OPS-0 are available.
 
-### B4 Understanding Gate
+### B4 DMD-BI-1 — Living Understanding
+
+- sourced facts, provenance and confidence;
+- contradictions and open questions;
+- no-repeat logic and highest-value unresolved question;
+- no formal verification.
+
+### B5 DMD-BI-2 — Advisory Brainstorming
+
+- recommendations, alternatives and trade-offs;
+- facts remain separate from AI recommendations;
+- rejected recommendations never become canonical truth.
+
+### B6 DMD-BI-3 — Understanding Gate / VerifiedBusinessState
 
 - completeness rules;
 - client “this is what you mean” confirmation;
 - VerifiedBusinessState revision.
+- no automatic ProjectRequest conversion.
 
 **Exit:** a real lead can go from vague description to a verified structured business state.
 
@@ -193,25 +212,35 @@ Add after basic design works, because it is an independent untrusted-content/sec
 
 ---
 
-## 6. Phase E — Formal project conversion
+## 6. Phase E — Commercial and claimed-project continuity
 
-### E1 Discovery → ProjectRequest
+### E1 Approved design → Commercial
 
-No retyping.
+The authoritative sequence remains:
 
-### E2 Blueprint → Master Proposal draft
+```text
+DMD-DES-3
+→ DMD-DES-4
+→ DMD-DES-5
+→ DMD-DES-6 ApprovedDesignRevision
+→ DMD-COM-0
+```
 
-AI can draft scope/milestone plan.
+The compact Workspace label `DESIGN` may group these canonical detailed milestones, but it must not renumber them or reuse `DMD-DES-0…3` for different meanings.
 
-Existing proposal lifecycle remains authoritative.
+Commercial preparation may produce non-authoritative internal estimates earlier only under separately approved architecture. No client-facing commercial decision, proposal/acceptance gate or binding commercial state may depend on an unapproved design candidate.
 
-### E3 Selected design/provenance linkage
+### E2 Commercial configuration → existing proposal lifecycle
 
-Project/request/proposal references selected design and blueprint versions.
+AI may draft scope and milestone suggestions from approved, version-pinned inputs, but the existing proposal lifecycle remains authoritative. Explicit proposal acceptance/payment policy gates production WorkOrder/provisioning.
 
-### E4 Commercial catalog preparation
+### E3 Claimed Workspace → My Projects continuity
 
-Do not finalize prices yet.
+`DMD-PROJECT-0` projects claimed pre-project work into the authenticated Dashboard/My Projects navigator without prematurely creating `ProjectRequest` or `ClientProject`. When formal materialization becomes appropriate, it reuses the existing request/proposal/project authority path through an idempotent source-linked handoff and requires no client retyping.
+
+### E4 Design selection versus purchase
+
+Design approval creates the immutable `ApprovedDesignRevision`. It may reserve or lock inventory only through an explicit design-inventory policy; it never means `bought`, proposal acceptance or payment. Those transitions belong to the Commercial layer.
 
 Add:
 
@@ -361,25 +390,20 @@ Do not start with:
 
 ## 12. First new-business/product epic recommendation
 
-After DMD-FND-1 through DMD-FND-4 are complete, the first new-business/product epic should be:
+After DMD-FND-1 through DMD-FND-4 are complete, the planning umbrella is:
 
 > **DMD-E1 — Guided Discovery → Verified Business State**
 
-It proves the differentiating product concept without requiring Design Engine, provisioning or GitHub automation yet. It is not the first implementation work overall: DMD-FND-1 isolated staging is the next implementation milestone.
+`DMD-E1` is a planning umbrella, not an implementation batch. The first product-facing implementation slice is `DMD-WORKSPACE-0`. Every contained slice is implemented independently, tested, deployed to staging and browser-verified before expansion.
 
-### E1 tasks
+### E1 contained slices
 
-1. architecture/security prerequisites;
-2. landing CTA + `/start` shell;
-3. DiscoverySession model/API;
-4. message persistence;
-5. AgentRun/provider adapter v1;
-6. VerifiedBusinessState schema;
-7. extraction + missing fields;
-8. Understanding Gate;
-9. client summary/correction;
-10. VerifiedBusinessState snapshot;
-11. tests + browser acceptance.
+1. `DMD-WORKSPACE-0`;
+2. `DMD-WS-1`;
+3. `DMD-AI-0`, after the required `DMD-OPS-0` foundation;
+4. `DMD-BI-1`;
+5. `DMD-BI-2`;
+6. `DMD-BI-3`.
 
 After E1, implement Capability/Route/Blueprint as E2.
 

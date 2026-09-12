@@ -257,6 +257,8 @@ ApprovedDesignRevision {
 
 Approved revision je immutable snapshot i stabilan input Commercial/Provisioning sloju.
 
+Approval/selection is not purchase. Design approval may reserve or lock a selected candidate only when an explicit design-inventory policy defines that transition. It must not set `bought`, imply proposal acceptance/payment or consume exclusive inventory through an implicit `usage_count` convention; purchase and binding commercial state belong to the Commercial layer.
+
 ---
 
 ## 10. Preview architecture

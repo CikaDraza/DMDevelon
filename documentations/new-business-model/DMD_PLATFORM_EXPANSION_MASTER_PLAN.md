@@ -1,9 +1,11 @@
 # DMD Platform Expansion — Discovery, Product Routing & Design Engine & Client Flow
 
-**Status:** Architecture / implementation roadmap  
+**Status:** CANONICAL architecture / implementation roadmap  
 **Date:** 2026-09-09  
-**Last updated:** 2026-09-11
-**Foundation:** `DMD_DESIGN_ENGINE_PRINCIPLES.md`
+**Last updated:** 2026-09-12  
+**Foundation:** `DMD_DESIGN_ENGINE_PRINCIPLES.md`  
+**Authority:** This file is the single canonical lifecycle and product guidance for the platform expansion. `audit-dmd/DMD_PLATFORM_EXPANSION_MASTER_PLAN.md` is a current-application audit addendum, not a second copy of this document; no other file may restate this guidance as its own authority.  
+**Execution index:** [`../TODO.md`](../TODO.md) owns milestone IDs (`DMD-FND-*`, `DMD-WS-*`, `DMD-BI-*`, `DMD-PI-*`, `DMD-DES-*`, `DMD-COM-*`, `DMD-PROJECT-*`, `DMD-CONV-*`), dependencies and completion status. The M0–M12 roadmap in §7 below is the earlier planning numbering and is not a competing execution index.
 
 ---
 
@@ -430,8 +432,8 @@ Zavisnosti: postojeći DMD i `DMD_DESIGN_ENGINE_PRINCIPLES.md`.
 Ishodi:
 
 - project/product intent entry;
-- basic intake;
-- optional product-type shortcuts;
+- free natural-language intake: “What are you trying to make possible? Tell me in your own words.”;
+- optional links/assets without a technical or product-type selector;
 - `DiscoverySession`;
 - attachments/links;
 - guest-to-account continuation;
@@ -652,7 +654,8 @@ Primer prvog velikog vertical slice-a:
 DMD-WORKSPACE-0 shell
 → Entry
 → DiscoverySession
-→ Guided Discovery
+→ Living Understanding
+→ Advisory Brainstorming
 → VerifiedBusinessState
 → CapabilityModel
 → ProductRouteDecision

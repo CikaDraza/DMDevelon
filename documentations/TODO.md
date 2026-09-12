@@ -44,22 +44,46 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 **Binding architecture:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
 
+**Active Workspace companion:** documentations/new-business-model/DMD_WORKSPACE_VERTICAL_SLICE_EXECUTION_PLAN.md. It explains client-visible slice acceptance without replacing this file's canonical IDs, dependencies or status.
+
 **Language decision:** DMD source remains `.js`, `.jsx` and `.mjs` only. TypeScript examples were copied from a different project and have been removed from the active expansion guidance. Do not add TypeScript files or syntax, and do not perform a typed-JavaScript/JSDoc migration: JSDoc is optional only for non-trivial exported boundaries, not local variables, ordinary props or routine helpers. Zod/JSON Schema are runtime validation, while the existing typescript/tsconfig/typecheck tooling remains a JavaScript build/module-resolution check; neither authorizes TypeScript source or generated TS types.
 
 **Historical evidence:** The Project Communication Hub record beginning at section 0 remains unchanged below. Completion in that historical work never means a new-business milestone is complete.
 
 ## Dependency direction
 
-DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-2A → DMD-FND-3 → DMD-FND-4 gates all new domains. After DMD-FND-4, the Workspace is the first product-facing expansion slice, while controlled legacy cleanup and non-UI platform foundations may proceed in parallel:
+DMD-FND-0 → DMD-FND-1 → DMD-FND-2 → DMD-FND-2A → DMD-FND-3 → DMD-FND-4 gates all new domains. After DMD-FND-4, the Workspace and operational foundation may begin independently, while controlled legacy cleanup proceeds on its own branch:
 
 ```text
-DMD-FND-4
-      ├──────────────→ DMD-WORKSPACE-0 → DMD-BI-1 → DMD-BI-2 → DMD-BI-3 → ...
-      ├──────────────→ DMD-OPS-0 → DMD-AI-0 → ...
+DMD-FND-4 COMPLETE
+      ├──────────────→ DMD-WORKSPACE-0 → DMD-WS-1 ───────┐
+      ├──────────────→ DMD-OPS-0 ─────────────────────────┤
+      │                                                    ↓
+      │                                                 DMD-AI-0
+      │                                                    ↓
+      │                                                 DMD-BI-1
+      │                                                    ↓
+      │                                                 DMD-BI-2
+      │                                                    ↓
+      │                                                 DMD-BI-3
+      │                                                    ↓
+      │                                                 DMD-PI-1
+      │                                                    ↓
+      │                                                 DMD-PI-2
+      │                                                    ↓
+      │                                                 DMD-BP-1
+      │                                                    ↓
+      │                                                 DMD-DES-0 → … → DMD-DES-6
+      │                                                    ↓
+      │                                                 DMD-COM-0 → …
+      │                                                    ↓
+      │                                                 DMD-PROJECT-0 → … → DMD-CONV-0
       └──────────────→ DMD-FND-5 → DMD-FND-6 → DMD-FND-7 → DMD-FND-8
 ```
 
-The Workspace is the canonical client projection of the complete lifecycle, not a new source-of-truth aggregate: idea → discovery → design → solution → commercial → project all remain one continuous client experience. The underlying product path is DiscoverySession → Verified Business State → Capability Model → Product Route → Solution Blueprint → Design Strategy → curated handoff → candidate/validation/review → Approved Design Revision → proposal/acceptance/payment → WorkOrder → evidence → Engineering Projection. Project Intelligence read/classification work may begin after DMD-FND-4, but its Blueprint/commercial integration waits for those inputs.
+`DMD-WORKSPACE-0` and `DMD-OPS-0` do not block one another. `DMD-WS-1` establishes the persistent anonymous conversation/session boundary without AI. Real `DMD-AI-0` begins only after both `DMD-WS-1` and the required `DMD-OPS-0` audit/runtime foundation exist. Legacy extraction remains independent and does not block the new client vertical.
+
+The Workspace is the canonical client projection of the complete lifecycle, not a new source-of-truth aggregate: idea → discovery → design → solution → commercial → project all remain one continuous client experience. The underlying product path is DiscoverySession → Living Understanding → Advisory Brainstorming → Verified Business State → Capability Model → Product Route → Solution Blueprint → Design Strategy → curated handoff → candidate/validation/review → immutable Approved Design Revision → commercial configuration/proposal/acceptance/payment → Project/WorkOrder → evidence → Engineering Projection.
 
 ## Global invariants
 
@@ -297,7 +321,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Explicitly out of scope:** React upgrade, catch-all extraction, production promotion, production-data migration, automatic provisioning, future AI-provider configuration and future GitHub/evidence webhook configuration.
 
-**Deferred ownership:** AI-provider environment configuration belongs to DMD-AI-0. GitHub/evidence webhook configuration belongs to DMD-PROJ-3.
+**Deferred ownership:** AI-provider environment configuration belongs to DMD-AI-0. GitHub/evidence webhook configuration belongs to DMD-PROJECT-3.
 
 ## DMD-FND-2 — Fresh current-system baseline
 
@@ -343,7 +367,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 - [x] Upgrade only React and React DOM to the binding-compatible 19.2+ versions and record any necessary peer/runtime compatibility changes. `react` and `react-dom` resolve to `19.2.8`; the lockfile resolves React-19-compatible peer variants where required.
 - [x] Run npm test, npm run test:api, npm run test:ui, npm run typecheck and npm run build. Unit 9/9, API 12 files and 236/236 tests, UI 8 files and 55/55 tests, typecheck and production build passed locally.
 - [x] Run the complete DMD-FND-2 staging smoke suite and compare it with the captured React 18 baseline. Completed and confirmed by the owner on staging.
-- [x] Record regressions and resolve them inside this bounded compatibility slice before DMD-FND-3/DMD-BI-1 work proceeds. Owner confirmation records no remaining regression blocker.
+- [x] Record regressions and resolve them inside this bounded compatibility slice before DMD-FND-3/new vertical-slice work proceeds. Owner confirmation records no remaining regression blocker.
 
 **Invariants:** Do not combine this upgrade with catch-all extraction, page decomposition, Discovery implementation or TypeScript source introduction.
 
@@ -637,7 +661,7 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Source documents:** audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md.
 
-**Dependencies:** DMD-OPS-0 and DMD-FND-1.
+**Dependencies:** DMD-OPS-0 and DMD-WS-1. DMD-FND-4 and DMD-WORKSPACE-0 are transitive prerequisites through those milestones.
 
 **Tasks:**
 
@@ -653,9 +677,9 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Explicitly out of scope:** Autonomous server-side coding, final pricing or multi-provider voting.
 
-## DMD-BI-1 — /start and DiscoverySession boundary
+## DMD-WS-1 — Anonymous DiscoverySession & Persistent Conversation
 
-**Goal:** Give a technical or non-technical lead a secure, resumable discovery entry.
+**Goal:** Give a guest a secure, resumable, claimable conversation/session boundary without requiring AI or formal business understanding.
 
 **Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; audit-dmd/DMD_CLIENT_DISCOVERY_DESIGN_LEAD_FLOW_V2.md; audit-dmd/DMD_FRONTEND_BACKEND_IMPLEMENTATION_MAP.md.
 
@@ -663,42 +687,64 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Tasks:**
 
-- [ ] Add /start with free-text, optional links/assets and optional technical shortcut cards; cards are hints, not product decisions.
-- [ ] Implement reconciled guest ownership, hashed/rotatable opaque access, expiry/resume and account claim.
-- [ ] Require registered ownership for deferred/supervised work while preserving allowed anonymous instant flow.
-- [ ] Keep legacy ProjectRequest as a manual fallback; do not create it from first vague input.
+- [ ] Bind the Workspace entry to free natural-language input and optional links/assets; do not present technical/product-type shortcut cards or require the client to select an architecture.
+- [ ] Persist guest `DiscoverySession` messages independently of later business interpretation.
+- [ ] Implement hashed/rotatable opaque guest access, expiry, resume, account claim and cross-account isolation.
+- [ ] Preserve captured work during claim; registration must not send an existing Workspace user into an empty unrelated dashboard state.
+- [ ] Require registered ownership only where deferred/supervised work genuinely needs it while preserving the approved anonymous flow.
 
-**Invariants:** Raw session ID never authorizes access; claim never makes a client re-enter captured data.
+**Invariants:** Raw session ID never authorizes access; claim never makes a client re-enter captured data. WS-1 owns session continuity, not business understanding, brainstorming, VerifiedBusinessState, product routing, design or formal project conversion. AI is not a WS-1 dependency.
 
-**Verification:** Guest resume/expiry/claim/cross-account tests and mobile staging smoke pass.
+**Verification:** Guest message persistence, resume, expiry, rotation, claim and cross-account isolation tests plus mobile staging/browser smoke pass without an AI/provider call.
 
-**Explicitly out of scope:** Routing, AI authority and design generation.
+**Explicitly out of scope:** AI interpretation, business facts, advisory recommendations, formal verification, product routing, design and ProjectRequest/ClientProject materialization.
 
-## DMD-BI-2 — Structured discovery and Understanding Gate
+## DMD-BI-1 — Living Understanding
 
-**Goal:** Persist evidence, sourced facts and client-correctable understanding before verification.
+**Goal:** Continuously build client-correctable business understanding from conversation evidence without prematurely verifying it.
 
 **Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; DMD_DESIGN_ENGINE_PRINCIPLES.md; audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
 
-**Dependencies:** DMD-BI-1 and DMD-AI-0.
+**Dependencies:** DMD-WS-1 and DMD-AI-0.
 
 **Tasks:**
 
-- [ ] Persist raw messages, links/assets, extracted/inferred/rejected facts, unresolved conflicts and requirement classification separately.
-- [ ] Use AI only to propose extraction, clarification and next questions through validated commands.
-- [ ] Support unknown, inferred, client_stated, verified, conflicted and not_applicable provenance/status; preserve source refs.
-- [ ] Apply no-repeat, intent-sensitive adaptive questions and product-category-aware blocking/non-blocking completeness rules.
-- [ ] Show editable plain-language summary/progress and capture existing-system/migration need without ordinary-chat credentials.
+- [ ] Build a living model of Business, Current workflow, Goals, People, Constraints, Assets, known capabilities/context and Open questions from persistent conversation evidence.
+- [ ] Persist raw messages/links/assets separately from extracted, inferred, rejected and conflicted facts; preserve source references, confidence and provenance/status such as unknown, inferred, client_stated, conflicted and not_applicable.
+- [ ] Use AI only to propose extraction, clarification and the highest-value unresolved question through validated commands; one message may populate many facts.
+- [ ] Enforce no-repeat logic: never re-ask a sufficiently known fact, while keeping genuine contradictions and material unknowns visible.
+- [ ] Show editable plain-language understanding/progress and capture existing-system/migration context without collecting ordinary-chat credentials.
 
-**Invariants:** Chat is evidence; future idea/preference is not production requirement; missing critical fact is not fabricated.
+**Invariants:** Chat is evidence; client-stated and inferred facts remain distinguishable; future idea/preference is not production requirement; missing facts are not fabricated. BI-1 performs no formal verification.
 
-**Verification:** Tests cover contradiction, correction, no-repeat, provenance, requirement classification and blocking gate.
+**Verification:** Tests cover multi-fact extraction, correction, contradiction, provenance/confidence, no-repeat behavior, source references and highest-value-question selection.
 
-**Explicitly out of scope:** Product selection or verified-state authority by the model.
+**Explicitly out of scope:** Advisory recommendation acceptance, formal verification, ProductRouteDecision and project materialization.
 
-## DMD-BI-3 — Verified Business State and ProjectRequest conversion
+## DMD-BI-2 — Advisory Brainstorming
 
-**Goal:** Produce versioned canonical business truth and carry it to legacy request flow without duplicate intake.
+**Goal:** Offer concise professional recommendations and alternatives without turning model advice into business truth.
+
+**Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
+
+**Dependencies:** DMD-BI-1.
+
+**Tasks:**
+
+- [ ] Produce short useful recommendations, alternative workflows, simpler MVP options, missing opportunities and professional warnings/trade-offs grounded in the living understanding.
+- [ ] Identify unnecessary requested technology without forcing an implementation/product selector onto the client.
+- [ ] Persist recommendation/proposal evidence separately from facts and require explicit policy/acceptance before any accepted recommendation may affect later canonical state.
+- [ ] Preserve rejected recommendations as non-truth evidence; they must not silently enter VerifiedBusinessState.
+
+**Invariants:** `client statement/fact ≠ AI recommendation`. Recommendation is not business truth, and rejection cannot mutate the fact model.
+
+**Verification:** Tests prove fact/recommendation separation, accepted/rejected advisory state, alternatives/trade-offs and no silent promotion into canonical facts.
+
+**Explicitly out of scope:** Formal verification, deterministic product routing, pricing, proposal or project creation.
+
+## DMD-BI-3 — Understanding Gate / VerifiedBusinessState
+
+**Goal:** Produce an authorized, versioned canonical business snapshot only after completeness and visible material conflicts are resolved or explicitly accepted.
 
 **Source documents:** DMD_BUSINESS_INTELLIGENCE_DISCOVERY.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; audit-dmd/DMD_EXTENSION_EXECUTION_PLAN_V2.md.
 
@@ -706,15 +752,16 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Tasks:**
 
-- [ ] Implement verification command, resolved/visible non-blocking conflicts, completeness report and immutable/versioned VerifiedBusinessState.
-- [ ] Record verifiedBy as authorized actor/system gate, never LLM assertion.
-- [ ] Convert verified discovery idempotently to existing ProjectRequest with source references and legacy compatibility.
+- [ ] Evaluate completeness and expose unresolved material conflicts in plain language.
+- [ ] Present the understanding for explicit client confirmation/correction before creating a versioned immutable `VerifiedBusinessState`.
+- [ ] Record `verifiedBy` through an authorized actor/system gate, never an LLM assertion.
+- [ ] Preserve accepted recommendation provenance without representing rejected/unaccepted advisory output as fact.
 
-**Invariants:** Only VerifiedBusinessState enters Product Intelligence; legacy requests/projects remain valid without it.
+**Invariants:** AI interprets/proposes; the system decides; the engine executes. Only authorized `VerifiedBusinessState` enters Product Intelligence. `VerifiedBusinessState` is not automatically a ProjectRequest or formal engineering commitment.
 
-**Verification:** Staging flow proves vague input → correction → one verified snapshot → one linked request with no retyping.
+**Verification:** Staging flow proves vague input → living understanding → advisory separation → correction → one authorized versioned snapshot, with no ProjectRequest/ClientProject created implicitly.
 
-**Explicitly out of scope:** Proposal pricing, provisioning or design execution.
+**Explicitly out of scope:** ProjectRequest materialization, proposal pricing, provisioning and design execution.
 
 ## DMD-PI-1 — Capability registry and ProductDefinition manifests
 
@@ -788,7 +835,8 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 **Tasks:**
 
 - [ ] Use the canonical DMD-FND-0 aggregate names and apply the separately reconciled lifecycle enums to DesignIntent, DesignAsset, DesignStrategy, DesignJob, DesignCandidate and ApprovedDesignRevision contracts.
-- [ ] Collect objective, feeling/style, dislikes, brand, colors, type, website/reference URLs, device priority, motion and uploads.
+- [ ] Collect information only the client is expected to know: existing logo/brand assets/photos, existing website, reference sites/materials, source content, business-grounded preferences, elements/colors that must remain and things they strongly want to avoid.
+- [ ] Treat CTA hierarchy, UX structure, responsive strategy, device prioritization, typography system, SEO/content architecture, funnel structure, interaction model, component structure and motion policy as professional system decisions. Client preferences are evidence, not a forced questionnaire.
 - [ ] Use signed/direct Cloudinary flow; store semantic source/role/title/description/intended placement/person/alt and delivery identity in DMD, never blobs.
 - [ ] Require client-upload description; final binding cannot retain role unsure.
 - [ ] Create editable DesignMediaSlot and AssetBinding revisions such as home.hero.primary.
@@ -867,7 +915,7 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Source documents:** DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md sections 17–22 and 30–33; audit-dmd/DMD_AI_ORCHESTRATION_MODEL_ROUTING.md.
 
-**Dependencies:** DMD-DES-2, DMD-OPS-0 and registered ownership from DMD-BI-1.
+**Dependencies:** DMD-DES-2, DMD-OPS-0 and registered ownership from DMD-WS-1.
 
 **Tasks:**
 
@@ -917,19 +965,19 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 - [ ] Persist immutable client-approved revision with candidate, strategy, Design System, rule, preview/commit and approval refs.
 - [ ] Preserve revision history; later change creates a new explicit decision.
 
-**Invariants:** Approved design is not project purchase/payment and cannot mutate after acceptance.
+**Invariants:** Approved design is not project purchase/payment and cannot mutate after acceptance. Selection/approval may reserve or lock a candidate only through an explicit design-inventory policy; `bought`, commercial acceptance and payment belong to the Commercial layer and never occur implicitly during design approval.
 
 **Verification:** Approval authorization/immutability tests pass.
 
 **Explicitly out of scope:** Proposal acceptance and payment.
 
-## DMD-PROJ-1 — Project Intelligence read/classification foundation
+## DMD-PROJECT-1 — Project Intelligence read/classification foundation
 
 **Goal:** Add source-safe assistance to existing projects without replacing their aggregates.
 
 **Source documents:** DMD_PROJECT_INTELLIGENCE.md; audit-dmd/DMD_PROJECT_INTELLIGENCE_TICKETING_CHANGE_CONTROL_V2.md; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md.
 
-**Dependencies:** DMD-FND-4 and DMD-FND-2; this is the allowed parallel branch.
+**Dependencies:** Existing-project read/classification work may begin after DMD-FND-4 and DMD-FND-2. In the new Workspace vertical, DMD-PROJECT-0 supplies claimed pre-project continuity before this capability is projected there.
 
 **Tasks:**
 
@@ -944,7 +992,7 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Explicitly out of scope:** Unreviewed project/commercial mutation or repo sync.
 
-## DMD-COM-1 — Commercial configuration and proposal materialization
+## DMD-COM-0 — Commercial configuration and proposal materialization
 
 **Goal:** Separate commercial objects and draft the existing proposal from approved scope/design.
 
@@ -958,11 +1006,32 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 - [ ] Reference measured AgentRun/DesignJob/workflow/storage cost evidence without inventing pricing formula.
 - [ ] Draft existing ProjectProposal/milestones/tasks/acceptance/evidence policy from approved inputs through authorized review/send/accept lifecycle.
 
-**Invariants:** No AIProposal parallel aggregate; draft/task edit cannot rewrite accepted proposal snapshot.
+**Invariants:** No AIProposal parallel aggregate; draft/task edit cannot rewrite accepted proposal snapshot. Non-authoritative estimates may be prepared earlier only under a separately approved architecture, but no client-facing commercial decision, proposal/acceptance gate or binding commercial state may depend on an unapproved DesignCandidate.
 
 **Verification:** Contract/integration tests prove separate lifecycles, versioning and authorization.
 
 **Explicitly out of scope:** Automatic price setting or payment provider selection.
+
+## DMD-PROJECT-0 — Claimed Workspace / My Projects continuity
+
+**Goal:** Preserve claimed pre-project Workspace work as an authenticated dashboard projection without prematurely creating `ProjectRequest` or `ClientProject` records.
+
+**Source documents:** DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; DMD_PLATFORM_EXPANSION_MASTER_PLAN.md; DMD_PROJECT_INTELLIGENCE.md.
+
+**Dependencies:** DMD-WS-1 and the relevant lifecycle state through DMD-COM-0. Formal project materialization remains governed by the existing request → proposal → acceptance/payment → project authority path.
+
+**Tasks:**
+
+- [ ] Project saved Workspace states into My Projects/navigation, including `Understanding in progress`, `Product direction ready`, `Design in progress`, `Commercial review` and `Active project` where canonical state supports them.
+- [ ] Ensure registration/claim returns a user with existing Workspace work to that work rather than the unrelated empty “You haven't requested any services yet” state.
+- [ ] Keep pre-project Workspace state distinct from `ProjectRequest`, proposal and `ClientProject` authority.
+- [ ] When formal materialization is appropriate, reuse the existing `ProjectRequest → proposal → ClientProject` path with an idempotent, source-linked handoff that requires no client retyping.
+
+**Invariants:** `VerifiedBusinessState ≠ ProjectRequest`; claimed Workspace work may be project-visible without being a formal engineering project. Dashboard is the authenticated navigation/ownership surface; Workspace remains the lifecycle work surface.
+
+**Verification:** Claim/registration/dashboard projection tests preserve the same Workspace state, create no premature project aggregate and prove repeated formal handoff creates at most one source-linked ProjectRequest.
+
+**Explicitly out of scope:** Implementing this projection now, automatic proposal creation, implicit commercial acceptance or bypassing existing project authority.
 
 ## DMD-COM-2 — Proposal acceptance and payment gate
 
@@ -970,7 +1039,7 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Source documents:** DMD_COMMERCIAL_PROVISIONING.md; DMD_DESIGN_AGENT_PIPELINE_IMPLEMENTATION_v1_0.md section 29; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md.
 
-**Dependencies:** DMD-COM-1.
+**Dependencies:** DMD-COM-0.
 
 **Tasks:**
 
@@ -1005,7 +1074,7 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Explicitly out of scope:** Automatic production provisioning or target-schema deformation by legacy data.
 
-## DMD-PROJ-2 — WorkOrder and repository binding
+## DMD-PROJECT-2 — WorkOrder and repository binding
 
 **Goal:** Hand accepted scope to local/human-supervised Claude Code/Codex with no second authority.
 
@@ -1025,13 +1094,13 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 
 **Explicitly out of scope:** DMD-hosted autonomous coding or unnecessary GitHub write access.
 
-## DMD-PROJ-3 — GitHub evidence and Engineering Projection
+## DMD-PROJECT-3 — GitHub evidence and Engineering Projection
 
 **Goal:** Translate validated repository/CI evidence into client-safe project truth.
 
 **Source documents:** audit-dmd/DMD_REPO_DB_ENGINEERING_HANDOFF.md; audit-dmd/DMD_SECURITY_RELIABILITY_GATES.md; audit-dmd/DMD_PROJECT_INTELLIGENCE_TICKETING_CHANGE_CONTROL_V2.md.
 
-**Dependencies:** DMD-PROJ-2 and DMD-OPS-0.
+**Dependencies:** DMD-PROJECT-2 and DMD-OPS-0.
 
 **Tasks:**
 
@@ -1045,6 +1114,29 @@ The catch-all remains a temporary compatibility layer for every endpoint not yet
 **Verification:** Staging end-to-end proves local commit → validated webhook → projection, while duplicate/invalid/stale/failed-CI paths remain safe.
 
 **Explicitly out of scope:** GitHub write automation, automatic client acceptance or commercial change.
+
+## DMD-CONV-0 — Shared conversation intelligence
+
+**Sequence:** LAST in the active Workspace vertical-slice plan.
+
+**Goal:** Reuse proven conversation intelligence across project/milestone `Ask a question`, group chat and direct messages without allowing conversation or AI interpretation to mutate project truth directly.
+
+**Source documents:** DMD_CLIENT_WORKSPACE_PRODUCT_DIRECTION.md; DMD_PROJECT_INTELLIGENCE.md; PROJECT_CHAT_PLAN.md.
+
+**Dependencies:** DMD-PROJECT-0 and the relevant implemented/verified Project and conversation foundations. This slice starts only after the preceding Workspace vertical has established stable truth, authorization and formalization boundaries.
+
+**Tasks:**
+
+- [ ] Interpret human messages, including operator answers, into notes or candidate actions with source-conversation provenance.
+- [ ] Reuse the existing authorized formalization paths: `Convert message → ProjectRequest | milestone task | ProjectMessage | ProjectItem`.
+- [ ] Preserve existing authorization, accepted-scope and change-control policies for every formal target.
+- [ ] Keep AI output as interpretation/proposal until an authorized system command performs the formal mutation.
+
+**Invariants:** AI and chat do not directly mutate project truth. Every formalized result remains source-linked, authorized and governed by the owning domain.
+
+**Verification:** Cross-surface tests prove consistent interpretation/provenance and reject unauthorized or direct AI mutation across Ask a question, group chat and DM.
+
+**Explicitly out of scope:** Implementing CONV-0 now, autonomous project mutation or bypassing current convert/change-control flows.
 
 ## Explicit deferred decisions
 

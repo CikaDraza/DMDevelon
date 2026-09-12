@@ -39,13 +39,12 @@ Mogući inputi:
 - „Hoću CRM“;
 - „Treba mi booking“;
 - „Nisam siguran“;
-- tehnički shortcut iz product/application cards;
 - slobodan opis;
 - link ka postojećem sajtu/profilu;
 - slike/reference;
 - postojeća dokumentacija.
 
-Cards pomažu korisniku, ali ne predstavljaju route decision.
+Entry ne prikazuje product-type ili tehničke shortcut kartice. Tehnički korisnik i dalje može slobodno da upotrebi termine kao što su CRM, LMS ili marketplace u prirodnom jeziku, ali klijent nikada ne bira arhitekturu niti product route kroz UI pre Discovery/Product Intelligence odluke.
 
 ---
 

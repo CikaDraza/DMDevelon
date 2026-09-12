@@ -2,6 +2,7 @@
 
 **Status:** CANONICAL PRODUCT DIRECTION  
 **Date:** 2026-09-11  
+**Last reconciled:** 2026-09-12
 **Implementation gate:** Starts only after `DMD-FND-4` is complete.  
 **Scope:** Client Experience, guided intake, design preview, product routing, commercial handoff and project continuation inside one persistent workspace.
 
@@ -240,6 +241,8 @@ A registered client may log in tomorrow, open Dashboard and see the project wait
 
 Clicking the project returns them to the same Workspace at the correct lifecycle state.
 
+Claimed pre-project Workspace work must also remain visible through this navigator. Registration/claim must not send a user with saved understanding, product direction, design or commercial-review state into the unrelated empty “You haven't requested any services yet” experience. This is the future `DMD-PROJECT-0` acceptance boundary; it does not make pre-project work a `ProjectRequest` or `ClientProject`.
+
 Examples:
 
 ```text
@@ -394,20 +397,21 @@ Do not begin with:
 - A/B variants;
 - several visual concepts generated for every guest.
 
-The user may provide simple visual signals such as:
+The user supplies information only they are expected to know, such as:
 
-- an existing brand;
-- one preferred color;
-- desired feeling;
-- references;
-- disliked examples;
-- business category;
-- audience;
-- visual intensity such as pastel, premium, minimal, neon, editorial or natural.
+- an existing logo and brand assets;
+- photos and source content/material;
+- an existing website;
+- reference sites/materials;
+- business-grounded preferences;
+- elements or colors that must remain;
+- examples or directions they strongly want to avoid.
 
-The design system derives a coherent palette and visual grammar from those signals.
+The design system derives the professional design decisions: CTA hierarchy, UX structure, responsive strategy, device prioritization, typography system, SEO/content architecture, funnel structure, interaction model, component structure and motion policy.
 
 A color choice is evidence, not a complete design instruction.
+
+A client may express preferences in any of these areas, but DMD must not turn professional design decisions into a required questionnaire.
 
 Industry is also a signal, not a hardcoded rule.
 
@@ -950,13 +954,17 @@ The product should grow through vertical slices.
 | Slice | Client receives | System behind it |
 |---|---|---|
 | `DMD-WORKSPACE-0` | Hero CTA → fullscreen Workspace | UI shell, responsive/resizable panes, fixture state |
-| `DMD-BI-1` | anonymous session can start/resume/claim | DiscoverySession, guest ownership/resume/claim |
-| `DMD-OPS-0 + DMD-AI-0` | chat begins real interpretation/questions | durable jobs, AgentRun, schemas, provider adapter |
-| `DMD-BI-2 / BI-3` | editable "what we understood" | facts, provenance, Understanding Gate, VerifiedBusinessState |
+| `DMD-WS-1` | anonymous conversation can persist/resume/claim | DiscoverySession, messages, guest ownership/resume/claim; no AI required |
+| `DMD-OPS-0` | safe durable operational foundation | audit, jobs, retries, diagnostics; may progress independently after FND-4 |
+| `DMD-AI-0` | conversation can begin real interpretation | AgentRun, schemas and provider-neutral adapter after both WS-1 and OPS-0 |
+| `DMD-BI-1` | editable living understanding | facts, provenance, confidence, contradictions, no-repeat logic |
+| `DMD-BI-2` | useful advisory brainstorming | recommendations, alternatives and trade-offs kept separate from facts |
+| `DMD-BI-3` | explicit understanding confirmation | completeness, Understanding Gate, versioned VerifiedBusinessState |
 | `DMD-PI-1 / PI-2 / BP-1` | recommended solution/product route | CapabilityModel, ProductRouteDecision, SolutionBlueprint |
-| `DMD-DES-0 → DES-3` | real responsive design preview and revisions | DesignIntent, assets, DesignStrategy, DesignJob, DesignCandidate |
-| Commercial | unlock, delivery choice, pricing/proposal | commercial configuration, acceptance/payment gate |
-| Project Mode | ongoing client/project experience | WorkOrder, changes, previews, ProjectEvidence |
+| `DESIGN` (`DMD-DES-0 → DMD-DES-6`) | intake → strategy → generation/preview → review/revision → approval | canonical detailed TODO milestones ending in immutable ApprovedDesignRevision |
+| `DMD-COM-0` and later Commercial slices | unlock, delivery choice, pricing/proposal | commercial configuration, proposal/acceptance/payment after approved design |
+| `DMD-PROJECT-0` and Project Mode | claimed pre-project continuity and ongoing project experience | dashboard projection, formal handoff, WorkOrder, changes, previews, ProjectEvidence |
+| `DMD-CONV-0` | shared assistance in Ask a question, group chat and DM | source-linked candidate actions through existing authorization/change control; intentionally last |
 
 Legacy extraction may continue in parallel through `DMD-FND-5 → DMD-FND-8`.
 
@@ -975,7 +983,7 @@ DMD-FND-2 React 18 fresh baseline
 ↓
 DMD-FND-2A React 19.2 isolated upgrade
 ↓
-DMD-FND-3 complete API/page inventory
+DMD-FND-3 complete-system inventory
 ↓
 DMD-FND-4 architecture/security shell
 ======================================

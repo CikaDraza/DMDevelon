@@ -84,19 +84,11 @@ The raw ID alone must not grant access. Use an opaque/session access mechanism a
 Ask only enough to begin:
 
 - project/business name optional;
-- free-text: “What are you trying to improve or build?”;
+- free-text: “What are you trying to make possible? Tell me in your own words.”;
 - optional website/social/product links;
 - optional screenshots/images;
-- optional shortcut cards:
-  - Booking / service business;
-  - Marketplace / matching;
-  - Education / membership;
-  - CRM / internal workflow;
-  - Content / subscription;
-  - E-commerce;
-  - I am not sure.
 
-Cards are hypotheses, not route decisions.
+Do not present product-type or technical shortcut cards. The client expresses intent; Discovery and Product Intelligence determine the product/technical architecture later.
 
 ### Stage B — Guided Business Discovery
 
