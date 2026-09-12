@@ -4,7 +4,7 @@
 **Source baseline:** `staging` @ `156790ac9e1765ede7b12bcb4ddf0ea93243c55d`  
 **Status:** 3H IN PROGRESS — method, row schema, global dispatcher facts, route-surface control table and initial cross-cutting risks only. No exact endpoint row is populated and the exact endpoint count is unproven.
 
-**Input state:** 3A–3F are `NOT STARTED` and have produced no durable domain artifact; 3G is complete as `DMD_FND_3_PAGE_INVENTORY.md`. This registry therefore has no domain rows to merge yet. `documentations/TODO.md` holds the canonical FND-3 evidence ledger.  
+**Input state:** 3A is complete as `DMD_FND_3A_PUBLIC_CMS_AUDIT.md` and proposes 28 exact rows for the public/marketing/CMS domain; 3G is complete as `DMD_FND_3_PAGE_INVENTORY.md`; 3B–3F are `NOT STARTED`. The 3A rows are a domain proposal awaiting merge and independent recount here; no row has been merged into §5 yet. `documentations/TODO.md` holds the canonical FND-3 evidence ledger.  
 **Authority:** `documentations/TODO.md` defines the FND-3 contract and completion status.
 
 This file is the one endpoint registry. Domain audit notes are evidence inputs, not competing inventories. No runtime code was changed while producing it.
@@ -71,7 +71,7 @@ Unknown facts use `UNKNOWN — requires follow-up`.
 
 ## 5. Exact endpoint rows
 
-No exact endpoint row has been written. Domain row merge has not begun because 3A–3F are `NOT STARTED`; this section must not receive a “complete” count until:
+No exact endpoint row has been merged into this registry. 3A has proposed 28 rows in its own artifact and 3B–3F are `NOT STARTED`; this section must not receive a “complete” count until:
 
 - every top-level and nested matcher has been expanded to an exact method/path pattern;
 - shadowing/order has been checked;

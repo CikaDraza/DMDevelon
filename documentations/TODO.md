@@ -383,7 +383,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Dependencies:** DMD-FND-2A.
 
-**Status:** IN PROGRESS — 3G complete, 3H in progress, 3A–3F and 3I not started (2026-09-12). No runtime mutation is authorized.
+**Status:** IN PROGRESS — 3A and 3G complete, 3H in progress, 3B–3F and 3I not started (2026-09-12). No runtime mutation is authorized.
 
 **Status evidence rule:** A submilestone advances only on a durable artifact committed under `documentations/`. Intent, delegation, an in-flight analysis session or a spawned agent is not `IN PROGRESS`, and an unrecorded reading pass is not evidence. When no artifact exists, the submilestone is `NOT STARTED` regardless of how much informal analysis preceded it.
 
@@ -391,7 +391,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Canonical submilestones:**
 
-- [ ] **3A — Public / Marketing / CMS:** public catalog, services, projects, testimonials, company profile, categories, contact/request entry points, homepage, `HomeClient`, metadata, public loaders and CMS catch-all behavior.
+- [x] **3A — Public / Marketing / CMS:** public catalog, services, projects, testimonials, company profile, categories, contact/request entry points, homepage, `HomeClient`, metadata, public loaders and CMS catch-all behavior. **Evidence:** `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` (2026-09-12) records 28 proposed exact rows (12 GET, 5 POST, 6 PUT, 5 DELETE, 0 PATCH), six owned models, two side effects and twelve risks. The row count is a domain proposal; registry merge and the system-wide count remain 3H.
 - [ ] **3B — Auth / Session / Access:** login/register/reset/verify/refresh/logout, `GET /api/auth/me`, users/settings, access-token ownership, refresh-cookie behavior, every direct/nested `useAuth()` consumer, server authentication, resource authorization, client UX gates, redirects and duplicated identity/session resolution.
 - [ ] **3C — Uploads / Assets:** Cloudinary/media dependencies, image/PDF flows, public/private assumptions, validation, ownership, provider side effects and future Design Asset seams.
 - [ ] **3D — Notifications / Cron / Operational endpoints:** health/system operations, notifications, email/digest, push, cron entry points, secrets, delivery side effects and operational ownership.
@@ -407,7 +407,7 @@ Canonical status is the table below. A submilestone may not be reported complete
 
 | Submilestone | Status | Durable artifact |
 |---|---|---|
-| 3A Public / Marketing / CMS | NOT STARTED | none |
+| 3A Public / Marketing / CMS | COMPLETE | `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` |
 | 3B Auth / Session / Access | NOT STARTED | none |
 | 3C Uploads / Assets | NOT STARTED | none |
 | 3D Notifications / Cron / Operational | NOT STARTED | none |
@@ -419,7 +419,7 @@ Canonical status is the table below. A submilestone may not be reported complete
 
 **DMD-FND-3 overall: IN PROGRESS.**
 
-3G completing before 3A–3F is a recording order, not a dependency inversion: the page inventory is a static route-surface record, while 3A–3F are domain evidence inputs that 3H merges and 3I reconciles. 3G is not closed against the central API registry until 3H resolves its callers.
+3A and 3G completing before 3B–3F is a recording order, not a dependency inversion: the page inventory is a static route-surface record, while 3A–3F are domain evidence inputs that 3H merges and 3I reconciles. 3G is not closed against the central API registry until 3H resolves its callers.
 
 These boundaries are organizational, not assumptions about ownership. When evidence shows that a source belongs elsewhere, classify it by actual ownership and record the reason rather than forcing it into the initial category.
 
