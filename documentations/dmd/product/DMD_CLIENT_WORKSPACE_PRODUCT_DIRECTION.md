@@ -391,6 +391,107 @@ DMD is not a page builder.
 
 ---
 
+## 8.5 Pending decisions, asynchronous work and blocked boundaries
+
+The Workspace must treat waiting as a normal product state when the next authorized action depends on a team/client/system decision or on asynchronous work that has not completed yet.
+
+The conversation does not automatically stop because one branch of work is waiting.
+
+The Workspace should determine:
+
+```text
+what is waiting
+what decision/result is required
+what that decision blocks
+what can continue independently
+```
+
+If useful work remains unblocked, the agent continues the conversation and those independent activities.
+
+Example:
+
+```text
+pending:
+team review of a non-standard product request
+
+may continue:
+business understanding
+content clarification
+asset collection
+questions unrelated to the blocked request
+
+may not continue:
+the state transition whose authorization depends on that review
+```
+
+If all useful next actions depend on the pending decision, waiting is the correct product behavior.
+
+The client must not be pushed through an invented answer merely to preserve conversational momentum.
+
+### Decision-wait communication
+
+A decision-wait state should be communicated clearly and naturally.
+
+Example direction:
+
+> Ovaj zahtev traži potvrdu tima pre nego što nastavimo sa tom promenom. Zahtev je sačuvan i prosleđen na pregled. Možemo u međuvremenu nastaviti sa delovima koji od te odluke ne zavise.
+
+If no useful work can continue:
+
+> Zahtev je sačuvan i tim ga pregledava. Ovaj sledeći korak zavisi od te odluke, pa ćemo nastaviti odavde čim bude potvrđena.
+
+The exact client-facing copy may adapt to tone, lifecycle and context.
+
+The product should be capable of showing useful state such as:
+
+```text
+Awaiting team decision
+Requested: <time>
+Blocks: <affected action>
+Still available: <unblocked work>
+```
+
+Elapsed time may be shown when it helps the client or team understand the state.
+
+Do not promise a response deadline unless a real configured service/process commitment exists.
+
+### Asynchronous generation is not an error
+
+The same principle applies when DMD has enough information but a higher-quality asynchronous process must finish before the next artifact is ready.
+
+For example, after Design Intake is sufficient, the Workspace may communicate:
+
+> Imamo dovoljno informacija. Sada pripremamo predlog dizajna na osnovu svega što smo definisali.
+
+The client does not need to know which model, provider, internal agent or engineering tool performs that work.
+
+DMD should prefer a controlled high-quality asynchronous result over generating a weaker immediate result only to appear synchronous.
+
+### Failure remains distinct
+
+The Workspace must distinguish:
+
+```text
+awaiting asynchronous result
+awaiting authorized decision
+temporary capacity limitation
+technical failure
+```
+
+A pending decision or normal asynchronous job must not render as a generic server error.
+
+Conversely, a genuine technical failure must enter the appropriate recovery/error path rather than being hidden behind a “team review” message.
+
+### Notification continuity
+
+When a decision belongs to the team or another authorized actor, the Workspace should create or project the corresponding actionable notification according to notification policy.
+
+The client-facing conversation may continue independently while that decision is pending.
+
+When the decision is resolved, the Workspace resumes from the preserved lifecycle/context state; the client must not be required to reconstruct or repeat the request.
+
+---
+
 # 9. Design MVP direction
 
 MVP should produce **one strong design direction**, not three automatically generated alternatives.
@@ -886,7 +987,7 @@ client request
 → DMD interpretation
 → orchestration
 → approved structured work
-→ Claude / Codex / other approved engineering tools
+→ approved engineering agent/tool
 → implementation
 → tests
 → build

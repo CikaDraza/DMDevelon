@@ -180,6 +180,153 @@ Odgovor se generiše iz task/milestone/evidence stanja, ne iz generičkog LLM se
 
 ---
 
+## 7.1 Pending decisions, notifications and asynchronous project review
+
+Project communication is naturally asynchronous.
+
+A client message does not require an immediate implementation commitment, commercial answer or final project decision.
+
+The first responsibility is to understand and preserve the request correctly.
+
+Example:
+
+```text
+client message
+→ interpretation
+→ project/scope/evidence lookup
+→ classification
+→ candidate action
+→ policy/authority check
+```
+
+If the required formal action is already authorized by deterministic policy, the normal command flow may continue.
+
+If the action requires project/admin/client authority, Project Intelligence must preserve it as pending review rather than inventing a decision.
+
+Example:
+
+```text
+message:
+"Add export of all appointments to Excel."
+
+possible result:
+change request candidate
+→ accepted-scope lookup
+→ impact assessment
+→ pending project decision
+→ notification
+→ later formal Task / Change Proposal / rejection
+```
+
+The client may immediately receive an acknowledgement without receiving a false commitment:
+
+> Zabeležio sam zahtev za export termina. Tim će proveriti kako se uklapa u trenutni scope i javićemo vam odluku.
+
+This means “the request is understood and being reviewed”, not “the feature has been accepted”.
+
+### Formalization boundary
+
+The following remain separate:
+
+```text
+message understood
+candidate action created
+decision pending
+decision resolved
+formal project record created/updated
+engineering execution started
+```
+
+A candidate incident, task, change request or proposal is not canonical project commitment merely because an AI agent produced it.
+
+The existing project policy/command boundary remains authoritative.
+
+### Pending decision state
+
+Project Intelligence must be able to determine, directly or through a future bounded representation:
+
+```text
+source message/evidence
+decision required
+reason
+decision owner/authority
+requested time
+affected project objects
+blocked actions
+unblocked actions
+recommendation/options where useful
+resolution
+decidedBy
+decidedAt
+```
+
+The exact database model is deferred until the implementation slice that owns it.
+
+Do not create a parallel project-truth model only for AI decisions.
+
+### Continue accepted work
+
+A pending project decision blocks only dependent work.
+
+Existing accepted work that does not depend on the unresolved decision may continue.
+
+Engineering evidence may also continue to be collected and normalized while a decision is pending.
+
+However, Project Intelligence must not:
+
+- turn an unapproved candidate into accepted scope;
+- create a commercial promise;
+- change an accepted schedule;
+- cross a security/architecture approval boundary;
+- represent proposed work as committed work.
+
+### Notification policy
+
+Project Intelligence should use the existing `Notification` capability rather than inventing a separate AI notification system.
+
+Notifications should progressively support importance and action semantics, including:
+
+```text
+information
+action required
+decision required
+blocking decision
+incident/security escalation
+```
+
+The exact channel policy is configurable.
+
+A decision may initially appear in the project/in-app notification surface and, according to importance and policy, escalate through push, email or reminders.
+
+Notification delivery must be idempotent/deduplicated enough to avoid repeated agent analysis generating repeated alerts for the same unresolved decision.
+
+### Resolution
+
+When the authorized decision arrives:
+
+```text
+decision
+→ policy validation
+→ canonical command / formal record where applicable
+→ audit/evidence
+→ unblock dependent work
+→ client/project update
+```
+
+The agent resumes from canonical project context and the preserved source request.
+
+The client should not need to repeat the original message.
+
+### No artificial escalation
+
+Project Intelligence must not send ordinary decisions to a human simply because a model is uncertain.
+
+If accepted scope, project policy, product rules or existing canonical state already answer the question, the system applies those rules.
+
+Human/team review is reserved for genuine authority, ambiguity, risk or judgment boundaries.
+
+---
+
 ## 8. Requirement vs idea filtering
 
 Klijenti često šalju ideje koje nisu deo produkcionog scope-a.

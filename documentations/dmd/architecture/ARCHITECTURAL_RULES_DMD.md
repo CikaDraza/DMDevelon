@@ -6,7 +6,7 @@
 **Supersedes:** `documentations/archive/dmd/superseded-architecture/DMD_EXTENSION_TARGET_ARCHITECTURE.md` where they conflict
 **Superseded by:** —
 
-**Version:** 1.2
+**Version:** 1.3
 **Contract class:** binding implementation contract
 **Date:** 2026-09-12
 **Applies to:** DMD Next.js application, Route Handlers, React UI, server modules, tests, scripts and all AI coding agents
@@ -511,7 +511,7 @@ Only repositories or explicitly named server data-access modules may import Mong
 
 ### 2.7 AI-generated code obeys the same rules
 
-Claude Code, Codex and any other coding agent are not allowed to bypass these boundaries because a change is “small” or “faster”.
+Any engineering agent or coding tool must obey the same architectural boundaries. A change being “small” or “faster” is never permission to bypass them.
 
 ---
 
@@ -737,6 +737,196 @@ The client must receive:
 * whether the system or a human owns the next action.
 
 Silent failure, circular AI conversation and unexplained inability to continue are prohibited product states.
+
+---
+
+### 7.1 Authorized waiting is a valid workflow state
+
+A DMD workflow does not fail merely because the next authorized action cannot be decided immediately.
+
+> **Waiting for an authorized decision is a valid system state, not an error state.**
+
+The system must distinguish at least three fundamentally different conditions:
+
+```text
+work is waiting for asynchronous execution or evidence
+work is waiting for an authorized decision
+work failed because of a technical/runtime error
+```
+
+These states must never collapse into the same generic failure response.
+
+A pending decision exists when available evidence is insufficient to authorize the next state-changing action under the current product, project, commercial, security or lifecycle policy.
+
+Examples include:
+
+- a genuinely new product-boundary decision;
+- an ambiguous scope change;
+- a commercial commitment not already covered by policy;
+- a high-impact architecture/security decision;
+- client approval where the lifecycle explicitly requires it;
+- a team decision required before a proposed action can become canonical work.
+
+A pending decision is **not** permission for an AI agent to invent authority.
+
+The canonical rule remains:
+
+> **AI interprets and proposes. The system authorizes. The engine executes. Human/team authority resolves decisions where policy requires judgment.**
+
+#### Evidence does not grant authority
+
+Evidence may be collected automatically from sources such as:
+
+```text
+repository changes
+commits
+pull requests
+tests
+builds
+deployments
+runtime/incident signals
+project messages
+client approvals
+engineering reports
+```
+
+The system may normalize that evidence automatically.
+
+A model may use it to propose:
+
+```text
+incident
+problem
+task
+change request
+scope implication
+decision request
+implementation recommendation
+```
+
+but evidence alone does not authorize the corresponding business or project mutation.
+
+Formal state changes still pass through the policy, authorization and lifecycle boundary that owns them.
+
+#### Continue everything that is not blocked
+
+A pending decision blocks only the actions whose authorization depends on that decision.
+
+> **The agent may continue work that is independent of a pending decision, but must not cross the blocked decision boundary.**
+
+For example:
+
+```text
+decision pending: approve design direction
+
+blocked:
+- ApprovedDesignRevision
+- commercial handoff that depends on approved design
+
+not necessarily blocked:
+- organize supplied assets
+- answer unrelated client questions
+- preserve/update already accepted facts
+- perform analysis that does not imply approval
+```
+
+The same principle applies to project work.
+
+One unresolved change request must not unnecessarily stop unrelated accepted tasks.
+
+If every useful next action depends on the unresolved decision, the workflow may legitimately wait.
+
+#### Do not manufacture decisions
+
+Human/team review is an exception boundary, not the default execution mechanism.
+
+An agent must not create a decision request merely because it is uncertain about a decision that canonical product/domain policy already resolves.
+
+The required sequence is:
+
+```text
+read canonical state and policy
+→ apply an existing authorized rule when one exists
+→ identify a genuinely unresolved authority/judgment boundary only when necessary
+→ request a decision
+```
+
+Ordinary product, UX, design and engineering decisions already assigned to DMD or a deterministic engine must remain owned by those systems.
+
+#### Pending decision visibility
+
+A durable pending-decision implementation should preserve enough information to answer:
+
+```text
+what decision is required
+why it is required
+who or what authority owns it
+when it was requested
+what it blocks
+what remains unblocked
+current status
+final decision and decision evidence when resolved
+```
+
+The exact persistence model is intentionally not locked here.
+
+A future implementation may use a `DecisionRequest`, `PendingDecision` or another bounded representation, but the semantic contract above is canonical.
+
+#### Notifications and escalation
+
+Existing notification infrastructure should progressively support decision importance.
+
+The system must be able to distinguish semantically between states such as:
+
+```text
+informational
+action required
+decision required
+blocking decision
+security / incident
+```
+
+Exact enum names, thresholds and channel rules are implementation decisions.
+
+Notification policy may use:
+
+```text
+in-app notification
+push notification
+email
+reminder / escalation
+```
+
+according to urgency, ownership and configured policy.
+
+The goal is prompt human awareness without turning every recommendation into an interruption.
+
+Notifications surface required authority; they do not themselves authorize the decision.
+
+#### Client-facing rule
+
+Clients must receive workflow truth, not internal orchestration details.
+
+When human/team review is legitimately required, the system should explain:
+
+- that the request was understood and preserved;
+- that a decision/review is required;
+- what is affected where useful;
+- what happens next.
+
+It must not expose internal model/provider selection, agent topology or engineering-tool mechanics.
+
+A real technical failure must still be reported as a failure.
+
+A pending authorized decision must not be falsely presented as:
+
+```text
+server error
+something went wrong
+unknown failure
+```
+
+and a real technical failure must not be disguised as “waiting for the team”.
 
 ---
 

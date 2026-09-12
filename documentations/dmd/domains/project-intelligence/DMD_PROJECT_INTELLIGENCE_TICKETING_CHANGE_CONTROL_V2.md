@@ -8,6 +8,7 @@
 
 **Existing foundation:** `ProjectItem`, `ChatMessage`, `ProjectProposal`, `ClientProject`, `HandoffDialog`
 **Goal:** Turn daily client communication into controlled project work without drowning development in ideas and manual tracking.
+**Canonical pending-decision rule:** `documentations/dmd/domains/project-intelligence/DMD_PROJECT_INTELLIGENCE.md` §7.1. This document applies that rule and does not define a separate policy or project-truth model.
 
 ---
 
