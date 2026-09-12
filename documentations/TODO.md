@@ -535,7 +535,7 @@ The exception is bounded. A hotfix repairs the proven defect and nothing else: n
 SECURITY HOTFIX CANDIDATE
 severity: critical
 source:   FND-3A-R1
-status:   FIX WRITTEN — REGRESSION SUITE NOT YET EXECUTED
+status:   FIXED — VERIFIED, AWAITING MERGE/DEPLOY
 branch:   hotfix/shc-1-testimonial-authz
 ```
 
@@ -547,8 +547,12 @@ branch:   hotfix/shc-1-testimonial-authz
 - **Reachability:** `lib/auth.js:35` returns `null` for a missing or invalid bearer token rather than throwing, so the branch is reached without credentials. Catch-all CORS is `Access-Control-Allow-Origin: *`.
 - **Why separated from FND-4:** this is not future architecture hardening. It is an existing authorization defect on the production branch.
 - **Fix:** `hotfix/shc-1-testimonial-authz` — authenticate, load the record, authorize author-or-admin, whitelist mutable fields. Ownership mirrors the existing DELETE rule for this resource, so no new policy is introduced.
-- **Verification state:** `npx tsc --noEmit` clean, `npm test` 191/191, `npm run build` passes. **`npm run test:api` has NOT been executed** — the local `dmd-test-mongo` replica set requires the Docker daemon, which is not running on this machine and could not be started without a password. The eleven regression assertions in `tests/integration/testimonial-authz.test.mjs` are therefore written but unproven.
-- **Merge gate:** do not merge or deploy until `npm run test:api` runs green.
+- **Verification (2026-09-12, local, `dmd-test-mongo` replica set at `127.0.0.1:27077`):**
+  - `npm run test:api` — 13 files, **245/245** passed, 0 skipped.
+  - `npm test` — **191/191**; `npm run test:ui` — 8 files, **55/55**; `npx tsc --noEmit` clean; `npm run build` passes.
+  - **Negative control:** with `app/api/[[...path]]/route.js` reverted to the vulnerable `staging` version, `tests/integration/testimonial-authz.test.mjs` fails **5 of 9**, including `rejects an anonymous caller and leaves the record untouched`. The suite therefore proves the defect rather than merely passing alongside it. The other 4 cover behavior that was already correct.
+  - Expected stderr in the run is asserted negative authorization/validation paths, not failures.
+- **Merge gate:** satisfied. Remaining owner steps: merge `hotfix/shc-1-testimonial-authz`, deploy, then run the targeted read-only same-pattern sweep before FND-3 resumes at 3B.
 - **Recorded consequence:** testimonials created anonymously carry `userId: null` and are not editable by their submitter. The DELETE branch already behaved this way; `app/dashboard/page.js:318` additionally treats an email match as ownership client-side. This divergence is an FND-4 input, not repaired here.
 - Full evidence: `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.
 
