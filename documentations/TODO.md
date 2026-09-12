@@ -40,7 +40,7 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 # NEW BUSINESS MODEL — Foundation & Platform Expansion
 
-**Status:** Foundation execution in progress. DMD-FND-0, DMD-FND-1, DMD-FND-2 and DMD-FND-2A are complete. DMD-FND-3 is next: the complete-system API/page/auth/data/side-effect inventory. This is the execution index, while documents under documentations/new-business-model/ remain the architecture and product contracts.
+**Status:** Foundation execution in progress. DMD-FND-0, DMD-FND-1, DMD-FND-2 and DMD-FND-2A are complete. DMD-FND-3 is in progress: the complete-system API/page/auth/data/side-effect inventory. This is the execution index, while documents under documentations/new-business-model/ remain the architecture and product contracts.
 
 **Binding architecture:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
 
@@ -383,7 +383,9 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Dependencies:** DMD-FND-2A.
 
-**Status:** NOT STARTED — documentation contract reconciled on 2026-09-12; the audit itself has not begun.
+**Status:** IN PROGRESS — 3G complete, 3H in progress, 3A–3F and 3I not started (2026-09-12). No runtime mutation is authorized.
+
+**Status evidence rule:** A submilestone advances only on a durable artifact committed under `documentations/`. Intent, delegation, an in-flight analysis session or a spawned agent is not `IN PROGRESS`, and an unrecorded reading pass is not evidence. When no artifact exists, the submilestone is `NOT STARTED` regardless of how much informal analysis preceded it.
 
 **Execution rule:** `Parallel discovery / read-only analysis = YES. Parallel architectural mutations / extraction = NO.` Domain audits may gather evidence in parallel, but FND-3 performs no endpoint extraction, auth/routing refactor, page decomposition or other runtime mutation. Integration suites may run concurrently only with isolated databases, separate fixture namespaces and proven independence; otherwise use parallel read-only audit, reconciliation and one canonical integration/full-suite verification.
 
@@ -395,9 +397,29 @@ Prioritize improvements that reduce client effort and human escape across the co
 - [ ] **3D — Notifications / Cron / Operational endpoints:** health/system operations, notifications, email/digest, push, cron entry points, secrets, delivery side effects and operational ownership.
 - [ ] **3E — Project Requests / Proposals / Client Projects:** request/proposal/project lifecycle, accepted scope, milestones/tasks, membership/invitations, access/resource ownership, transactions and audit/history.
 - [ ] **3F — Communication / Chat / DM / Project Items:** milestone `Ask a question`, group channels, direct messages, reads/pins, message conversion, `ProjectItem`, permissions and notification/evidence relationships.
-- [ ] **3G — Dashboard / Admin / Application Pages:** every relevant route surface, including admin, dashboard, project/request detail, chat/DM and auth-related pages; map Server/Client boundaries, loaders/browser calls, state ownership, deep links and real decomposition seams.
-- [ ] **3H — Central Legacy API Registry & Completeness Audit:** this is the single registry populated by 3A–3G, not an eighth duplicate domain audit. Reconcile every HTTP method, catch-all branch and matcher/branch order; include `OPTIONS`, separate `/api/seed`, existing dedicated ownership/restore routes and any other reachable API route. Prove the registry count matches source and no endpoint remains only implicit in a domain note.
+- [x] **3G — Dashboard / Admin / Application Pages:** every relevant route surface, including admin, dashboard, project/request detail, chat/DM and auth-related pages; map Server/Client boundaries, loaders/browser calls, state ownership, deep links and real decomposition seams. **Evidence:** `audit-dmd/DMD_FND_3_PAGE_INVENTORY.md` (2026-09-12) records 12 page routes, 2 supporting route surfaces and 2 global layout/provider surfaces. Its own caller/metadata reconciliation against the central API registry is carried by 3H/3I, not reopened here.
+- [~] **3H — Central Legacy API Registry & Completeness Audit:** this is the single registry populated by 3A–3G, not an eighth duplicate domain audit. Reconcile every HTTP method, catch-all branch and matcher/branch order; include `OPTIONS`, separate `/api/seed`, existing dedicated ownership/restore routes and any other reachable API route. Prove the registry count matches source and no endpoint remains only implicit in a domain note. **Current state:** `audit-dmd/DMD_FND_3_API_INVENTORY.md` (2026-09-12) holds the completeness method, row schema, global dispatcher facts, route-surface control table and initial cross-cutting risks. Section 5 exact endpoint rows are empty and the exact endpoint count remains `UNKNOWN — requires follow-up`.
 - [ ] **3I — Reconciliation / Risk Map / Migration Map:** reconcile cross-domain findings, explicit unknowns, source-of-truth ownership, side effects, coverage gaps, risk and future seams; only this pass may recommend the exact FND-4 scope and whether DMD currently needs `proxy.js` for identified coarse request/security boundaries.
+
+### FND-3 evidence ledger
+
+Canonical status is the table below. A submilestone may not be reported complete or in progress anywhere else in this repository against a different value.
+
+| Submilestone | Status | Durable artifact |
+|---|---|---|
+| 3A Public / Marketing / CMS | NOT STARTED | none |
+| 3B Auth / Session / Access | NOT STARTED | none |
+| 3C Uploads / Assets | NOT STARTED | none |
+| 3D Notifications / Cron / Operational | NOT STARTED | none |
+| 3E Project Requests / Proposals / Client Projects | NOT STARTED | none |
+| 3F Communication / Chat / DM / Project Items | NOT STARTED | none |
+| 3G Dashboard / Admin / Application Pages | COMPLETE | `audit-dmd/DMD_FND_3_PAGE_INVENTORY.md` |
+| 3H Central Legacy API Registry | IN PROGRESS | `audit-dmd/DMD_FND_3_API_INVENTORY.md` (method/schema/risks only; endpoint rows empty) |
+| 3I Reconciliation / Risk Map / Migration Map | NOT STARTED | none |
+
+**DMD-FND-3 overall: IN PROGRESS.**
+
+3G completing before 3A–3F is a recording order, not a dependency inversion: the page inventory is a static route-surface record, while 3A–3F are domain evidence inputs that 3H merges and 3I reconciles. 3G is not closed against the central API registry until 3H resolves its callers.
 
 These boundaries are organizational, not assumptions about ownership. When evidence shows that a source belongs elsewhere, classify it by actual ownership and record the reason rather than forcing it into the initial category.
 
