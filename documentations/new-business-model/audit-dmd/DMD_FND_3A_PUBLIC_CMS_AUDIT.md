@@ -116,7 +116,7 @@ Severity is this domain's assessment; FND-4 owns the final classification and an
 
 | ID | Severity | Finding | Evidence |
 |---|---|---|---|
-| 3A-R1 | **Critical** | `PUT /api/testimonials/:id` authenticates **only** when `body.adminReply` is present. An anonymous caller can overwrite `clientName`, `rating`, `comment` and `userId` on **any** testimonial. There is no ownership check on this branch. | `route.js:5247-5257` |
+| 3A-R1 | **Critical — SECURITY HOTFIX CANDIDATE (SHC-1)** | `PUT /api/testimonials/:id` authenticates **only** when `body.adminReply` is present. An anonymous caller can overwrite `clientName`, `rating`, `comment` and `userId` on **any** testimonial. There is no ownership check on this branch. The identical branch is present on `main` (`route.js:5242`), so this is an active defect on the production branch, not future hardening. Raised for a separate owner decision in `documentations/TODO.md` § Security hotfix candidates; **not** repaired inside FND-3. | `route.js:5247-5257`; `main` `route.js:5242`; `lib/auth.js:35` |
 | 3A-R2 | **Critical** | `POST /api/testimonials` accepts anonymous callers, the model has no approval state, and `GET /api/testimonials` is public. Anonymous content reaches the public marketing site with no review, plus an admin notification per submission. | `route.js:4618-4626`, `models/Testimonial.js`, `route.js:1562` |
 | 3A-R3 | **High** | `GET /api/testimonials` and `GET /api/testimonials/:id` return raw documents including `clientEmail`. No serializer exists for this domain. Client email addresses are readable by anyone, cross-origin (wildcard CORS). | `route.js:1562,1567`; `lib/` has no public serializer |
 | 3A-R4 | **High** | No publication gate exists in the data model for `Service`, `Project`, `Testimonial` or `CMSPage`. `GET /api/cms-pages` returns **every** CMS page unauthenticated, including `noIndex` ones, enumerating unlinked content. | `models/*`, `route.js:1626` |
@@ -128,6 +128,12 @@ Severity is this domain's assessment; FND-4 owns the final classification and an
 | 3A-R10 | **Low–Medium** | `Project.slug` is `unique` but not `required`, so slug-less projects are creatable; the sitemap compensates by filtering null/empty slugs. Whether the unique index is sparse at this baseline is `UNKNOWN — requires follow-up`. | `models/Project.js`, `app/sitemap.js` |
 | 3A-R11 | **High (process)** | **Zero automated test coverage** for the entire 3A domain. No unit, integration or UI test references any 3A endpoint. | `tests/` sweep returns no match for any 3A path |
 | 3A-R12 | **Low** | Rows 2, 5, 7 and 12 (`services/:id`, `projects/:id`, `testimonials/:id`, `categories`) have **no known browser caller**. They remain implemented, publicly reachable and untested. | reverse caller sweep |
+
+### 5.1 Severity separation
+
+Only 3A-R1 is raised as a security hotfix candidate. It is the single finding in this domain where an unauthenticated caller can mutate an existing record belonging to someone else.
+
+3A-R2 is serious but a different class: anonymous submission that becomes public with no moderation lifecycle is an abuse, content-integrity and product-policy problem. It does not permit arbitrary modification of another party's existing document, and it remains 3I/FND-4 scope together with 3A-R3 through 3A-R12.
 
 ## 6. Source-of-truth and side-effect summary
 

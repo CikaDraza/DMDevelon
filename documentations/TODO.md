@@ -519,6 +519,39 @@ The migration unit is one exact HTTP method + path contract, not a whole domain 
 
 The catch-all remains a temporary compatibility layer for every endpoint not yet migrated and is deleted only when its inventory reaches zero. New Business Intelligence endpoints do not enter the catch-all or wait for its retirement: after DMD-FND-4 they are created directly as dedicated routes backed by server/modules/<domain>, while legacy extraction continues sequentially on the parallel foundation branch.
 
+## Security hotfix candidates
+
+This section is **not** part of DMD-FND-3 and is not gated by it. FND-3 is a read-only inventory and must not repair anything it finds; a finding that is an *active* exploitable vulnerability on a deployed branch is nevertheless not something an audit schedule may silently hold. Items here are raised for a separate, explicit owner decision. Recording an item here authorizes no code change by itself.
+
+Classification rule: an item qualifies only when current source evidence shows an unauthenticated or cross-tenant caller can read or mutate data they do not own, on a branch that is deployed. Abuse, content-integrity, product-policy and hardening findings do **not** qualify and remain FND-4/3I scope.
+
+### SHC-1 — Unauthenticated arbitrary testimonial mutation
+
+```text
+SECURITY HOTFIX CANDIDATE
+severity: critical
+source:   FND-3A-R1
+status:   AWAITING OWNER DECISION
+```
+
+- **Endpoint:** `PUT /api/testimonials/:id`
+- **Evidence:** `app/api/[[...path]]/route.js:5247-5257` on `staging`; byte-identical branch present on `main` at `route.js:5242`.
+- **Behavior:** The authorization gate fires only when `body.adminReply !== undefined`. Every other field is written through `findByIdAndUpdate(id, body)` with no authentication and no ownership check, so an anonymous caller can overwrite `clientName`, `rating`, `comment` and `userId` on any existing testimonial.
+- **Reachability:** `lib/auth.js:35` returns `null` for a missing or invalid bearer token rather than throwing, so the branch is reached without credentials. Catch-all CORS is `Access-Control-Allow-Origin: *`.
+- **Why separated from FND-4:** this is not future architecture hardening. It is an existing authorization defect on the production branch.
+- **Decision required:** whether to fix now on a dedicated branch outside the FND-3 read-only gate, or to accept the exposure until FND-4 with a recorded rationale. Full evidence: `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.
+
+### Explicitly not hotfix candidates
+
+Serious, but a different class; these stay in 3I/FND-4 scope.
+
+- **FND-3A-R2** — anonymous testimonial submission is immediately public with no moderation lifecycle. Abuse, content-integrity and product-policy problem, not arbitrary mutation of another party's existing record.
+- **FND-3A-R3** — `clientEmail` returned by the public testimonial reads.
+- **FND-3A-R4** — `GET /api/cms-pages` returns every page including `noIndex`; no publication gate exists in any 3A model.
+- **FND-3A-R5** — anonymous contact endpoint fans out to email and admin notifications with no rate limit.
+- **FND-3A-R6** — `GET /api/company-profile` creates a document as a side effect of an unauthenticated read.
+- **FND-3A-R11** — zero automated test coverage across the 3A domain.
+
 ## DMD-FND-4 — Security and architecture shell
 
 **Goal:** Establish safe dedicated-route and private-data foundations before new domains.
