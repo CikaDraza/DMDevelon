@@ -541,8 +541,8 @@ The exception is bounded. A hotfix repairs the proven defect and nothing else: n
 SECURITY HOTFIX CANDIDATE
 severity: critical
 source:   FND-3A-R1
-status:   FIXED — VERIFIED, AWAITING MERGE/DEPLOY
-branch:   hotfix/shc-1-testimonial-authz
+status:   FIXED — MERGED TO STAGING, DEPLOYMENT VERIFICATION PENDING
+branch:   staging (implementation commit 5e18d24)
 ```
 
 **Owner decision (2026-09-12):** fix immediately under the governance exception, then run a targeted read-only same-pattern sweep, then resume FND-3 at 3B. Deferring to FND-4 was explicitly rejected because the defect is live on `main`.
@@ -558,9 +558,33 @@ branch:   hotfix/shc-1-testimonial-authz
   - `npm test` — **191/191**; `npm run test:ui` — 8 files, **55/55**; `npx tsc --noEmit` clean; `npm run build` passes.
   - **Negative control:** with `app/api/[[...path]]/route.js` reverted to the vulnerable `staging` version, `tests/integration/testimonial-authz.test.mjs` fails **5 of 9**, including `rejects an anonymous caller and leaves the record untouched`. The suite therefore proves the defect rather than merely passing alongside it. The other 4 cover behavior that was already correct.
   - Expected stderr in the run is asserted negative authorization/validation paths, not failures.
-- **Merge gate:** satisfied. Remaining owner steps: merge `hotfix/shc-1-testimonial-authz`, deploy, then run the targeted read-only same-pattern sweep before FND-3 resumes at 3B.
+- **Merge gate:** satisfied and present on `staging` / `origin/staging` through implementation commit `5e18d24`. Deployment was not verified by the local source pass.
 - **Recorded consequence:** testimonials created anonymously carry `userId: null` and are not editable by their submitter. The DELETE branch already behaved this way; `app/dashboard/page.js:318` additionally treats an email match as ownership client-side. This divergence is an FND-4 input, not repaired here.
 - Full evidence: `dmd/audits/fnd-3/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.
+
+### Targeted same-pattern security sweep
+
+```text
+status: COMPLETE — ONE NEW CRITICAL CANDIDATE FOUND
+scope:  read-only catch-all mutation/auth pattern review
+result: SHC-2; DMD-FND-3B remains blocked
+```
+
+The bounded sweep required after SHC-1 is recorded in `dmd/audits/fnd-3/DMD_SHC_TARGETED_SECURITY_SWEEP.md`. It found no other active High/Critical occurrence except SHC-2. This sweep is not FND-3B and does not change any FND-3 submilestone status.
+
+### SHC-2 — Self-service admin privilege escalation through Mongo update operators
+
+```text
+SECURITY HOTFIX CANDIDATE
+severity: critical
+source:   targeted same-pattern sweep after SHC-1
+status:   OPEN — OWNER DECISION REQUIRED
+endpoint: PUT /api/users/:id
+```
+
+An authenticated non-admin may update their own user ID, and the route removes only a top-level `body.isAdmin` before passing the complete body to `User.findByIdAndUpdate`. An operator payload such as `{"$set":{"isAdmin":true}}` bypasses the shallow check and persists global admin authority. `getUserFromRequest` reloads that authority from MongoDB on later requests, so the escalation is effective without trusting browser role state.
+
+This finding qualifies for the existing SHC governance exception but is not authorized for implementation by the read-only sweep. Required next sequence: owner decision → bounded SHC-2 hotfix and regression tests → merge/deploy evidence → resume DMD-FND-3 at 3B. Do not fold endpoint extraction, a central auth framework or the FND-4 actor-resolved profile redesign into SHC-2.
 
 ### Explicitly not hotfix candidates
 
