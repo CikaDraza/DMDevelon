@@ -5245,17 +5245,68 @@ export async function PUT(request, context) {
 
     // Testimonials (admin reply)
     if (pathStr.startsWith("testimonials/")) {
+      // Authorization hung off a single payload field: an `adminReply` in the
+      // body demanded an admin, and every other field was written for whoever
+      // asked — including a caller with no token at all, who could rewrite the
+      // name, rating and text of any testimonial on the public site. The gate
+      // belongs to the operation and the resource, not to one field, so
+      // authenticate first, load the record, then decide.
       const user = await getUserFromRequest(request);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: getCorsHeaders() },
+        );
+      }
+
       const id = path[1];
+      // Resource-first: ownership comes from the stored record, never from
+      // anything the caller sent.
+      const existing = await Testimonial.findById(id);
+      if (!existing) {
+        return NextResponse.json(
+          { error: "Testimonial not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
+      }
+
+      // The same ownership rule the DELETE branch already applies to this
+      // resource: its author, or an admin.
+      const isOwner =
+        existing.userId && String(existing.userId) === String(user._id);
+      if (!isOwner && !user.isAdmin) {
+        return NextResponse.json(
+          { error: "Forbidden" },
+          { status: 403, headers: getCorsHeaders() },
+        );
+      }
+
+      // Only the fields the two real callers send. Spreading the raw body let
+      // a caller set `userId` and hand themselves someone else's testimonial.
+      const updates = {};
+      for (const field of [
+        "clientName",
+        "clientEmail",
+        "clientTitle",
+        "rating",
+        "comment",
+      ]) {
+        if (body[field] !== undefined) updates[field] = body[field];
+      }
+
+      // adminReply stays admin-only, now as a field policy on top of an
+      // authorization decision rather than instead of one.
       if (body.adminReply !== undefined) {
-        if (!user || !user.isAdmin) {
+        if (!user.isAdmin) {
           return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401, headers: getCorsHeaders() },
+            { error: "Forbidden" },
+            { status: 403, headers: getCorsHeaders() },
           );
         }
+        updates.adminReply = body.adminReply;
       }
-      const testimonial = await Testimonial.findByIdAndUpdate(id, body, {
+
+      const testimonial = await Testimonial.findByIdAndUpdate(id, updates, {
         new: true,
       });
       if (!testimonial) {
