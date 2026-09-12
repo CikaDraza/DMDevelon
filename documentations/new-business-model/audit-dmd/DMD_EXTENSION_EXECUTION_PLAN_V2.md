@@ -1,6 +1,7 @@
 # DMD Platform Expansion — Execution Plan V2 After Current-App Audit
 
 **Date:** 2026-09-09  
+**FND-3 reconciliation:** 2026-09-12
 **Baseline:** DMDevelon `main` @ `4e75c893a6fa7b92cf57efca115faacc60c7f322`
 
 ---
@@ -16,11 +17,13 @@ DMD-FND-0 complete
 → DMD-FND-1 isolated staging
 → DMD-FND-2 fresh baseline
 → DMD-FND-2A React 19.2 compatibility
-→ DMD-FND-3 endpoint/page inventory
+→ DMD-FND-3 complete-system inventory
 → DMD-FND-4 security/architecture shell
 ```
 
 After DMD-FND-4, the Business Intelligence branch may begin while DMD-FND-5 through DMD-FND-8 migrate legacy endpoints sequentially on the parallel cleanup branch.
+
+After DMD-FND-4 the default development model becomes vertical slices. Targeted audits remain allowed when new evidence exposes an unresolved architectural, security or data-integrity risk.
 
 The existing project/chat/proposal core is stronger than expected, so Project Intelligence can be developed earlier in parallel, while discovery/product/design still form the primary new client vertical.
 
@@ -33,6 +36,26 @@ Overall implementation starts with DMD-FND-1 isolated staging. After the foundat
 ## 2. Phase A — Baseline hardening and architecture shell
 
 This is a conceptual grouping, not permission to collapse or reorder DMD-FND-1 through DMD-FND-4. Execute these concerns only through the bounded milestones in `documentations/TODO.md`; do not combine staging isolation, baseline capture, React compatibility or catch-all inventory into one change.
+
+### FND-3 execution boundary
+
+FND-3 is one complete-system audit milestone whose canonical contract lives in `documentations/TODO.md`. Read-only discovery may run in parallel by domain; endpoint extraction, auth/routing refactor, page decomposition and other architectural mutations may not.
+
+```text
+3A Public / Marketing / CMS
+3B Auth / Session / Access
+3C Uploads / Assets
+3D Notifications / Cron / Operational endpoints
+3E Project Requests / Proposals / Client Projects
+3F Communication / Chat / DM / Project Items
+3G Dashboard / Admin / Application Pages
+3H Central Legacy API Registry & Completeness Audit
+3I Reconciliation / Risk Map / Migration Map
+```
+
+3A–3G populate the same API/page registries. 3H is the global method/path/branch completeness control, not a duplicate domain audit. 3I is the completion gate and must reconcile API/page/auth/data ownership, side effects, risks, migration seams and explicit unknowns before FND-3 can define the exact FND-4 scope.
+
+The binding `proxy.js` architecture is conditional: it defines how Proxy must be built if DMD adopts it, but does not require FND-4 to add Proxy without evidence. FND-3 must first establish existing route families, current credential/context visibility and concrete coarse request/security gaps. Resource authorization remains in the owning Route Handler/application/domain policy.
 
 ### A1 Documentation reconciliation
 

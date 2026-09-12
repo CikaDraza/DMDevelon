@@ -1,8 +1,8 @@
 # DMD — Architectural Rules & Coding Standards
 
-**Version:** 1.1
+**Version:** 1.2
 **Status:** binding implementation contract  
-**Date:** 2026-09-11
+**Date:** 2026-09-12
 **Applies to:** DMD Next.js application, Route Handlers, React UI, server modules, tests, scripts and all AI coding agents  
 **Primary architecture:** Next.js 16+ App Router + React 19.2+ + JavaScript + MongoDB/Mongoose  
 **Language rule:** DMD source is `.js`, `.jsx` and `.mjs` only. Do not introduce TypeScript files, TypeScript syntax, TypeScript-only architecture or a typed-JavaScript migration.
@@ -93,6 +93,351 @@ A material architecture change requires a documented decision before broad imple
 `page.js`, `layout.js`, `route.js`, `loading.js`, `error.js`, `not-found.js` and `proxy.js` are framework entry points.
 
 They must not become domain modules.
+
+#### 2.1.1 General Next.js Proxy contract
+
+These rules are reusable and binding for DMD and any Next.js application governed by this contract **when that application adopts `proxy.js`**. They standardize how a Proxy is built; they do not require every project or milestone to add one.
+
+`proxy.js` is only a thin framework entry point. Its responsibilities are limited to:
+
+1. receive `NextRequest`;
+2. create, or delegate creation of, the bounded request/proxy context actually needed;
+3. call one small proxy policy or a justified explicit pipeline;
+4. return `NextResponse`.
+
+```text
+proxy.js
+   ↓
+create/request context
+   ↓
+proxy policy / pipeline
+   ↓
+NextResponse
+```
+
+It must not contain:
+
+- business or domain logic;
+- a large authentication/session implementation;
+- tenant lookup implementation;
+- database queries;
+- a large route switch or complex route-family branching;
+- provider SDK implementation;
+- product-specific workflows.
+
+Framework entry-point size must remain proportional to adapter work even when the application becomes large. This extends the `Routing files are adapters, not applications` invariant; it does not create a separate architecture for Proxy.
+
+#### 2.1.2 Resolve shared request classification once
+
+Shared request context needed for routing or coarse security decisions must be resolved once and passed to the downstream proxy policy or pipeline. Depending on the real application requirement, that context may include only a subset of:
+
+```text
+pathname
+hostname
+surface / domain type
+authenticated actor
+workspace / project / tenant identifier
+environment / preview mode
+trusted proxy-derived headers
+debug trace
+```
+
+> Resolve shared request classification once; do not make multiple downstream layers independently rediscover the same host, surface, tenant, workspace or routing context.
+
+Downstream code must not guess again what the gateway has already determined reliably. A request context contains only gateway/request-classification data required by the active policy. It is not a global business-state object, a replacement for application input or a cache of arbitrary domain records.
+
+#### 2.1.3 Proxy authentication is lazy and coarse
+
+Proxy is not the complete authorization engine.
+
+Where justified by actual route surfaces, it may establish coarse boundaries such as:
+
+```text
+anonymous user cannot enter a protected platform surface
+internal endpoint requires its internal credential
+superadmin surface requires an authenticated superadmin
+protected API family requires authentication
+```
+
+The application/domain policy that owns the protected resource remains authoritative for questions such as:
+
+```text
+Can this collaborator read this project?
+Can this actor approve this proposal?
+Can this user mutate this workspace?
+```
+
+> Proxy may establish coarse request/security boundaries. Domain authorization remains with the application/domain policy that owns the protected resource.
+
+Authentication is resolved lazily when possible. Public marketing, public product and intentionally public recovery requests must not pay JWT/session verification cost merely because a global Proxy exists. Public bypasses must be explicit, narrow and tested; self-verifying webhooks remain responsible for their own cryptographic verification.
+
+A route, Server Function or application use case must never treat a successful Proxy pass as proof of resource-level authorization.
+
+#### 2.1.4 DMD current baseline and adoption decision
+
+DMD is currently not a multi-tenant routing platform. Its current product requirements do not justify:
+
+- tenant subdomain resolution;
+- custom tenant-domain resolution;
+- path-based tenant routing;
+- tenant-specific URL rewrites;
+- per-tenant domain canonicalization;
+- a multi-tenant gateway pipeline.
+
+The presence of this architectural standard does **not** mean that DMD-FND-4 must implement `proxy.js`. DMD-FND-3 must first inventory the actual route families, current credential visibility and coarse request/security gaps. FND-3 reconciliation then defines whether FND-4 needs Proxy and, if so, its exact bounded scope.
+
+If DMD adopts Proxy, it starts with the smallest implementation justified by that evidence:
+
+```text
+proxy.js
+   ↓
+small request/security policy
+```
+
+Only demonstrated multi-surface complexity may justify:
+
+```text
+proxy.js
+   ↓
+bounded request context
+   ↓
+small explicit pipeline
+```
+
+Do not change DMD authentication merely to make Proxy possible. In the current baseline, a browser-owned access token is not automatically visible at the server request boundary; any refresh-cookie-derived decision must be documented as coarse/optimistic unless the server auth contract proves more. Resource authorization remains:
+
+```text
+Route Handler
+   ↓
+authenticated actor
+   ↓
+application use case
+   ↓
+resource/domain authorization policy
+```
+
+Do not predefine Proxy matchers for routes or surfaces that do not yet exist. Do not copy a larger product's gateway solely because it may be useful later. This applies the existing rule against provider/framework abstractions for hypothetical future use.
+
+#### 2.1.5 Reusable Pattern — Multi-Tenant / Multi-Domain Next.js Gateway
+
+> This is not the current DMD proxy requirement. It is a reusable high-level pattern for products whose actual domain model requires multi-tenant or multi-domain routing.
+
+When that requirement is proven, the reference flow is:
+
+```text
+Request
+   ↓
+proxy.js
+   ↓
+createProxyContext(request)
+   ↓
+executePipeline(context)
+   │
+   ├── system
+   ├── detect-domain / resolve-context
+   ├── public
+   ├── auth
+   └── routing
+   ↓
+finalize(response)
+```
+
+The first step that makes a final decision may return `NextResponse`. A step that only enriches context returns `null`/continue. `finalize()` may apply bounded cross-cutting response behavior, such as one refreshed cookie or an explicitly enabled safe debug trace.
+
+##### Gateway entry point
+
+`proxy.js` remains only:
+
+```text
+request
+→ createContext()
+→ executePipeline()
+→ response
+```
+
+Tenant, identity and product implementation remain outside the framework file.
+
+##### ProxyContext
+
+One explicit context object travels through the pipeline instead of an expanding list of unrelated parameters. It may contain only data justified by the gateway contract, for example:
+
+```text
+request
+hostname
+pathname
+surface / domain type
+
+tenant:
+  public identifier / slug
+  canonical tenant ID
+  custom domain
+
+request headers/context
+auth result
+debug trace
+```
+
+This is a runtime JavaScript contract. It does not authorize TypeScript source or a repository-wide typed-JavaScript migration.
+
+##### System
+
+Infrastructure traffic that must be decided before product routing belongs here, such as cron, internal server-to-server endpoints, internal-secret validation and health/system callbacks. This layer must not contain product workflow.
+
+##### Detect domain / resolve context
+
+This layer normalizes public request identity. A multi-tenant application may distinguish:
+
+```text
+base / marketing domain
+admin domain
+superadmin / platform domain
+tenant subdomain
+tenant custom domain
+preview / staging host
+localhost / development mode
+path-based preview tenant
+```
+
+Different public addresses must resolve to the same canonical context where they represent the same tenant:
+
+```text
+tenant.example.com
+custom-client-domain.com
+preview.example.com/tenant-slug
+
+            ↓
+
+canonical tenantId
+canonical tenant context
+```
+
+##### Canonical tenant identity security invariant
+
+> Public slug/domain is an address. Canonical tenant ID is the security identity.
+
+A slug such as `kiki-kiss-beauty` is not authorization evidence. It must resolve to a canonical tenant record and identifier. If resolution is not reliable, deny or return not-found; never continue as though the public slug were a verified tenant identity.
+
+Cross-tenant access requires both identities:
+
+```text
+authenticated identity
+        +
+resolved canonical tenantId
+        ↓
+tenant access policy
+```
+
+A valid global JWT/session does not grant access to every tenant.
+
+##### Public
+
+The public layer handles explicitly unauthenticated categories such as public APIs, authentication/recovery endpoints, cryptographically self-verifying webhooks and tenant-specific public metadata such as manifest/favicon. Bypasses must be explicit and tested; broad wildcard bypasses are prohibited without a documented requirement.
+
+##### Auth
+
+Authentication runs only for a surface that requires it:
+
+```text
+extract credentials
+→ verify
+→ optional refresh
+→ verify refreshed credentials
+→ coarse role/surface check
+→ tenant access check where required
+```
+
+When authentication refreshes a cookie/token, response mutation may be centralized in `finalize()` rather than performed independently by several steps. Resource/domain authorization still occurs in the owning application policy.
+
+##### Routing
+
+Routing is the final gateway decision layer. For a multi-tenant product it may pass marketing traffic, reject unresolved tenant traffic, optionally canonical-redirect legacy hosts, apply a coarse guard to protected route families and rewrite a public tenant URL to one canonical internal application tree.
+
+Public and internal route structures need not be identical:
+
+```text
+https://client-domain.com/services
+              ↓ internal rewrite
+/tenant/services
+```
+
+The public URL remains unchanged unless a deliberate canonical redirect is part of the contract.
+
+##### Preview and staging
+
+Production host-based routing and preview/staging path-based routing must be distinct explicit policies. Preview must never accidentally canonical-redirect QA traffic to a production custom domain. Host/environment behavior must be directly tested rather than inferred accidentally from a hostname pattern.
+
+##### Adapter boundary
+
+A complex gateway depends on contracts, not engine implementation:
+
+```text
+proxy pipeline
+      ↓
+platform/service adapter
+      ↓
+tenant / identity implementation
+```
+
+The pipeline may depend on operations such as `resolveTenant`, `resolveDomain`, `verifyIdentity` and `validateTenantAccess`; it must not know whether they are implemented by a database service, internal HTTP endpoint, RPC service or cache. Do not introduce these adapters in a small application without a real requirement.
+
+##### Debug trace
+
+A complex pipeline may expose an optional trace only behind an explicit debug control, for example:
+
+```text
+domain=client
+tenant=<canonical-id>
+auth=skipped
+rewrite=/tenant/services
+```
+
+Normal production requests must not pay unnecessary trace overhead or expose internal diagnostics. A trace must never contain JWTs, session tokens, secrets, passwords or sensitive PII.
+
+##### Testing contract
+
+A multi-tenant/multi-domain gateway requires its own behavior matrix:
+
+```text
+host × pathname × environment × auth state → expected action
+```
+
+Expected actions include pass, rewrite, redirect, `401`, `403` and not-found. Cover the real product variants among marketing/base domain, tenant subdomain, custom domain, unresolved tenant, admin/platform host, preview, staging, localhost/development, public API, protected API, internal endpoint, canonical redirect, cross-tenant denial and debug trace.
+
+Tests assert behavior contracts, not the private implementation shape of pipeline steps.
+
+#### 2.1.6 Proxy architecture decision rule
+
+First decide whether the product has a request-boundary problem that requires Proxy. If it does, complexity follows demonstrated product requirements:
+
+```text
+Simple application
+    ↓
+thin proxy entrypoint
+    ↓
+small explicit request/security policy
+
+Multi-surface application
+    ↓
+thin proxy entrypoint
+    ↓
+shared request context
+    ↓
+small pipeline if justified
+
+Multi-tenant / multi-domain platform
+    ↓
+thin gateway
+    ↓
+context resolution
+    ↓
+pipeline
+    ↓
+tenant + identity adapters
+    ↓
+routing/security tests
+```
+
+Do not introduce the multi-tenant gateway pattern merely because it is technically attractive. Proxy complexity must reduce a concrete product/security/routing problem rather than become mandatory boilerplate.
 
 ### 2.2 Next.js filesystem routing is the HTTP map
 

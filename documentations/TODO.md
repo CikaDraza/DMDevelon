@@ -40,7 +40,7 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 # NEW BUSINESS MODEL — Foundation & Platform Expansion
 
-**Status:** Foundation execution in progress. DMD-FND-0, DMD-FND-1 and DMD-FND-2 are complete. DMD-FND-2A is next: the isolated React 19.2 compatibility slice. This is the execution index, while documents under documentations/new-business-model/ remain the architecture and product contracts.
+**Status:** Foundation execution in progress. DMD-FND-0, DMD-FND-1, DMD-FND-2 and DMD-FND-2A are complete. DMD-FND-3 is next: the complete-system API/page/auth/data/side-effect inventory. This is the execution index, while documents under documentations/new-business-model/ remain the architecture and product contracts.
 
 **Binding architecture:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
 
@@ -336,14 +336,14 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Dependencies:** DMD-FND-2.
 
-**Status:** IN PROGRESS (2026-09-12). React and React DOM are pinned to `19.2.8`; no application-domain, route or page-refactor change is included. The UI test environment now clears Radix's temporary body pointer lock after each test because jsdom has no CSS animation engine to emit the post-unmount animation event that React 19/Radix presence cleanup awaits. This is test-environment compatibility only, not runtime UI behavior.
+**Status:** COMPLETE (2026-09-12). React and React DOM are pinned to `19.2.8`; no application-domain, route or page-refactor change is included. The UI test environment now clears Radix's temporary body pointer lock after each test because jsdom has no CSS animation engine to emit the post-unmount animation event that React 19/Radix presence cleanup awaits. This is test-environment compatibility only, not runtime UI behavior. The owner confirmed completion of staging testing against the React 18 baseline and reported no remaining regression blocking DMD-FND-3.
 
 **Tasks:**
 
 - [x] Upgrade only React and React DOM to the binding-compatible 19.2+ versions and record any necessary peer/runtime compatibility changes. `react` and `react-dom` resolve to `19.2.8`; the lockfile resolves React-19-compatible peer variants where required.
 - [x] Run npm test, npm run test:api, npm run test:ui, npm run typecheck and npm run build. Unit 9/9, API 12 files and 236/236 tests, UI 8 files and 55/55 tests, typecheck and production build passed locally.
-- [ ] Run the complete DMD-FND-2 staging smoke suite and compare it with the captured React 18 baseline.
-- [ ] Record regressions and resolve them inside this bounded compatibility slice before DMD-FND-3/DMD-BI-1 work proceeds.
+- [x] Run the complete DMD-FND-2 staging smoke suite and compare it with the captured React 18 baseline. Completed and confirmed by the owner on staging.
+- [x] Record regressions and resolve them inside this bounded compatibility slice before DMD-FND-3/DMD-BI-1 work proceeds. Owner confirmation records no remaining regression blocker.
 
 **Invariants:** Do not combine this upgrade with catch-all extraction, page decomposition, Discovery implementation or TypeScript source introduction.
 
@@ -351,28 +351,110 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Explicitly out of scope:** Next.js migration, route refactor, UI redesign and new business-domain code.
 
-## DMD-FND-3 — Catch-all API and giant-page inventory
+## DMD-FND-3 — Complete System Inventory
 
-**Goal:** Create the mandatory migration inventory before endpoint/page extraction.
+**Goal:** Produce one complete, evidence-based API/page/auth/data/side-effect migration map before endpoint extraction or the FND-4 security/architecture shell is scoped.
 
-**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 9 and 61–63; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md.
+**Source documents:** ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md sections 2.1, 9 and 61–63; audit-dmd/DMD_CURRENT_APP_ARCHITECTURE_AUDIT.md; audit-dmd/DMD_EXTENSION_TARGET_ARCHITECTURE.md.
 
 **Dependencies:** DMD-FND-2A.
 
-**Tasks:**
+**Status:** NOT STARTED — documentation contract reconciled on 2026-09-12; the audit itself has not begun.
 
-- [ ] Inventory every reachable verb/path in app/api/[[...path]]/route.js with URL, method, auth, models, responsibility, callers, tests and risk.
-- [ ] Classify rows as operations/cron, auth/users, public catalog, CMS, project requests, client projects/proposals, membership/invitations, chat/items, notifications/push/media or admin/analytics.
-- [ ] Include separate POST /api/seed and every direct provider/model/error/CORS concern.
-- [ ] Inventory ownership seams in HomeClient, admin, dashboard, project-detail and CMS catch-all/client loader.
-- [ ] Inventory `GET /api/auth/me` as an explicit auth/users row, including its bearer/refresh-cookie behavior and every direct or nested `useAuth()` caller. Record that each hook instance owns a separate mount effect and that App Router development Strict Mode exposes the duplication through repeated requests.
-- [ ] Freeze the catch-all: no new branch may be added.
+**Execution rule:** `Parallel discovery / read-only analysis = YES. Parallel architectural mutations / extraction = NO.` Domain audits may gather evidence in parallel, but FND-3 performs no endpoint extraction, auth/routing refactor, page decomposition or other runtime mutation. Integration suites may run concurrently only with isolated databases, separate fixture namespaces and proven independence; otherwise use parallel read-only audit, reconciliation and one canonical integration/full-suite verification.
 
-**Invariants:** No endpoint migrates before its complete row and regression contract exist; public CMS catch-all is not a business-router precedent.
+**Canonical submilestones:**
 
-**Verification:** Inventory count equals reachable dispatcher branches and has no unclassified row.
+- [ ] **3A — Public / Marketing / CMS:** public catalog, services, projects, testimonials, company profile, categories, contact/request entry points, homepage, `HomeClient`, metadata, public loaders and CMS catch-all behavior.
+- [ ] **3B — Auth / Session / Access:** login/register/reset/verify/refresh/logout, `GET /api/auth/me`, users/settings, access-token ownership, refresh-cookie behavior, every direct/nested `useAuth()` consumer, server authentication, resource authorization, client UX gates, redirects and duplicated identity/session resolution.
+- [ ] **3C — Uploads / Assets:** Cloudinary/media dependencies, image/PDF flows, public/private assumptions, validation, ownership, provider side effects and future Design Asset seams.
+- [ ] **3D — Notifications / Cron / Operational endpoints:** health/system operations, notifications, email/digest, push, cron entry points, secrets, delivery side effects and operational ownership.
+- [ ] **3E — Project Requests / Proposals / Client Projects:** request/proposal/project lifecycle, accepted scope, milestones/tasks, membership/invitations, access/resource ownership, transactions and audit/history.
+- [ ] **3F — Communication / Chat / DM / Project Items:** milestone `Ask a question`, group channels, direct messages, reads/pins, message conversion, `ProjectItem`, permissions and notification/evidence relationships.
+- [ ] **3G — Dashboard / Admin / Application Pages:** every relevant route surface, including admin, dashboard, project/request detail, chat/DM and auth-related pages; map Server/Client boundaries, loaders/browser calls, state ownership, deep links and real decomposition seams.
+- [ ] **3H — Central Legacy API Registry & Completeness Audit:** this is the single registry populated by 3A–3G, not an eighth duplicate domain audit. Reconcile every HTTP method, catch-all branch and matcher/branch order; include `OPTIONS`, separate `/api/seed`, existing dedicated ownership/restore routes and any other reachable API route. Prove the registry count matches source and no endpoint remains only implicit in a domain note.
+- [ ] **3I — Reconciliation / Risk Map / Migration Map:** reconcile cross-domain findings, explicit unknowns, source-of-truth ownership, side effects, coverage gaps, risk and future seams; only this pass may recommend the exact FND-4 scope and whether DMD currently needs `proxy.js` for identified coarse request/security boundaries.
 
-**Explicitly out of scope:** Big-bang rewrite or catch-all deletion.
+These boundaries are organizational, not assumptions about ownership. When evidence shows that a source belongs elsewhere, classify it by actual ownership and record the reason rather than forcing it into the initial category.
+
+### Central API inventory contract
+
+Every exact endpoint/method record uses:
+
+```text
+exact method + path/pattern
+→ source file / source branch
+→ owning domain
+→ authentication
+→ authorization / resource ownership
+→ input/query validation
+→ models / source of truth
+→ response contract
+→ error contract
+→ side effects
+→ transaction semantics
+→ external providers
+→ serializers / normalization
+→ CORS/origin behavior where relevant
+→ known callers
+→ existing tests
+→ coverage gap
+→ explicit risk
+→ target route/module
+```
+
+`risk` remains a separate field, not hidden inside general debt. Unknown facts are recorded exactly as `UNKNOWN — requires follow-up`; they are never inferred without evidence.
+
+### Central page inventory contract
+
+HTTP endpoints and pages remain separate registries. Every relevant page/application surface uses:
+
+```text
+URL / route surface
+→ source file
+→ Server / Client Component boundary
+→ auth/access gate
+→ server loaders
+→ browser/API calls
+→ state owner
+→ metadata behavior
+→ 404 behavior
+→ deep-link behavior
+→ existing tests
+→ coverage gap
+→ risk
+→ ownership seam
+→ target composition
+```
+
+The inventory is not limited to the initially named surfaces; the audit adds every material page/application surface it discovers.
+
+### Auth and Proxy decision boundary
+
+FND-3 distinguishes `authentication ≠ authorization ≠ client-side UX gate` and documents duplicated protection without repairing it. The current browser-owned access token and refresh-cookie behavior are evidence inputs; FND-3 must not change auth merely to enable Proxy.
+
+The binding Proxy rules describe how `proxy.js` must be built **if adopted**. They do not require FND-4 to implement it regardless of evidence. FND-3 maps existing route families, what credentials/context the server request boundary can actually observe, which coarse gaps Proxy could address and what must remain in Route Handler/application/domain authorization. Do not invent matchers for absent routes such as the future `/start` Workspace surface.
+
+### 3I completion gate
+
+`DMD-FND-3 COMPLETE` requires all of the following, not merely individually finished 3A–3H notes:
+
+- **API completeness:** every endpoint, method, dispatcher branch and relevant ordering rule is recorded.
+- **Page completeness:** every material page/application surface and ownership boundary is recorded.
+- **Auth completeness:** authentication, authorization and client UX gating locations are distinguished.
+- **Data ownership:** the canonical source of truth for every important workflow is known or explicitly unknown.
+- **Side effects:** email, notification, upload, cron and provider effects are mapped.
+- **Risks:** every known architecture, security and data-integrity risk has explicit evidence.
+- **Migration seams:** every major legacy ownership block has a proposed future architectural boundary.
+- **Unknowns:** unresolved questions are explicit; no assumption is recorded as fact.
+
+Only after 3I proves this gate may FND-3 be marked complete and the exact FND-4 scope—including the evidence-based Proxy adoption decision—be defined.
+
+**Invariants:** The catch-all is frozen against new branches. No endpoint migrates before its complete row and regression contract exist; the public CMS catch-all is not a business-router precedent. FND-3 documents current reality and does not change it.
+
+**Verification:** Central API registry count equals all reachable dispatcher/dedicated branches with no unclassified row; page registry covers every material surface; 3I closes or explicitly records every cross-domain gap and unknown.
+
+**Explicitly out of scope:** Runtime code, `proxy.js`, route/auth changes, endpoint extraction, page decomposition, tests added solely for implementation behavior, big-bang rewrite or catch-all deletion.
 
 ### Required protocol for every DMD-FND-5 through DMD-FND-8 extraction
 
