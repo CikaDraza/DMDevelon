@@ -38,7 +38,7 @@ Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/cl
 
 # NEW BUSINESS MODEL — Foundation & Platform Expansion
 
-**Status:** Foundation execution in progress. DMD-FND-0 and DMD-FND-1 are complete. DMD-FND-2 is in progress on the fresh React 18 current-system baseline recorded below. This is the execution index, while documents under documentations/new-business-model/ remain the architecture and product contracts.
+**Status:** Foundation execution in progress. DMD-FND-0, DMD-FND-1 and DMD-FND-2 are complete. DMD-FND-2A is next: the isolated React 19.2 compatibility slice. This is the execution index, while documents under documentations/new-business-model/ remain the architecture and product contracts.
 
 **Binding architecture:** documentations/new-business-model/ARCHITECTURAL RULES/ARCHITECTURAL_RULES_DMD.md.
 
@@ -305,7 +305,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Dependencies:** DMD-FND-1.
 
-**Status:** IN PROGRESS. Canonical evidence: `audit-dmd/DMD_FND_2_CURRENT_SYSTEM_BASELINE.md`.
+**Status:** COMPLETE (2026-09-12). Canonical evidence: `audit-dmd/DMD_FND_2_CURRENT_SYSTEM_BASELINE.md`.
 
 **Tasks:**
 
@@ -317,6 +317,8 @@ Prioritize improvements that reduce client effort and human escape across the co
 - [x] Preserve existing ProjectRequest, ProjectProposal, ClientProject, ProjectItem, chat, central access and notification foundations. FND-2 changes documentation/evidence only; no domain, route, model or UI behavior is changed.
 
 **Fresh baseline evidence (2026-09-12):** Application baseline `4efeebb` resolves Node 24.13.1, npm 11.14.1, Next 16.2.10, React/React DOM 18.3.1, Mongoose 8.24.1, Vitest 2.1.9 and TypeScript checker 5.9.3. Fresh `npm test` passed 9/9 files, API integration passed 12/12 files and 236/236 tests in 28.85s, UI passed 8/8 files and 55/55 tests, typecheck passed and the production build compiled, typechecked and generated all 16 registered routes. API stderr contains the expected negative authorization/validation paths exercised by passing assertions, not failures. No lint script or configuration exists, so lint is explicitly not claimed or required until a separately bounded lint decision defines it. Read-only staging checks passed 14/14: the landing and six public API surfaces returned 200, a deliberately missing CMS slug returned 404, and anonymous auth/request/project/chat/notification/users calls returned 401. Authenticated role journeys remain open exactly as shown in the canonical baseline document; no implementation behavior changed during capture.
+
+**Authenticated staging completion evidence (2026-09-12):** Preview deployment `dpl_7EaC9UXKa8Tp6AVu6V4d78WbStCF` passed the staging-only `scripts/fnd2-authenticated-staging-smoke.mjs` matrix with temporary admin, owner, collaborator, viewer and outsider identities. Login, canonical `/auth/me`, refresh, logout invalidation, project/request access, proposal draft visibility/send, chat read/write boundaries, account-scoped notifications, settings persistence and admin/non-admin boundaries all returned their expected `200/201/401/403/404` contracts. The final run performed its own cleanup and reported zero fixture residue; an independent prefix audit also returned zero across users, projects, requests, memberships, channels, messages, proposals and notifications. All temporary recipients used `@example.invalid` with email/push disabled, and the smoke avoided client-originated actions that would notify real staging admins or create Cloudinary folders. Automated browser navigation reached Vercel Preview SSO, so no SSO credential or protection cookie was extracted or bypassed. The owner then personally completed the authenticated staging UI journeys and accepted the client outcome. This supplies the previously missing rendered login/reload and role-page evidence, closes DMD-FND-2 and permits DMD-FND-2A. Canonical detail is recorded in `audit-dmd/DMD_FND_2_CURRENT_SYSTEM_BASELINE.md`.
 
 **Invariants:** Legacy records with no new-business references remain usable; accepted proposal/history is not replaced.
 
@@ -332,10 +334,12 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Dependencies:** DMD-FND-2.
 
+**Status:** IN PROGRESS (2026-09-12). React and React DOM are pinned to `19.2.8`; no application-domain, route or page-refactor change is included. The UI test environment now clears Radix's temporary body pointer lock after each test because jsdom has no CSS animation engine to emit the post-unmount animation event that React 19/Radix presence cleanup awaits. This is test-environment compatibility only, not runtime UI behavior.
+
 **Tasks:**
 
-- [ ] Upgrade only React and React DOM to the binding-compatible 19.2+ versions and record any necessary peer/runtime compatibility changes.
-- [ ] Run npm test, npm run test:api, npm run test:ui, npm run typecheck and npm run build.
+- [x] Upgrade only React and React DOM to the binding-compatible 19.2+ versions and record any necessary peer/runtime compatibility changes. `react` and `react-dom` resolve to `19.2.8`; the lockfile resolves React-19-compatible peer variants where required.
+- [x] Run npm test, npm run test:api, npm run test:ui, npm run typecheck and npm run build. Unit 9/9, API 12 files and 236/236 tests, UI 8 files and 55/55 tests, typecheck and production build passed locally.
 - [ ] Run the complete DMD-FND-2 staging smoke suite and compare it with the captured React 18 baseline.
 - [ ] Record regressions and resolve them inside this bounded compatibility slice before DMD-FND-3/DMD-BI-1 work proceeds.
 

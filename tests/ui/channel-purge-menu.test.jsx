@@ -3,7 +3,7 @@
 // sends the right scope — the difference between "delete the last month's
 // worth" and "delete everything" is one field in the request body.
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const purgeState = { mutateAsync: vi.fn(), isPending: false };
@@ -47,6 +47,11 @@ beforeEach(() => {
   toast.error.mockClear();
 });
 
+const waitForDialogToClose = () =>
+  waitFor(() => {
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
 describe("the purge menu", () => {
   it("renders nothing for a viewer who may not moderate", () => {
     const { container } = render(
@@ -83,6 +88,7 @@ describe("the purge menu", () => {
       screen.getByRole("button", { name: /Delete everything/i }),
     );
     expect(purgeState.mutateAsync).toHaveBeenCalledWith({ scope: "all" });
+    await waitForDialogToClose();
   });
 
   it("sends the 30-day window for the older-than action", async () => {
@@ -99,6 +105,7 @@ describe("the purge menu", () => {
       scope: "older_than",
       days: 30,
     });
+    await waitForDialogToClose();
   });
 
   it("cancelling sends nothing", async () => {
@@ -110,6 +117,7 @@ describe("the purge menu", () => {
     await userEvent.click(screen.getByRole("button", { name: /Cancel/i }));
 
     expect(purgeState.mutateAsync).not.toHaveBeenCalled();
+    await waitForDialogToClose();
   });
 
   it("describes a DM as a direct message, not as a #channel", async () => {
@@ -122,6 +130,8 @@ describe("the purge menu", () => {
     );
 
     expect(screen.getByText(/this direct message/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+    await waitForDialogToClose();
   });
 
   it("warns when the purge orphaned converted records", async () => {
@@ -144,6 +154,7 @@ describe("the purge menu", () => {
       expect.stringContaining("2 of them"),
       expect.anything(),
     );
+    await waitForDialogToClose();
   });
 
   it("reports a failure instead of implying the messages are gone", async () => {
@@ -161,5 +172,6 @@ describe("the purge menu", () => {
 
     expect(toast.error).toHaveBeenCalledWith("Nope");
     expect(toast.success).not.toHaveBeenCalled();
+    await waitForDialogToClose();
   });
 });

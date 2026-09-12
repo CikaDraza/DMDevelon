@@ -10,6 +10,11 @@ import { afterEach, vi } from "vitest";
 
 afterEach(() => {
   cleanup();
+  // Radix's React 19 presence cleanup waits for a CSS animation event after
+  // a portaled dialog is unmounted. jsdom has no CSS animation engine, so it
+  // never produces that event and the temporary body pointer lock would leak
+  // into the next isolated test. A real browser removes it on animation end.
+  document.body.style.pointerEvents = "";
 });
 
 // jsdom has no layout engine, so scrollHeight/clientHeight are 0 and
