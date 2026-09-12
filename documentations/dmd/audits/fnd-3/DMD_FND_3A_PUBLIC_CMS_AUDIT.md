@@ -122,7 +122,7 @@ Severity is this domain's assessment; FND-4 owns the final classification and an
 
 | ID | Severity | Finding | Evidence |
 |---|---|---|---|
-| 3A-R1 | **Critical — SECURITY HOTFIX CANDIDATE (SHC-1)** | `PUT /api/testimonials/:id` authenticates **only** when `body.adminReply` is present. An anonymous caller can overwrite `clientName`, `rating`, `comment` and `userId` on **any** testimonial. There is no ownership check on this branch. The identical branch is present on `main` (`route.js:5242`), so this is an active defect on the production branch, not future hardening. Raised for a separate owner decision in `documentations/TODO.md` § Security hotfix candidates; **not** repaired inside FND-3. | `route.js:5247-5257`; `main` `route.js:5242`; `lib/auth.js:35` |
+| 3A-R1 | **Critical — SECURITY HOTFIX CANDIDATE (SHC-1)** · *remediated after this baseline; see §5.2 drift note* | `PUT /api/testimonials/:id` authenticates **only** when `body.adminReply` is present. An anonymous caller can overwrite `clientName`, `rating`, `comment` and `userId` on **any** testimonial. There is no ownership check on this branch. The identical branch is present on `main` (`route.js:5242`), so this is an active defect on the production branch, not future hardening. Raised for a separate owner decision in `documentations/TODO.md` § Security hotfix candidates; **not** repaired inside FND-3. | `route.js:5247-5257`; `main` `route.js:5242`; `lib/auth.js:35` |
 | 3A-R2 | **Critical** | `POST /api/testimonials` accepts anonymous callers, the model has no approval state, and `GET /api/testimonials` is public. Anonymous content reaches the public marketing site with no review, plus an admin notification per submission. | `route.js:4618-4626`, `models/Testimonial.js`, `route.js:1562` |
 | 3A-R3 | **High** | `GET /api/testimonials` and `GET /api/testimonials/:id` return raw documents including `clientEmail`. No serializer exists for this domain. Client email addresses are readable by anyone, cross-origin (wildcard CORS). | `route.js:1562,1567`; `lib/` has no public serializer |
 | 3A-R4 | **High** | No publication gate exists in the data model for `Service`, `Project`, `Testimonial` or `CMSPage`. `GET /api/cms-pages` returns **every** CMS page unauthenticated, including `noIndex` ones, enumerating unlinked content. | `models/*`, `route.js:1626` |
@@ -140,6 +140,23 @@ Severity is this domain's assessment; FND-4 owns the final classification and an
 Only 3A-R1 is raised as a security hotfix candidate. It is the single finding in this domain where an unauthenticated caller can mutate an existing record belonging to someone else.
 
 3A-R2 is serious but a different class: anonymous submission that becomes public with no moderation lifecycle is an abuse, content-integrity and product-policy problem. It does not permit arbitrary modification of another party's existing document, and it remains 3I/FND-4 scope together with 3A-R3 through 3A-R12.
+
+### 5.2 Post-baseline supplemental findings
+
+Two findings were confirmed **after** the 3A audit baseline, on 2026-09-12, while diagnosing an unrelated local development-server fault. They are recorded here because the public metadata surface is 3A's domain (§4, rows *Homepage metadata* and *CMS metadata*).
+
+**This section does not reopen 3A.** 3A remains `COMPLETE` in the `documentations/TODO.md` evidence ledger, which is the only status source. This is an append-only supplement to §5, not a re-audit, and it changes no §3 row.
+
+Neither finding is an unauthenticated or cross-tenant read/mutation of data the caller does not own, so neither qualifies as a security hotfix candidate under the binding classification rule in `documentations/TODO.md`. FND-3 therefore remains read-only: **no runtime file was changed.** Both are FND-4 inputs.
+
+**Verified at:** `staging` @ `666cbcf` **and** `main` @ `1982f40` — both branches carry the identical code, current at the time of recording.
+
+| ID | Severity | Finding | Evidence |
+|---|---|---|---|
+| 3A-R13 | **Medium** | Root layout derives metadata from a non-existent root `slug`. `app/layout.js` destructures `slug` from the root layout's `params`, but the root layout has no dynamic segment, so `slug` is **always** `undefined`. `getSeoMeta(undefined)` therefore never takes the `route === "/"` branch and falls through to the CMS branch, issuing `CMSPage.findOne({ slug: undefined })`; Mongoose strips the `undefined` value from the filter, reducing the query to `findOne({})`. The call resolves an **arbitrary first CMS document**, causing an unnecessary DB read on every render and latent global metadata contamination — including a global `robots: "noindex, nofollow"` when that document carries `seo.noIndex`. A read-only probe against the current database returned `slug: privacy`, `seo.title: "Privacy Policy \| DMDevelon"`, `seo.noIndex: true` as the resolved document. **Current page-level metadata masks the visible effect on verified routes:** `/` emits `robots: index, follow` and the correct canonical because `app/page.js` overrides both. Routes without their own `robots` inherit the contaminated value. | `app/layout.js:19` → `lib/seo.js:14,25-26`; masking override at `app/page.js:50-53`; read-only DB probe (4 `cmspages` documents, first = `privacy`) |
+| 3A-R14 | **Low** | Root layout returns `canonical` as a **top-level** Metadata API field. Next.js does not emit it; canonical belongs under `alternates.canonical`. The emitted `<link rel="canonical">` therefore comes only from page-level metadata where implemented. The identical defect was already found and corrected in the homepage route, whose in-source comment documents exactly this lesson — the root layout was not updated with it. | `app/layout.js:36`; corrected counterpart and its rationale at `app/page.js:50-53` |
+
+**Baseline drift note.** Between the 3A baseline `b8db489` and current `staging` `666cbcf`, `app/api/[[...path]]/route.js` changed in exactly two commits, both security hotfixes: `5e18d24` (SHC-1) and `f2a6aa0` (SHC-2). Only one §3 row changed **behavior** — row 20, `PUT /api/testimonials/:id`, remediated by SHC-1 and no longer anonymously writable; SHC-2 changed `PUT /api/users/:id`, which is 3B, not 3A. Every other §3 row is unchanged apart from line-number drift. The full drift reconciliation, including the per-row current line numbers and the consequence for 3A-R11 coverage, is carried by 3H in `DMD_FND_3_API_INVENTORY.md` §5.4 — not restated here.
 
 ## 6. Source-of-truth and side-effect summary
 

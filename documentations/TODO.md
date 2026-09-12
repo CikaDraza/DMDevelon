@@ -389,7 +389,7 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Dependencies:** DMD-FND-2A.
 
-**Status:** IN PROGRESS — 3A and 3G complete, 3H in progress, 3B–3F and 3I not started (2026-09-12). No runtime mutation is authorized.
+**Status:** IN PROGRESS — 3A and 3G complete, 3H in progress with the 3A row batch merged, 3B–3F and 3I not started (2026-09-12). No runtime mutation is authorized.
 
 **Status evidence rule:** A submilestone advances only on a durable artifact committed under `documentations/`. Intent, delegation, an in-flight analysis session or a spawned agent is not `IN PROGRESS`, and an unrecorded reading pass is not evidence. When no artifact exists, the submilestone is `NOT STARTED` regardless of how much informal analysis preceded it.
 
@@ -397,14 +397,14 @@ Prioritize improvements that reduce client effort and human escape across the co
 
 **Canonical submilestones:**
 
-- [x] **3A — Public / Marketing / CMS:** public catalog, services, projects, testimonials, company profile, categories, contact/request entry points, homepage, `HomeClient`, metadata, public loaders and CMS catch-all behavior. **Evidence:** `dmd/audits/fnd-3/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` (2026-09-12) records 28 proposed exact rows (12 GET, 5 POST, 6 PUT, 5 DELETE, 0 PATCH), six owned models, two side effects and twelve risks. The row count is a domain proposal; registry merge and the system-wide count remain 3H.
+- [x] **3A — Public / Marketing / CMS:** public catalog, services, projects, testimonials, company profile, categories, contact/request entry points, homepage, `HomeClient`, metadata, public loaders and CMS catch-all behavior. **Evidence:** `dmd/audits/fnd-3/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` (2026-09-12) records 28 proposed exact rows (12 GET, 5 POST, 6 PUT, 5 DELETE, 0 PATCH), six owned models, two side effects and twelve risks. The row count was a domain proposal; all 28 rows were independently re-verified and **merged into the 3H registry on 2026-09-12** at `666cbcf`. The system-wide count remains 3H. 3A additionally carries two post-baseline supplemental metadata findings, `3A-R13` and `3A-R14`, in its §5.2; they add no registry row and do not reopen 3A.
 - [ ] **3B — Auth / Session / Access:** login/register/reset/verify/refresh/logout, `GET /api/auth/me`, users/settings, access-token ownership, refresh-cookie behavior, every direct/nested `useAuth()` consumer, server authentication, resource authorization, client UX gates, redirects and duplicated identity/session resolution.
 - [ ] **3C — Uploads / Assets:** Cloudinary/media dependencies, image/PDF flows, public/private assumptions, validation, ownership, provider side effects and future Design Asset seams.
 - [ ] **3D — Notifications / Cron / Operational endpoints:** health/system operations, notifications, email/digest, push, cron entry points, secrets, delivery side effects and operational ownership.
 - [ ] **3E — Project Requests / Proposals / Client Projects:** request/proposal/project lifecycle, accepted scope, milestones/tasks, membership/invitations, access/resource ownership, transactions and audit/history.
 - [ ] **3F — Communication / Chat / DM / Project Items:** milestone `Ask a question`, group channels, direct messages, reads/pins, message conversion, `ProjectItem`, permissions and notification/evidence relationships.
 - [x] **3G — Dashboard / Admin / Application Pages:** every relevant route surface, including admin, dashboard, project/request detail, chat/DM and auth-related pages; map Server/Client boundaries, loaders/browser calls, state ownership, deep links and real decomposition seams. **Evidence:** `dmd/audits/fnd-3/DMD_FND_3_PAGE_INVENTORY.md` (2026-09-12) records 12 page routes, 2 supporting route surfaces and 2 global layout/provider surfaces. Its own caller/metadata reconciliation against the central API registry is carried by 3H/3I, not reopened here.
-- [~] **3H — Central Legacy API Registry & Completeness Audit:** this is the single registry populated by 3A–3G, not an eighth duplicate domain audit. Reconcile every HTTP method, catch-all branch and matcher/branch order; include `OPTIONS`, separate `/api/seed`, existing dedicated ownership/restore routes and any other reachable API route. Prove the registry count matches source and no endpoint remains only implicit in a domain note. **Current state:** `dmd/audits/fnd-3/DMD_FND_3_API_INVENTORY.md` (2026-09-12) holds the completeness method, row schema, global dispatcher facts, route-surface control table and initial cross-cutting risks. Section 5 exact endpoint rows are empty and the exact endpoint count remains `UNKNOWN — requires follow-up`.
+- [~] **3H — Central Legacy API Registry & Completeness Audit:** this is the single registry populated by 3A–3G, not an eighth duplicate domain audit. Reconcile every HTTP method, catch-all branch and matcher/branch order; include `OPTIONS`, separate `/api/seed`, existing dedicated ownership/restore routes and any other reachable API route. Prove the registry count matches source and no endpoint remains only implicit in a domain note. **Ingest policy:** domain rows are merged **incrementally**, one completed domain audit at a time, rather than held until 3A–3F are all finished and merged in one pass. Each merged row carries `source_domain`, `source_commit`, `verified_at_commit` and `verification_status` (`proposed` | `verified` | `disputed`), and every batch reconciles baseline drift against current `staging` before merge. This is a population order **inside 3H only**: it creates no second milestone or status system, this ledger stays the only status source, and merging a domain's rows never advances that domain's ledger state. **Current state:** `dmd/audits/fnd-3/DMD_FND_3_API_INVENTORY.md` holds the completeness method, row schema, global dispatcher facts, route-surface control table, initial cross-cutting risks and **the first merged batch — 28 exact 3A rows, all `verified` at `666cbcf` (2026-09-12)**. Row 20 (`PUT /api/testimonials/:id`) records current post-SHC-1 behavior while preserving the historical 3A-R1 finding reference. The **system-wide** exact endpoint count remains `UNKNOWN — requires follow-up` and must not be inferred from the 28 merged rows.
 - [ ] **3I — Reconciliation / Risk Map / Migration Map:** reconcile cross-domain findings, explicit unknowns, source-of-truth ownership, side effects, coverage gaps, risk and future seams; only this pass may recommend the exact FND-4 scope and whether DMD currently needs `proxy.js` for identified coarse request/security boundaries.
 
 ### FND-3 evidence ledger
@@ -420,7 +420,7 @@ Canonical status is the table below. A submilestone may not be reported complete
 | 3E Project Requests / Proposals / Client Projects | NOT STARTED | none |
 | 3F Communication / Chat / DM / Project Items | NOT STARTED | none |
 | 3G Dashboard / Admin / Application Pages | COMPLETE | `dmd/audits/fnd-3/DMD_FND_3_PAGE_INVENTORY.md` |
-| 3H Central Legacy API Registry | IN PROGRESS | `dmd/audits/fnd-3/DMD_FND_3_API_INVENTORY.md` (method/schema/risks only; endpoint rows empty) |
+| 3H Central Legacy API Registry | IN PROGRESS | `dmd/audits/fnd-3/DMD_FND_3_API_INVENTORY.md` (method/schema/risks + 28 merged 3A rows, all `verified` @ `666cbcf`; 3B–3F rows outstanding, system-wide count unproven) |
 | 3I Reconciliation / Risk Map / Migration Map | NOT STARTED | none |
 
 **DMD-FND-3 overall: IN PROGRESS.**
@@ -480,6 +480,37 @@ URL / route surface
 ```
 
 The inventory is not limited to the initially named surfaces; the audit adds every material page/application surface it discovers.
+
+### 3B auth/session/access contract
+
+3B uses a stricter per-endpoint contract than the general registry row, because collapsing these into a single "authenticated" fact is what hid both SHC-1 and SHC-2. Every auth/access contract must separate:
+
+```text
+authentication_source
+actor_identity_source
+target_resource_source
+authorization_basis
+client_supplied_authority_fields
+session_effect
+credential_effect
+```
+
+Worked example — `PUT /api/users/:id` after SHC-2:
+
+```text
+authentication_source:          bearer token
+actor_identity_source:          authenticated User
+target_resource_source:         URL :id
+authorization_basis:            self OR admin
+client_supplied_authority_fields: bounded after SHC-2
+session_effect:                 password change bumps sessionVersion
+```
+
+`actor_identity_source` and `target_resource_source` are always recorded separately, even when they coincide: an authorization rule that reads identity from anything the caller supplied is the defect class both hotfixes closed.
+
+**Standing inputs.** 3B opens with two deferred questions already raised by the SHC-2 work and recorded in § SHC-2 — `AUTH-EMAIL-1` (replacement email requires no current password, does not clear verification state, does not verify the replacement address, does not normalize through `emailNormalized` and does not invalidate sessions) and `AUTH-PASSWORD-1` (self password change requires a session but not the current password; admin reset shares the generic endpoint with no dedicated audit/operation contract). They are 3B audit inputs, not SHC-2 scope and not authorization to change anything.
+
+**Boundaries.** 3B is a read-only audit: no refactor, no extraction, no central auth framework and no account-policy fix while it runs. A newly discovered **active** Critical/High defect becomes a separate SHC candidate under the governance exception above; it does not turn the audit into a hotfix. Verified 3B rows are ingested into the 3H registry as their own incremental batch once the audit completes, and 3C follows.
 
 ### Auth and Proxy decision boundary
 
@@ -541,8 +572,10 @@ The exception is bounded. A hotfix repairs the proven defect and nothing else: n
 SECURITY HOTFIX CANDIDATE
 severity: critical
 source:   FND-3A-R1
-status:   FIXED — MERGED TO STAGING, DEPLOYMENT VERIFICATION PENDING
-branch:   staging (implementation commit 5e18d24)
+status:   CLOSED — STAGING AND PRODUCTION VERIFIED
+endpoint: PUT /api/testimonials/:id
+staging:  5e18d24
+main:     25fa70a
 ```
 
 **Owner decision (2026-09-12):** fix immediately under the governance exception, then run a targeted read-only same-pattern sweep, then resume FND-3 at 3B. Deferring to FND-4 was explicitly rejected because the defect is live on `main`.
@@ -558,7 +591,8 @@ branch:   staging (implementation commit 5e18d24)
   - `npm test` — **191/191**; `npm run test:ui` — 8 files, **55/55**; `npx tsc --noEmit` clean; `npm run build` passes.
   - **Negative control:** with `app/api/[[...path]]/route.js` reverted to the vulnerable `staging` version, `tests/integration/testimonial-authz.test.mjs` fails **5 of 9**, including `rejects an anonymous caller and leaves the record untouched`. The suite therefore proves the defect rather than merely passing alongside it. The other 4 cover behavior that was already correct.
   - Expected stderr in the run is asserted negative authorization/validation paths, not failures.
-- **Merge gate:** satisfied and present on `staging` / `origin/staging` through implementation commit `5e18d24`. Deployment was not verified by the local source pass.
+- **Merge gate:** satisfied and present on `staging` / `origin/staging` through implementation commit `5e18d24`.
+- **Production closure (recorded 2026-09-12, previously pending):** `main` required a conflict-safe equivalent rather than a cherry-pick, the same pattern SHC-2 later followed. `5e18d24` is **not** an ancestor of `main`; main-specific revision `25fa70a` carries the equivalent fix (`app/api/[[...path]]/route.js` +59 lines) together with the 161-line `tests/integration/testimonial-authz.test.mjs` regression suite. `origin/main` source now authenticates first, loads the record, authorizes author-or-admin with **403**, and writes an explicit field allowlist with `adminReply` kept admin-only (`route.js:5255`). `25fa70a` is an ancestor of `main` HEAD `1982f40`, the revision of the Ready production deployment `dpl_GHFD1fh2mZa9DtviAuLphYmjrpM1` recorded under SHC-2. **Scope of this evidence:** source presence on `main` and inclusion in the deployed production revision. No dedicated authenticated production mutation smoke was run against this endpoint; the authorization matrix was exercised by the 9-test suite against a local replica set.
 - **Recorded consequence:** testimonials created anonymously carry `userId: null` and are not editable by their submitter. The DELETE branch already behaved this way; `app/dashboard/page.js:318` additionally treats an email match as ownership client-side. This divergence is an FND-4 input, not repaired here.
 - Full evidence: `dmd/audits/fnd-3/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.
 
@@ -612,7 +646,8 @@ Serious, but a different class; these stay in 3I/FND-4 scope.
 - **FND-3A-R4** — `GET /api/cms-pages` returns every page including `noIndex`; no publication gate exists in any 3A model.
 - **FND-3A-R5** — anonymous contact endpoint fans out to email and admin notifications with no rate limit.
 - **FND-3A-R6** — `GET /api/company-profile` creates a document as a side effect of an unauthenticated read.
-- **FND-3A-R11** — zero automated test coverage across the 3A domain.
+- **FND-3A-R11** — zero automated test coverage across the 3A domain. Partially stale since SHC-1: row 20 (`PUT /api/testimonials/:id`) now has 9 tests; 27 of 28 rows remain uncovered. Recorded as drift in the 3H registry §5.4, not re-scored here.
+- **FND-3A-R13** (Medium) and **FND-3A-R14** (Low) — root-layout metadata defects recorded post-baseline in `dmd/audits/fnd-3/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.2. Neither is an unauthenticated or cross-tenant read/mutation of data the caller does not own, so neither qualifies under the classification rule above. FND-4 inputs; **not** repaired inside FND-3.
 
 ## DMD-FND-4 — Security and architecture shell
 

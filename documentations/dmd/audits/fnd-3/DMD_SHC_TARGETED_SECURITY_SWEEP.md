@@ -131,6 +131,7 @@ The owner subsequently authorized this bounded implementation. Local fix and ver
 - Several admin-only legacy editors still pass broad request bodies into Mongoose updates. They require allowlists and validation during their owning migration slices, but this sweep found no ordinary/anonymous actor path through their admin gates.
 - The ID-bound self-profile route remains architectural debt already assigned to FND-4. SHC-2 can close the active privilege escalation without extracting or redesigning the endpoint.
 - SHC-1 deployment was not verified by this local source sweep. Git history proves its implementation is contained in `staging` and `origin/staging`; environment/deployment evidence remains a separate gate.
+  - **Reconciled 2026-09-12 (this sweep's statement stands as written at its baseline; the gate it names is now closed):** `main` carries the conflict-safe equivalent `25fa70a`, an ancestor of `main` HEAD `1982f40`, which is the revision of Ready production deployment `dpl_GHFD1fh2mZa9DtviAuLphYmjrpM1`. SHC-1 is therefore recorded as `CLOSED — STAGING AND PRODUCTION VERIFIED` in `documentations/TODO.md`, on source-and-deployment-inclusion evidence; no dedicated authenticated production mutation smoke was run against `PUT /api/testimonials/:id`.
 
 ---
 
