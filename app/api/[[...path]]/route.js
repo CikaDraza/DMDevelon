@@ -654,6 +654,19 @@ function cleanString(value, field, max, { required = false } = {}) {
   return cleaned;
 }
 
+// Reject Mongo update/path syntax anywhere in a JSON payload. Explicit field
+// allowlists remain the authorization boundary; this is cheap defence in
+// depth for endpoints whose legacy contract accepts a JSON object.
+function assertNoUnsafeMongoKeys(value, path = "body") {
+  if (!value || typeof value !== "object") return;
+  for (const [key, nested] of Object.entries(value)) {
+    if (key.startsWith("$") || key.includes(".")) {
+      throw apiError(`Unsafe field key at ${path}`);
+    }
+    assertNoUnsafeMongoKeys(nested, `${path}.${key}`);
+  }
+}
+
 function proposalSnapshot(proposal) {
   return {
     kind: proposal.kind || "phase",
@@ -5417,37 +5430,62 @@ export async function PUT(request, context) {
           { status: 401, headers: getCorsHeaders() },
         );
       }
-      // Only admin can change isAdmin status
-      if (body.isAdmin !== undefined && !user.isAdmin) {
-        delete body.isAdmin;
+
+      assertNoUnsafeMongoKeys(body);
+
+      const target = await User.findById(id);
+      if (!target) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404, headers: getCorsHeaders() },
+        );
       }
+
+      // Construct the mutation server-side. Security/session fields and
+      // notification preferences are never copied from this generic profile
+      // payload; preferences already have /api/user/settings.
+      const update = {};
+      for (const field of ["name", "image", "email"]) {
+        if (body[field] === undefined) continue;
+        if (typeof body[field] !== "string") {
+          throw apiError(`${field} must be a string`);
+        }
+        update[field] = body[field];
+      }
+
+      if (body.password !== undefined) {
+        if (typeof body.password !== "string") {
+          throw apiError("password must be a string");
+        }
+        if (!body.password) throw apiError("password is required");
+        update.password = hashPassword(body.password);
+        update.sessionVersion = Number(target.sessionVersion || 0) + 1;
+      }
+
+      if (user.isAdmin && body.isAdmin !== undefined) {
+        if (typeof body.isAdmin !== "boolean") {
+          throw apiError("isAdmin must be a boolean");
+        }
+        update.isAdmin = body.isAdmin;
+      }
+
       // Don't allow changing email while an active project relies on it for
       // ownership matching (keeps client projects from being orphaned).
-      let targetUser = null;
-      if (body.email !== undefined) {
-        const target = await User.findById(id);
-        targetUser = target;
-        if (target && body.email !== target.email) {
-          const activeProjects = await ClientProject.countDocuments({
-            status: { $nin: [...TERMINAL_PROJECT_STATUSES] },
-            $or: [{ clientUserId: id }, { clientEmail: target.email }],
-          });
-          if (activeProjects > 0) {
-            delete body.email;
-          }
+      if (update.email !== undefined && update.email !== target.email) {
+        const activeProjects = await ClientProject.countDocuments({
+          status: { $nin: [...TERMINAL_PROJECT_STATUSES] },
+          $or: [{ clientUserId: id }, { clientEmail: target.email }],
+        });
+        if (activeProjects > 0) {
+          delete update.email;
         }
       }
-      // Hash password if being updated
-      if (body.password) {
-        body.password = hashPassword(body.password);
-        targetUser = targetUser || (await User.findById(id));
-        if (targetUser) {
-          body.sessionVersion = Number(targetUser.sessionVersion || 0) + 1;
-        }
-      }
-      const updatedUser = await User.findByIdAndUpdate(id, body, {
-        new: true,
-      }).select("-password -resetToken -resetTokenExpiry");
+
+      const updatedUser = await User.findByIdAndUpdate(
+        id,
+        { $set: update },
+        { new: true, runValidators: true },
+      ).select("-password -resetToken -resetTokenExpiry");
       if (!updatedUser) {
         return NextResponse.json(
           { error: "User not found" },
