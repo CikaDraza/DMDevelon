@@ -525,21 +525,32 @@ This section is **not** part of DMD-FND-3 and is not gated by it. FND-3 is a rea
 
 Classification rule: an item qualifies only when current source evidence shows an unauthenticated or cross-tenant caller can read or mutate data they do not own, on a branch that is deployed. Abuse, content-integrity, product-policy and hardening findings do **not** qualify and remain FND-4/3I scope.
 
+**Governance exception (binding):** `DMD-FND-3 remains read-only unless audit evidence proves an actively exploitable Critical/High security defect on an active branch. Such a defect may trigger a separately scoped Security Hotfix outside DMD-FND-3; the audit itself remains unchanged.`
+
+The exception is bounded. A hotfix repairs the proven defect and nothing else: no architectural refactor, no new lifecycle, no serializer or central-auth framework, no endpoint extraction from the catch-all. Order is fixed — hotfix, tests, merge/deploy, then a targeted read-only same-pattern sweep whose new findings become further `SHC-*` items or FND-4 inputs, and only then does FND-3 resume.
+
 ### SHC-1 — Unauthenticated arbitrary testimonial mutation
 
 ```text
 SECURITY HOTFIX CANDIDATE
 severity: critical
 source:   FND-3A-R1
-status:   AWAITING OWNER DECISION
+status:   FIX WRITTEN — REGRESSION SUITE NOT YET EXECUTED
+branch:   hotfix/shc-1-testimonial-authz
 ```
+
+**Owner decision (2026-09-12):** fix immediately under the governance exception, then run a targeted read-only same-pattern sweep, then resume FND-3 at 3B. Deferring to FND-4 was explicitly rejected because the defect is live on `main`.
 
 - **Endpoint:** `PUT /api/testimonials/:id`
 - **Evidence:** `app/api/[[...path]]/route.js:5247-5257` on `staging`; byte-identical branch present on `main` at `route.js:5242`.
 - **Behavior:** The authorization gate fires only when `body.adminReply !== undefined`. Every other field is written through `findByIdAndUpdate(id, body)` with no authentication and no ownership check, so an anonymous caller can overwrite `clientName`, `rating`, `comment` and `userId` on any existing testimonial.
 - **Reachability:** `lib/auth.js:35` returns `null` for a missing or invalid bearer token rather than throwing, so the branch is reached without credentials. Catch-all CORS is `Access-Control-Allow-Origin: *`.
 - **Why separated from FND-4:** this is not future architecture hardening. It is an existing authorization defect on the production branch.
-- **Decision required:** whether to fix now on a dedicated branch outside the FND-3 read-only gate, or to accept the exposure until FND-4 with a recorded rationale. Full evidence: `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.
+- **Fix:** `hotfix/shc-1-testimonial-authz` — authenticate, load the record, authorize author-or-admin, whitelist mutable fields. Ownership mirrors the existing DELETE rule for this resource, so no new policy is introduced.
+- **Verification state:** `npx tsc --noEmit` clean, `npm test` 191/191, `npm run build` passes. **`npm run test:api` has NOT been executed** — the local `dmd-test-mongo` replica set requires the Docker daemon, which is not running on this machine and could not be started without a password. The eleven regression assertions in `tests/integration/testimonial-authz.test.mjs` are therefore written but unproven.
+- **Merge gate:** do not merge or deploy until `npm run test:api` runs green.
+- **Recorded consequence:** testimonials created anonymously carry `userId: null` and are not editable by their submitter. The DELETE branch already behaved this way; `app/dashboard/page.js:318` additionally treats an email match as ownership client-side. This divergence is an FND-4 input, not repaired here.
+- Full evidence: `audit-dmd/DMD_FND_3A_PUBLIC_CMS_AUDIT.md` §5.
 
 ### Explicitly not hotfix candidates
 
