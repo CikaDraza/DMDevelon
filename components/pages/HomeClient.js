@@ -237,7 +237,7 @@ const CustomDots = ({ dots, activeIndex, onDotClick }) => (
 
 // Profile picture URL
 const PROFILE_PICTURE =
-  "https://res.cloudinary.com/dufo1t5li/image/upload/v1771869893/profile_picture_nmlgdr.png";
+  "https://res.cloudinary.com/dufo1t5li/image/upload/v1789206966/profile_picture_e1hmoh.png";
 
 // Header Component
 function Header({ user, onLoginClick, onLogout }) {

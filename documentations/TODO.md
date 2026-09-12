@@ -34,6 +34,8 @@ Sekcija 5: kompletan invitations/membership API (7 endpointa), transakcioni acce
 
 Sekcija 6: kompletan Chat API (11 endpointa: liste, detalj, poruke, pin, read/clear, DM, edit/delete). **Uživo test od 49 provera, sve prošlo bez ijedne ispravke** — prva sekcija u ovom projektu gde uživo test nije otkrio nijedan bug, verovatno zahvaljujući disciplini uspostavljenoj u prethodnim sekcijama (array-oblik `.create()` pod transakcijom, eksplicitno odsustvo ključa umesto `undefined`).
 
+**Homepage asset maintenance (2026-09-12):** Animirani profilni balončić u Hero sekciji koristi zaseban, kodom definisan prezentacioni asset i ne čita `CompanyProfile.heroImage`. Njegov Cloudinary URL je zamenjen novom profilnom slikom, bez promene postojeće entrance animacije, dimenzija ili Company Profile ugovora. `npm run typecheck` prolazi.
+
 ---
 
 # NEW BUSINESS MODEL — Foundation & Platform Expansion
